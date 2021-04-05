@@ -149,7 +149,7 @@ void Graph::readGraph(const char * aFilename) {
             // cout << token << endl;
             bool isBounded = (token[0] == 'B') ? true : false;
             // cout << (isBounded ? "yes" : "no") << endl;
-            if (junCoverage <= 0) continue;
+            if (junCoverage <= 0 && junCopy <= 0) continue;
             
             strtok(sourceNode, ":");
             int sourceId = atoi(strtok(NULL, ":"));
@@ -243,8 +243,10 @@ void Graph::calculateHapDepth() {
         }
     }
 
+    // mHaploidDepth = mAvgCoverageRaw / mAvgPloidy;
+    // mHaploidDepthJunc = mAvgCoverageRawJunc / mAvgPloidy;
     mHaploidDepth = mAvgCoverageRaw / mAvgPloidy;
-    mHaploidDepthJunc = mAvgCoverageRawJunc / mAvgPloidy;
+    mHaploidDepthJunc = mHaploidDepth;
     cout << "Average ploidy: " << mAvgPloidy << endl
         << "Haploid depth: " << mHaploidDepth << endl;
     mAvgCoverage = mAvgPloidy * mHaploidDepth;
@@ -555,6 +557,7 @@ void Graph::print() {
     cout << "Avg ploidy: " << mAvgPloidy << endl;
     cout << "Avg coverage: " << mAvgCoverage << endl;
     cout << "Haploid coverage: " << mHaploidDepth << endl;
+    cout << "Haploid junc coverage: " << mHaploidDepthJunc << endl;
     cout << "Source: " << to_string(mSource->getId()) << endl;
     cout << "Sink: " << to_string(mSink->getId()) << endl;
     cout << "Segments: " << mSegments->size() << endl;

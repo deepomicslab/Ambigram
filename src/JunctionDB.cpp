@@ -249,9 +249,11 @@ void JunctionDB::print() {
         for (entry_t * e : *eForward) {
             cout << r->getChrom() << ':' << r->getPos() << (char)(r->getStrand()) << " => " << e->chrom << ':' << e->pos << e->strand << " " << e->support << endl;
         }
+        cout << "forward done" << endl;
         for (entry_t * e : *eBackward) {
             cout << r->getChrom() << ':' << r->getPos() << (char)(r->getStrand()) << " <= " << e->chrom << ':' << e->pos << e->strand << " " << e->support << endl;
         }
+        cout << "backward done" << endl;
     }
 }
 

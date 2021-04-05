@@ -325,35 +325,78 @@ int LocalGenomicMap::balancerILP(const char * lpFn) {
 
         // constrains for in=out=copynum
         vector<int> visitedIdx;
+        vector<int> visitedCount;
+        vector<int>::iterator found;
         CoinPackedVector constrain7;
+        // constrain7.insert(i, 1);
+        // for (Edge * e : *((*segs)[i]->getPositiveVertex()->getEdgesAsTarget())) {
+        //     int juncIndex = mGraph->getJunctionIndexByEdge(e);
+        //     if (find(visitedIdx.begin(), visitedIdx.end(), juncIndex) 
+        //         == visitedIdx.end()) {
+        //         constrain7.insert(segs->size() + juncIndex, -1);
+        //         visitedIdx.push_back(juncIndex);
+        //     }
+        // }
         constrain7.insert(i, 1);
         for (Edge * e : *((*segs)[i]->getPositiveVertex()->getEdgesAsTarget())) {
+            // cout << e->getInfo() << endl;
             int juncIndex = mGraph->getJunctionIndexByEdge(e);
-            if (find(visitedIdx.begin(), visitedIdx.end(), juncIndex) 
-                == visitedIdx.end()) {
-                constrain7.insert(segs->size() + juncIndex, -1);
+            found = find(visitedIdx.begin(), visitedIdx.end(), juncIndex);
+            if (found == visitedIdx.end()) {
+                // constrain7.insert(segs->size() + juncIndex, -1);
                 visitedIdx.push_back(juncIndex);
+                visitedCount.push_back(1);
+            } else {
+                if (e->getTarget() != e->getSource()) {
+                    visitedCount[found - visitedIdx.begin()]++;
+                }
             }
         }
+        for (int j = 0; j < visitedIdx.size(); j++) {
+            cout << visitedIdx[j] << ":" << visitedCount[j] << " ";
+            constrain7.insert(segs->size() + visitedIdx[j], -visitedCount[j]);
+        }
+        cout << endl;
         constrainLowerBound[4 * i + 2] = 0;
         constrainUpperBound[4 * i + 2] = 0;
         matrix->appendRow(constrain7);
         visitedIdx.clear();
+        visitedCount.clear();
 
         CoinPackedVector constrain8;
+        // constrain8.insert(i, 1);
+        // for (Edge * e : *((*segs)[i]->getPositiveVertex()->getEdgesAsSource())) {
+        //     int juncIndex = mGraph->getJunctionIndexByEdge(e);
+        //     if (find(visitedIdx.begin(), visitedIdx.end(), juncIndex) 
+        //         == visitedIdx.end()) {
+        //         constrain8.insert(segs->size() + juncIndex, -1);
+        //         visitedIdx.push_back(juncIndex);
+        //     }
+        // }
         constrain8.insert(i, 1);
         for (Edge * e : *((*segs)[i]->getPositiveVertex()->getEdgesAsSource())) {
             int juncIndex = mGraph->getJunctionIndexByEdge(e);
-            if (find(visitedIdx.begin(), visitedIdx.end(), juncIndex) 
-                == visitedIdx.end()) {
-                constrain8.insert(segs->size() + juncIndex, -1);
+            found = find(visitedIdx.begin(), visitedIdx.end(), juncIndex);
+            if (found == visitedIdx.end()) {
+                // constrain8.insert(segs->size() + juncIndex, -1);
                 visitedIdx.push_back(juncIndex);
+                visitedCount.push_back(1);
+            } else {
+                if (e->getTarget() != e->getSource()) {
+                    visitedCount[found - visitedIdx.begin()]++;
+                }
             }
         }
+        for (int j = 0; j < visitedIdx.size(); j++) {
+            cout << visitedIdx[j] << ":" << visitedCount[j] << " ";
+            constrain8.insert(segs->size() + visitedIdx[j], -visitedCount[j]);
+        }
+        cout << endl;
         constrainLowerBound[4 * i + 3] = 0;
         constrainUpperBound[4 * i + 3] = 0;
         matrix->appendRow(constrain8);
         visitedIdx.clear();
+        visitedCount.clear();
     }
     cout << "Segment done" << endl;
 
@@ -372,7 +415,7 @@ int LocalGenomicMap::balancerILP(const char * lpFn) {
             // max_cov = (*juncs)[i]->getWeight()->getCopyNum();
             min_cov = (*juncs)[i]->getWeight()->getCoverage();
         }
-        // t_i - c_ix_i + e_i_1 >= c_i
+        // t_i - c_ix_i + e_i_1 >= 0
         // double copy = (*juncs)[i]->getWeight()->getCopyNum() + 0.01;
         double cov = (*juncs)[i]->getWeight()->getCoverage() + 0.05;
         CoinPackedVector constrain1;
@@ -388,7 +431,7 @@ int LocalGenomicMap::balancerILP(const char * lpFn) {
         constrainUpperBound[4 * segs->size() + 4 * i] = si->getInfinity();
         matrix->appendRow(constrain1);
 
-        // t_i + c_ix_i - e_i_1 <= 0
+        // t_i - c_ix_i - e_i_1 <= 0
         CoinPackedVector constrain2;
         // constrain2.insert(segs->size() + i, 1);
         // constrain2.insert(numSegsJuncs + i, -copy);
@@ -482,6 +525,8 @@ int LocalGenomicMap::balancerILP(const char * lpFn) {
     // TODO
     vector<double> coefs = scaleILPCoef(covs);
     double max_coef = *max_element(coefs.begin(), coefs.end());
+    double min_coef = *min_element(coefs.begin(), coefs.end());
+    min_coef = (min_coef > 0) ? min_coef : 0.1;
     max_cov += 1000;
     for (int i = 0; i < numVariables; i++) {
         if (i >= numSegsJuncs) {
@@ -512,8 +557,8 @@ int LocalGenomicMap::balancerILP(const char * lpFn) {
                     // objective[i] = (*juncs)[i - numSegsJuncs - juncs->size() - segs->size()]->getWeight()->getCoverage();
                     // objective[i] = (*juncs)[i - numSegsJuncs - juncs->size() - segs->size()]->getWeight()->getCopyNum();
                     // ]->getWeight()->getCoverage();
-                    // objective[i] = 1;
-                    objective[i] = coefs[i - numSegsJuncs - juncs->size()];
+                    objective[i] = min_coef;
+                    // objective[i] = coefs[i - numSegsJuncs - juncs->size() - segs->size()];
                 }
                 // objective[i] = 1 * cred;
                 // objective[i] = 1;
@@ -676,7 +721,7 @@ void LocalGenomicMap::addAllJuncsFromDB(JunctionDB *aJuncDB) {
         for (entry_t *ent: *(rec->getForwardEntries())) {
             // if (ent->support < 2) continue;
             Vertex *currentVertex;
-            cout << "Rec: " << rec->getChrom() << " " << rec->getPos()
+            cout << "Rec forward: " << rec->getChrom() << " " << rec->getPos()
                  << rec->getStrand() << endl;
             try {
                 if (rec->getStrand() == '+') {
@@ -695,7 +740,7 @@ void LocalGenomicMap::addAllJuncsFromDB(JunctionDB *aJuncDB) {
                 continue;
             }
             Vertex *nextVertex;
-            cout << "Ent: " << ent->chrom << " " << ent->pos << endl;
+            cout << "Ent forward: " << ent->chrom << " " << ent->pos << endl;
             try {
                 if (ent->strand == '+') {
                     nextVertex = mGraph->getSegmentByChromStart(
@@ -734,7 +779,7 @@ void LocalGenomicMap::addAllJuncsFromDB(JunctionDB *aJuncDB) {
         for (entry_t *ent: *(rec->getBackwardEntries())) {
             // if (ent->support < 2) continue;
             Vertex *currentVertex;
-            cout << "Rec: " << rec->getChrom() << " " << rec->getPos()
+            cout << "Rec backward: " << rec->getChrom() << " " << rec->getPos()
                  << rec->getStrand() << endl;
             try {
                 if (rec->getStrand() == '+') {
@@ -753,7 +798,7 @@ void LocalGenomicMap::addAllJuncsFromDB(JunctionDB *aJuncDB) {
                 continue;
             }
             Vertex *prevVertex;
-            cout << "Ent: " << ent->chrom << " " << ent->pos << endl;
+            cout << "Ent backward: " << ent->chrom << " " << ent->pos << endl;
             try {
                 if (ent->strand == '+') {
                     prevVertex = mGraph->getSegmentByChromEnd(
@@ -2200,10 +2245,28 @@ void LocalGenomicMap::traverse(Vertex * aStartVertex, JunctionDB * aJuncDB) {
 
     Edge * nextEdge = this->traverseNextEdge(currentVertex, aJuncDB);
     while (nextEdge != NULL) {
+        if (currentVertex->getId() == 24) {
+            cout << mGraph->getSegmentById(24)->getWeight()->getCopyNum() << endl;
+        }
         currentVertex->traverse();
-        nextEdge->traverse();
+        // if (nextEdge->getSource()->getSegment() == nextEdge->getTarget()->getSegment()) {
+        //     nextEdge->traverse();
+        //     nextEdge->traverse();
+        // } else {
+            nextEdge->traverse();
+        // }
         ep->push_back(nextEdge);
         vp->push_back(nextEdge->getTarget());
+        // if (currentVertex->getId() == 24) {
+        //     int vcount = 0;
+        //     for (VertexPath::iterator it = vp->begin(); it < vp->end() - 1; it++) {
+        //         if ((*it)->getId() == 24) {
+        //             vcount++;
+        //         }
+        //     }
+        //     this->print(*vp);
+        //     cout << "\033[1;31m" << vcount << "\033[0m " << mGraph->getSegmentById(24)->getWeight()->getCopyNum() << endl;
+        // }
 
         currentVertex = nextEdge->getTarget();
         nextEdge = this->traverseNextEdge(currentVertex, aJuncDB);
@@ -2346,41 +2409,95 @@ void LocalGenomicMap::generateHaploids() {
     this->sortCircuits();
     srand(time(NULL));
 
+    vector<bool> is_inserted(mCircuits->size(), false);
+    is_inserted[0] = true;
     VertexPath *mainPath = (*mCircuits)[0];
-    for (int i = 1; i < mCircuits->size(); i++) {
-        deque<Vertex *> vq = deque<Vertex *>((*mCircuits)[i]->begin(), (*mCircuits)[i]->end() - 1);
-        bool isInserted = false;
-        for (int j = 0; j <= vq.size(); j++) {
-            Vertex * startV = vq.front();
+    int i = 1;
+    VertexPath * current_circuit = new VertexPath();
+    VertexPath * comp_circuit;
+    bool is_comp = false;
+    bool all_inserted = false;
+    while (!all_inserted) {
+        while (i < mCircuits->size()) {
+            if (is_inserted[i]) {
+                i++;
+                continue;
+            }
+        // for (int i = 1; i < mCircuits->size(); i++) {
+            if (!is_comp) {
+                current_circuit->assign(mCircuits->at(i)->begin(), mCircuits->at(i)->end());
+            } else {
+                comp_circuit = this->get_complement(mCircuits->at(i));
+                current_circuit->assign(comp_circuit->begin(), comp_circuit->end());
+                // comp_circuit->clear();
+            }
+            deque<Vertex *> vq = deque<Vertex *>(current_circuit->begin(), current_circuit->end() - 1);
+            bool isInserted = false;
             VertexPath::iterator cItr;
             VertexPath::iterator foundItr;
-            // while (!isInserted) {
-            cItr = mainPath->begin();
-            // cout << "i=" << i << ": " << startV->getInfo() << " " << (*cItr)->getInfo() << endl;
-            while (cItr != mainPath->end() && cItr - 1 != mainPath->end()) {
-                foundItr = find(cItr, mainPath->end(), startV);
-                if (foundItr != mainPath->end()) {
-                // if (rand() * 1.0 / RAND_MAX < 0.5 && foundItr != mainPath->end()) {
-                    cout << "Insert at " << (*foundItr)->getInfo() << endl;
-                    isInserted = true;
-                    break;
+            for (int j = 0; j <= vq.size(); j++) {
+                Vertex * startV = vq.front();
+                // while (!isInserted) {
+                cItr = mainPath->begin();
+                // cout << "i=" << i << ": " << startV->getInfo() << " " << (*cItr)->getInfo() << endl;
+                while (cItr != mainPath->end() && cItr - 1 != mainPath->end()) {
+                    foundItr = find(cItr, mainPath->end(), startV);
+                    if (foundItr != mainPath->end()) {
+                    // if (rand() * 1.0 / RAND_MAX < 0.5 && foundItr != mainPath->end()) {
+                        cout << "Insert at " << (*foundItr)->getInfo() << endl;
+                        isInserted = true;
+                        break;
+                    }
+                    cItr = foundItr + 1;
                 }
-                cItr = foundItr + 1;
+                // }
+                if (isInserted) {
+                    // mainPath->insert(foundItr, vq.begin(), vq.end());
+                    // int count = 0;
+                    // for (Vertex * v: *mainPath) {
+                    //     if (v->getId() == 24) {
+                    //         count++;
+                    //     }
+                    // }
+                    // this->print(*mainPath);
+                    // cout << count << endl;
+                    break;
+                    // mainPath->insert(foundItr + 1, (*mCircuits)[i]->begin() + 1, (*mCircuits)[i]->end());
+                // } else {
+                //     mHaploids->push_back((*mCircuits)[i]);
+                }
+                vq.pop_front();
+                vq.push_back(startV);
             }
-            // }
             if (isInserted) {
                 mainPath->insert(foundItr, vq.begin(), vq.end());
-                break;
-                // mainPath->insert(foundItr + 1, (*mCircuits)[i]->begin() + 1, (*mCircuits)[i]->end());
-            // } else {
-            //     mHaploids->push_back((*mCircuits)[i]);
+                is_inserted[i] = true;
+                i++;
+                is_comp = false;
+            } else {
+                if (is_comp) {
+                    i++;
+                    is_comp = false;
+                } else {
+                    is_comp = true;
+                }
+                // cout << "NOT INSERTED: " << endl;
+                // this->print(*(*mCircuits)[i]);
             }
-            vq.pop_front();
-            vq.push_back(startV);
+        }
+        all_inserted = true;
+        for (i = 0; i < is_inserted.size(); i++) {
+            if (!is_inserted[i]) {
+                this->print(*mainPath);
+                this->print(*mCircuits->at(i));
+                all_inserted = false;
+                break;
+            }
         }
     }
     mHaploids->push_back(mainPath);
     cout << "Mainpath done" << endl;
+    cout << mHaploids->size() << endl;
 
     for (Vertex * v: *mainPath) {
         cout << v->getInfo() << " ";

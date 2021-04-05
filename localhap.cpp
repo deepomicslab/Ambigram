@@ -19,6 +19,7 @@ int main(int argc, char * argv[]) {
         try {
             JunctionDB * db_sample = new JunctionDB(juncdbFn_sample);
             db_sample->sortRecordEntry();
+            db_sample->print();
 
             Graph * g = new Graph(lhRawFn); 
             g->calculateHapDepth();
@@ -88,7 +89,7 @@ int main(int argc, char * argv[]) {
         const char * circuitsFn = argv[4];
         const char * hapFn = argv[5];
         bool verbose = (strcmp(argv[6], "--verbose") == 0) ? true : false;
-//         const char * longFragFn = argv[7];
+        // const char * longFragFn = argv[7];
         try {
             JunctionDB * db = new JunctionDB(juncdbFn);
             db->sortRecordEntry();
@@ -106,13 +107,13 @@ int main(int argc, char * argv[]) {
 
             LocalGenomicMap * lgm = new LocalGenomicMap(g);
             
-//             lgm->read_long_frags(longFragFn);
-//             for (VertexPath *frag : *(lgm->get_long_frags())) {
-//                 for (Vertex * v: *frag) {
-//                     cout << v->getInfo() << " ";
-//                 }
-//                 cout << endl;
-//             }
+            // lgm->read_long_frags(longFragFn);
+            // for (VertexPath *frag : *(lgm->get_long_frags())) {
+            //     for (Vertex * v: *frag) {
+            //         cout << v->getInfo() << " ";
+            //     }
+            //     cout << endl;
+            // }
             // return 0;
             // TODO some problems on checking reachability
             // especially with inversion
@@ -159,7 +160,7 @@ int main(int argc, char * argv[]) {
 
             lgm->writeCircuits(circuitsFn);
 
-            // cout << "Generating haploids..." << endl;
+            cout << "Generating haploids..." << endl;
             g->print();
             lgm->generateHaploids();
             // // cout << "Estimated haploids: " << endl;
