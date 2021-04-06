@@ -2236,6 +2236,9 @@ Edge * LocalGenomicMap::traverseNextEdge(Vertex * aStartVertex, JunctionDB * aJu
     return selectedEdge;
 }
 
+void LocalGenomicMap::traverseWithLongFrag(Vertex * startVertex, JunctionDB * aJuncDB) {
+
+}
 void LocalGenomicMap::traverse(Vertex * aStartVertex, JunctionDB * aJuncDB) {
     VertexPath *vp = new VertexPath();
     EdgePath *ep = new EdgePath();

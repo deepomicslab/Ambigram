@@ -71,6 +71,8 @@ class LocalGenomicMap {
         void checkInferredJunctionCredibility();
         void clearSegmentJunctionCredibility(Segment * aSegment);
 
+//        traverse with long fragment
+        void traverseWithLongFrag(Vertex * startVertex, JunctionDB * aJuncDB);
 
         int findCircuit(Vertex * aVertex, VertexPath & pathVertices, EdgePath & pathEdges);
         void traverse(Vertex * startVertex, JunctionDB * aJuncDB);
