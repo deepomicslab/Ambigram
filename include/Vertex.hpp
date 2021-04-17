@@ -35,13 +35,17 @@ class Vertex {
         // constructor and destructor
         Vertex(int aId, char aDir, Weight * aWeight, double aCredibility);
         ~Vertex();
-
-       // getter and setter
+    // getter and setter
        int getId();
        int getStart();
        int getEnd();
        char getDir();
        string getInfo();
+
+    inline bool operator == (const Vertex &other) const {
+        if (mId == other.mId && mDir == other.mDir) return true;
+        return false;
+    };
        
        double getInCoverage();
        double getOutCoverage();

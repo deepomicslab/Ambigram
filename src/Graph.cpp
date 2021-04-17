@@ -98,7 +98,7 @@ void Graph::readGraph(const char * aFilename) {
         if (token == NULL) {
             continue;
         }
-        if (strcmp(token, "SAMPLE") == 0) {
+        if (strcmp(token, "SAMPLE_NAME") == 0) {
             mSampleName = string(strtok(NULL, " "));
         } else if (strcmp(token, "AVG_SEG_DP") == 0) {
             mAvgCoverage = atof(strtok(NULL, " "));

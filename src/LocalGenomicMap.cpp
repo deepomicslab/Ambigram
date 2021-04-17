@@ -2236,16 +2236,16 @@ Edge * LocalGenomicMap::traverseNextEdge(Vertex * aStartVertex, JunctionDB * aJu
     return selectedEdge;
 }
 
-void LocalGenomicMap::traverseWithLongFrag(Vertex * startVertex, JunctionDB * aJuncDB) {
-
-}
 void LocalGenomicMap::traverse(Vertex * aStartVertex, JunctionDB * aJuncDB) {
     VertexPath *vp = new VertexPath();
     EdgePath *ep = new EdgePath();
-
-    Vertex * currentVertex = aStartVertex;
+    Vertex * currentVertex;
+    if (mLongFrags == nullptr) {
+        currentVertex = aStartVertex;
+    } else {
+        currentVertex = traverseLongPath(aStartVertex, vp);
+    }
     vp->push_back(currentVertex);
-
     Edge * nextEdge = this->traverseNextEdge(currentVertex, aJuncDB);
     while (nextEdge != NULL) {
         if (currentVertex->getId() == 24) {
@@ -2296,6 +2296,55 @@ void LocalGenomicMap::traverseGraph(JunctionDB * aJuncDB) {
         this->traverse(currentVertex, aJuncDB);
         // mGraph->print();
     }
+}
+Vertex * LocalGenomicMap::traverseLongPath(Vertex *aStartVertex, VertexPath* vPath) {
+    int pathN = -1;
+    int maxL = 0;
+    int i = 0;
+    for(auto path: *this->mLongFrags) {
+        if (path[0][0] == aStartVertex) {
+            int l = longPathLenInGraph(path);
+            if (l > maxL) {
+                maxL = l;
+                pathN = i;
+            }
+        }
+        i++;
+    }
+    i = 0;
+    if (maxL <= 0) {
+        return aStartVertex;
+    }
+//    auto m = this->mLongFrags[pathN][0];
+    for (i = 0; i < maxL - 1; i++) {
+        auto v = (*((*this->mLongFrags)[pathN]))[i];
+        vPath->push_back(v);
+        v->traverse();
+        auto vNext = (*((*this->mLongFrags)[pathN]))[i+1];
+        for(Edge* e: *(v->getEdgesAsSource())) {
+            if (e->getTarget() == vNext) {
+                e->traverse();
+                break;
+            }
+        }
+    }
+    return (*(this->mLongFrags)[0][pathN])[maxL-1];
+}
+
+int LocalGenomicMap::longPathLenInGraph(VertexPath *longPath) {
+    int n = 1;
+    for (auto v = longPath->begin(); v != longPath->end()-1;v++) {
+        bool flag = false;
+//        auto t = *(v+1);
+        for (Edge * e : *(*v)->getEdgesAsSource()) {
+            if (e->getTarget() == *(v+1)) {
+                flag = true;
+                break;
+            }
+        }
+        if(flag) n++;
+    }
+    return n;
 }
 
 // void LocalGenomicMap::traverseGraph() {

@@ -26,7 +26,7 @@ class LocalGenomicMap {
         vector<VertexPath *> * mCircuits;
         vector<VertexPath *> * mHaploids;
 
-        vector<VertexPath *> *mLongFrags;
+        vector<VertexPath *> * mLongFrags;
 
     public:
         LocalGenomicMap(Graph * aGraph);
@@ -71,13 +71,14 @@ class LocalGenomicMap {
         void checkInferredJunctionCredibility();
         void clearSegmentJunctionCredibility(Segment * aSegment);
 
-//        traverse with long fragment
-        void traverseWithLongFrag(Vertex * startVertex, JunctionDB * aJuncDB);
-
         int findCircuit(Vertex * aVertex, VertexPath & pathVertices, EdgePath & pathEdges);
         void traverse(Vertex * startVertex, JunctionDB * aJuncDB);
         Edge * traverseNextEdge(Vertex * aStartVertex, JunctionDB * aJuncDB);
         void traverseGraph(JunctionDB * aJuncDB);            // traverse all junctions and segments first
+//        Traverse long path first
+        Vertex * traverseLongPath(Vertex * aStartVertex, VertexPath* vPath);
+//        find if long path in current graph (count path)
+        int longPathLenInGraph(VertexPath* longPath);
         void isCircuitSimple(VertexPath * circuit, pair<int, int> & notSimpleIdx);
         void allCircuitsSimple(vector< tuple<int, int, int> > & notSimpleIdx);
         void extractCircuits();          // after traversing the whole graph, extract circuits from found paths
