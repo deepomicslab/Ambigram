@@ -139,12 +139,12 @@ def read_sv(file_name):
                           names=['chrom_5p', 'pos_5p', 'strand_5p',
                                  'chrom_3p', 'pos_3p', 'strand_3p',
                                  'inner_ins', 'span_reads', 'junc_reads',
-                                 'id', 'qual', 'filter', 'meta_info', 'anno_info'])
+                                 'id', 'qual', 'filter','group', 'meta_info', 'gene_5p', 'gene_3p'])
 
 
 def get_precise_sv(sv_df, chrom_5p=None, start_5p=None, end_5p=None,
                    chrom_3p=None, start_3p=None, end_3p=None,
-                   drop_imprecise=True, drop_insertions=True,
+                   drop_imprecise=False, drop_insertions=False,
                    support_thres=5):
     # depth_tabix = pysam.TabixFile(depth_filename)
     # avg_depth = get_avg_depth(depth_tabix, chrom, start, end)
@@ -155,6 +155,7 @@ def get_precise_sv(sv_df, chrom_5p=None, start_5p=None, end_5p=None,
     #                              'id', 'qual', 'filter', 'meta_info', 'anno_info'])
     # print(next(sv_df.itertuples()).chrom_5p, chrom)
     res_df = sv_df
+
     if chrom_5p:
         res_df = res_df.loc[lambda row: row.chrom_5p == chrom_5p]
         if start_5p:
@@ -168,8 +169,7 @@ def get_precise_sv(sv_df, chrom_5p=None, start_5p=None, end_5p=None,
             res_df = res_df.loc[lambda row: row.pos_3p >= start_3p]
         if end_3p:
             res_df = res_df.loc[lambda row: row.pos_3p <= end_3p]
-
-    res_df = res_df.loc[lambda row: row.junc_reads >= support_thres]
+    # res_df = res_df.loc[lambda row: row.junc_reads >= support_thres]
     if drop_imprecise:
         res_df = res_df.loc[lambda row: ~row.meta_info.str.contains('IMPRECISE')]
     if drop_insertions:

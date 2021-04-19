@@ -29,6 +29,7 @@ def map_bps_chrom_infos(chrom_infos, bps_map):
 def map_bps_sv(sv, bps_map):
     for i in sv.index:
         # print(bps_map.loc[lambda df: df.before == sv.loc[i, 'pos_5p']].after)
+        t=bps_map.loc[lambda df: df.chrom == sv.loc[i, 'chrom_5p']].loc[lambda df: df.before == sv.loc[i, 'pos_5p']]
         sv.at[i, 'pos_5p'] = bps_map.loc[lambda df: df.chrom == sv.loc[i, 'chrom_5p']]\
                                     .loc[lambda df: df.before == sv.loc[i, 'pos_5p']]\
                                     .iloc[0].after
@@ -37,7 +38,8 @@ def map_bps_sv(sv, bps_map):
                                     .iloc[0].after
 
 def dedup(sv):
-    sv = sv.sort_values(by=sv.columns[:6].tolist() + ['junc_reads'])
+    # sv = sv.sort_values(by=sv.columns[:6].tolist() + ['junc_reads'])
+    sv = sv.sort_values(by=sv.columns[:-1].tolist())
     return sv[~sv.duplicated(sv.columns[:6], keep='last')]
 
 def segmentation(sv, chrom, start, end, id_start=1, drop_imprecise=True, drop_insertions=True):
@@ -58,7 +60,7 @@ def segmentation(sv, chrom, start, end, id_start=1, drop_imprecise=True, drop_in
 def update_junc_db_by_sv(sv, junc_db):
     # avg_depth = get_avg_depth(depth_tabix, chrom, start, end)
     for row in sv.itertuples():
-        if row.inner_ins != '.':
+        if False and row.inner_ins != '.':
             continue
         idx1 = junc_db.loc[lambda r: r.chrom_5p == row.chrom_5p]\
                       .loc[lambda r: r.pos_5p == row.pos_5p]\
@@ -75,7 +77,7 @@ def update_junc_db_by_sv(sv, junc_db):
             #                           'pos_3p': row.pos_3p,
             #                           'strand_3p': row.strand_3p,
             #                           'count': row.junc_reads / avg_depth}, ignore_index=True)
-            if row.junc_reads > 5:
+            if True or row.junc_reads > 3:
                 junc_db = junc_db.append({'chrom_5p': row.chrom_5p,
                                           'pos_5p': row.pos_5p,
                                           'strand_5p': row.strand_5p,
@@ -136,7 +138,7 @@ def update_junc_db_by_seg_in_chrom(segs, junc_db, bam, ext):
             #                           'strand_3p': '+',
             #                           'count': get_normal_junc_read_num(bam, row.chrom, row.end, ext=ext) / avg_depth}, ignore_index=True)
 
-            if get_normal_junc_read_num(bam, row.chrom, row.end, ext=ext) > 5:
+            if get_normal_junc_read_num(bam, row.chrom, row.end, ext=ext) > 3:
                 junc_db = junc_db.append({'chrom_5p': row.chrom,
                                           'pos_5p': row.end,
                                           'strand_5p': '+',
@@ -207,7 +209,8 @@ def generate_config(filename, samplename, sv, segs, depth_tabix, bam, ext, ploid
         left = next(segs.itertuples())
         for right in segs.iloc[1:].itertuples():
             support = get_normal_junc_read_num(bam, left.chrom, left.end, ext=ext)
-            if support > 5:
+            if support > 1:
+                # pass
                 juncs_depth.append(support)
                 output_juncs.append(f'JUNC H:{left.ID}:+ H:{right.ID}:+ {support} -1 U B')
                 # fout.write(f'JUNC H:{left.ID}:+ H:{right.ID}:+ {support} -1 U B\n')
@@ -240,10 +243,12 @@ def generate_config(filename, samplename, sv, segs, depth_tabix, bam, ext, ploid
                     right = segs.loc[lambda r: r.chrom == row.chrom_3p]\
                                .loc[lambda r: r.start == row.pos_3p]
             # print(f'JUNC H:{left.ID.values[0]}:{row.strand_5p} H:{right.ID.values[0]}:{row.strand_3p} {row.junc_reads} -1 U B')
-            juncs_depth.append(row.junc_reads)
+            # juncs_depth.append(row.junc_reads)
+            juncs_depth.append((row.left_read + row.right_read)/2)
 
-            if row.inner_ins == '.':
-                output_juncs.append(f'JUNC H:{left.ID.values[0]}:{row.strand_5p} H:{right.ID.values[0]}:{row.strand_3p} {row.junc_reads} -1 U B')
+            # print(row.inner_ins)
+            if True or row.inner_ins == '.':
+                output_juncs.append(f'JUNC H:{left.ID.values[0]}:{row.strand_5p} H:{right.ID.values[0]}:{row.strand_3p} {(row.left_read + row.right_read)/2} -1 U B')
             else:
                 ins_segs.append((ins_id, f'Ins_{ins_id}', 1, len(row.inner_ins), row.inner_ins))
                 output_segs.append(f'SEG H:{ins_id}:Ins_{ins_id}:1:{len(row.inner_ins)} 1 -1')
@@ -273,4 +278,4 @@ def generate_config(filename, samplename, sv, segs, depth_tabix, bam, ext, ploid
         fout.write('\n'.join(output_segs + output_juncs) + '\n')
 
     if len(ins_segs) > 0:
-        pd.DataFrame(ins_segs, columns=['ID', 'chrom', 'start', 'end', 'seq']).to_csv(os.path.dirname(filename) + '/' + samplename + '.inner_ins', index=False, sep='\t')
+        pd.DataFrame(ins_segs, columns=['ID', 'chrom', 'start', 'end', 'seq']).to_csv(os.path.dirname(filename) + './' + samplename + '.inner_ins', index=False, sep='\t')

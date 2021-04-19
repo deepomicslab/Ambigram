@@ -95,12 +95,12 @@ class MainArgParser:
         parser.add_argument('-i', '--keep-imprecise',
                             dest='keep_imprecise',
                             action='store_true',
-                            default=False,
+                            default=True,
                             help='Keep imprecise SV')
         parser.add_argument('-I', '--keep-insertions',
                             dest='keep_insertions',
                             action='store_true',
-                            default=False,
+                            default=True,
                             help='Keep insertions')
         parser.add_argument('-o', '--out-bps-map',
                             dest='bps_map_out',
@@ -118,8 +118,16 @@ class MainArgParser:
                                     )
         else:
             chrom_junc = None
-        sv_df = bpsmap.concat_sv(args.sv_list)
-        chrom_infos = pd.read_csv(args.chrom_info, sep='\t')
+        seek_sv = False
+        if seek_sv:
+            sv_df = pd.read_table(args.sv_list, skiprows=1, header=None,
+                                  usecols=[0, 1, 2, 3, 4, 5, 6, 7],
+                                  names=['chrom_5p', 'pos_5p', 'strand_5p', 'left_read',
+                                         'chrom_3p', 'pos_3p', 'strand_3p', 'right_read'])
+            # sv_df = pd.read_csv(args.sv_list)
+        else:
+            sv_df = bpsmap.concat_sv(args.sv_list)
+        chrom_infos = pd.read_csv(args.chrom_info,dtype={'end':np.int64}, sep='\t')
         # print(chrom_junc.head())
         # print(sv_df.head())
         # print(chrom_infos.head())
@@ -134,7 +142,10 @@ class MainArgParser:
                     list(chrom_junc.chrom_3p.unique()) +
                     chroms))
             else:
-                chroms = sorted(set(chroms))
+                # print(chroms)
+                print(list(sv_df.columns))
+
+            chroms = sorted(set(chroms))
             bps_map = []
             for chrom in chroms:
                 sv_5p = bpsmap.get_precise_sv(sv_df, chrom_5p=chrom, drop_imprecise=not args.keep_imprecise, drop_insertions=not args.keep_insertions)
@@ -177,10 +188,12 @@ class MainArgParser:
                             dest='bam_file',
                             required=True,
                             help='Individual BAM file')
-        # parser.add_argument('-S', '--seeksv',
-        #                     dest='is_seeksv',
-        #                     action='store_true',
-        #                     help='Whether seeksv results')
+        parser.add_argument('-S', '--seeksv',
+                            dest='is_seeksv',
+                            required=False,
+                            default=False,
+                            action='store_true',
+                            help='Whether seeksv results')
         parser.add_argument('-m', '--bps-map',
                             dest='bps_map',
                             required=True,
@@ -230,12 +243,12 @@ class MainArgParser:
         parser.add_argument('-i', '--keep-imprecise',
                             dest='keep_imprecise',
                             action='store_true',
-                            default=False,
+                            default=True,
                             help='Keep imprecise SV')
         parser.add_argument('-I', '--keep-insertions',
                             dest='keep_insertions',
                             action='store_true',
-                            default=False,
+                            default=True,
                             help='Keep insertions')
         args = parser.parse_args(sys.argv[2:])
 
@@ -244,14 +257,17 @@ class MainArgParser:
         bps_map = pd.read_csv(args.bps_map, sep='\t')
         chrom_infos = pd.read_csv(args.chrom_info, sep='\t')
         print('Reading SV')
-        # if not args.is_seeksv:
-        sv = bpsmap.read_sv(args.sv_file)
-        # sv = bpsmap.get_precise_sv_svaba(sv, chrom, start, end)
+        if not args.is_seeksv:
+            sv = bpsmap.read_sv(args.sv_file)
+            sv = bpsmap.get_precise_sv(sv, drop_imprecise=not args.keep_imprecise, drop_insertions=not args.keep_insertions)
+    # sv = bpsmap.get_precise_sv_svaba(sv, chrom, start, end)
         # n, nc, sv = bpsmap.merge_sv_tgs2sgs(sv, sv, 10)
-        # else:
-        #     sv = bpsmap.get_precise_sv_seeksv(args.sv_file, chrom, start, end)
-        sv = bpsmap.get_precise_sv(sv, drop_imprecise=not args.keep_imprecise, drop_insertions=not args.keep_insertions)
-        config.map_bps_sv(sv, bps_map)
+        else:
+            sv = pd.read_table(args.sv_file, skiprows=1, header=None,
+                                  usecols=[0, 1, 2, 3, 4, 5, 6, 7],
+                                  names=['chrom_5p', 'pos_5p', 'strand_5p', 'left_read',
+                                         'chrom_3p', 'pos_3p', 'strand_3p', 'right_read'])
+        # config.map_bps_sv(sv, bps_map)
         config.map_bps_chrom_infos(chrom_infos, bps_map)
         sv = config.dedup(sv)
 

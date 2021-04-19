@@ -81,7 +81,7 @@ class LocalGenomicMap {
         void traverseGraph(JunctionDB * aJuncDB);            // traverse all junctions and segments first
 //        Traverse long path first
         Vertex * traverseLongPath(Vertex * aStartVertex, VertexPath* vPath);
-//        find if long path in current graph (count path)
+//        find if long path in current graph (return how far the path can be traversed in current graph)
         int longPathLenInGraph(VertexPath* longPath);
         void isCircuitSimple(VertexPath * circuit, pair<int, int> & notSimpleIdx);
         void allCircuitsSimple(vector< tuple<int, int, int> > & notSimpleIdx);
