@@ -109,6 +109,7 @@ int main(int argc, char * argv[]) {
 //
              if(longFragFn != nullptr) {
                  lgm->read_long_frags(longFragFn);
+                 lgm->setUsingLong(true);
                  for (VertexPath *frag : *(lgm->get_long_frags())) {
                      for (Vertex * v: *frag) {
                          cout << v->getInfo() << " ";
