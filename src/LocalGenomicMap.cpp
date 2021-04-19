@@ -20,12 +20,16 @@ LocalGenomicMap::LocalGenomicMap(Graph * aGraph) {
 
     mCircuits = new vector< VertexPath *>();
     mHaploids = new vector< VertexPath *>();
+    usingLong = false;
 }
 
 LocalGenomicMap::~LocalGenomicMap() {;}
 
 Graph * LocalGenomicMap::getGraph() { return mGraph; }
 void LocalGenomicMap::setGraph(Graph * aGraph) { mGraph = aGraph; }
+
+bool LocalGenomicMap::isUsingLong() { return usingLong; }
+void LocalGenomicMap::setUsingLong(bool v) {usingLong = v;}
 
 vector<VertexPath *> *LocalGenomicMap::get_long_frags() {
     return mLongFrags;
@@ -2240,7 +2244,7 @@ void LocalGenomicMap::traverse(Vertex * aStartVertex, JunctionDB * aJuncDB) {
     VertexPath *vp = new VertexPath();
     EdgePath *ep = new EdgePath();
     Vertex * currentVertex;
-    if (mLongFrags == nullptr) {
+    if (!usingLong) {
         currentVertex = aStartVertex;
     } else {
         currentVertex = traverseLongPath(aStartVertex, vp);

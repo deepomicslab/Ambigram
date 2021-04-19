@@ -115,7 +115,7 @@ int main(int argc, char * argv[]) {
                      }
                      cout << endl;
                  }
-             }
+             } else lgm->setUsingLong(false);
 //             return 0;
             // TODO some problems on checking reachability
             // especially with inversion

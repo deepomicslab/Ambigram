@@ -28,6 +28,8 @@ class LocalGenomicMap {
 
         vector<VertexPath *> * mLongFrags;
 
+        bool usingLong;
+
     public:
         LocalGenomicMap(Graph * aGraph);
         ~LocalGenomicMap();
@@ -35,6 +37,8 @@ class LocalGenomicMap {
         /* getter and setter */
         Graph * getGraph();
         void setGraph(Graph * aGraph);
+        bool isUsingLong();
+        void setUsingLong(bool v);
         
         /* Long fragments for TGS */
         vector<VertexPath *> *get_long_frags();
