@@ -2305,6 +2305,7 @@ Vertex * LocalGenomicMap::traverseLongPath(Vertex *aStartVertex, VertexPath* vPa
     int pathN = -1;
     int maxL = 0;
     int i = 0;
+//    find longest path that current graph can cover, choose this graph to traverse.
     for(auto path: *this->mLongFrags) {
         if (path[0][0] == aStartVertex) {
             int l = longPathLenInGraph(path);
