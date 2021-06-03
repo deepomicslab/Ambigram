@@ -118,8 +118,9 @@ class MainArgParser:
                                     )
         else:
             chrom_junc = None
-        sv_df = bpsmap.concat_sv(args.sv_list)
+        sv_df = bpsmap.read_sv(args.sv_list)
         chrom_infos = pd.read_csv(args.chrom_info, sep='\t')
+        print(sv_df["chrom_5p"][0])
         # print(chrom_junc.head())
         # print(sv_df.head())
         # print(chrom_infos.head())
@@ -135,6 +136,7 @@ class MainArgParser:
                     chroms))
             else:
                 chroms = sorted(set(chroms))
+            print(chroms)
             bps_map = []
             for chrom in chroms:
                 sv_5p = bpsmap.get_precise_sv(sv_df, chrom_5p=chrom, drop_imprecise=not args.keep_imprecise, drop_insertions=not args.keep_insertions)
@@ -152,6 +154,7 @@ class MainArgParser:
                         )))
                 else:
                     bps = np.array(sorted(set(bps)))
+                # print(bps)
                 bps_map.extend([(chrom, *t) for t in bpsmap.map_bps(bps, 10)])
             bpsmap.write_bps_map(args.bps_map_out, bps_map)
 

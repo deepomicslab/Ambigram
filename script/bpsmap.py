@@ -135,11 +135,16 @@ def concat_sv(sv_list_filename):
     return df
 
 def read_sv(file_name):
-    return pd.read_csv(file_name, header=None, sep='\t',
+    res = pd.read_csv(file_name, header=None, sep='\t',index_col=False,
                           names=['chrom_5p', 'pos_5p', 'strand_5p',
                                  'chrom_3p', 'pos_3p', 'strand_3p',
                                  'inner_ins', 'span_reads', 'junc_reads',
                                  'id', 'qual', 'filter', 'meta_info', 'anno_info'])
+    res = res.astype({'chrom_5p': str, 'pos_5p': np.int64, 'strand_5p': str,
+                      'chrom_3p': str, 'pos_3p': np.int64, 'strand_3p': str,
+                      'inner_ins': str, 'span_reads': np.int64, 'junc_reads': np.int64,
+                      'id': str, 'qual': np.float64, 'filter': str, 'meta_info': str, 'anno_info': str})
+    return res
 
 
 def get_precise_sv(sv_df, chrom_5p=None, start_5p=None, end_5p=None,

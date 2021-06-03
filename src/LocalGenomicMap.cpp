@@ -95,6 +95,24 @@ void LocalGenomicMap::read_long_frags(const char *fn) {
         return p1->size() > p2->size();        
     });
 }
+void LocalGenomicMap::read_hic_matrix(const char *fn) {
+    int len = this->mGraph->getSegments()->size();
+    this->hicMatrix = new double* [len+1];
+    for (int i = 1; i < len+1; i++){
+        this->hicMatrix[i] = new double [len + 1];
+    }
+    ifstream in(fn);
+    string line, value;
+    stringstream ss;
+    while (getline(in, line)) {
+        this->hicMatrix++;
+        ss = stringstream(line);
+        while (ss >> value) {
+            double matrixV = stod(value);
+            *(*(this->hicMatrix)++) = matrixV;
+        }
+    }
+}
 
 void LocalGenomicMap::merge_long_frags(VertexPath *aFrag) {
     VertexPath::iterator found_iter, iter;
@@ -1893,10 +1911,75 @@ void LocalGenomicMap::checkReachability(JunctionDB * aJuncDB, bool verbose) {
     cout << "Graph reachable." << endl;
 }
 
+vector<Segment*> * LocalGenomicMap::extractReachableGraph(bool verbose) {
+    vector<Segment*>* res = new vector<Segment*>();
+    cout << "Checking reachability..." << endl;
+    VertexPath backwardSourceNotReachableVertices;
+    VertexPath backwardSinkNotReachableVertices;
+    VertexPath forwardSourceNotReachableVertices;
+    VertexPath forwardSinkNotReachableVertices;
+        backwardSourceNotReachableVertices.clear();
+        backwardSinkNotReachableVertices.clear();
+        forwardSourceNotReachableVertices.clear();
+        forwardSinkNotReachableVertices.clear();
+
+        mGraph->checkOrphan();
+
+        // check reachability for each vertex
+        bool isSinkSourceConnectedOriginally;
+        try {
+            this->connectSourceSink();
+            isSinkSourceConnectedOriginally = false;
+        } catch (DuplicateJunctionException &e) {
+            isSinkSourceConnectedOriginally = true;
+        }
+        for (Segment * seg: *(mGraph->getSegments())) {
+            if (seg == mGraph->getSource() || seg == mGraph->getSink()) {
+                continue;
+            }
+
+            // heuristic rule to keep a segment
+            if (seg->isOrphan()) {
+                if (seg->getWeight()->getCoverage() < 0.25 * mGraph->getAvgCoverage()) {
+                    continue;
+                }
+            }
+
+            if (!seg->hasLowerBoundLimit()) continue;
+
+            VertexPath segV;
+            segV.push_back(seg->getPositiveVertex());
+            segV.push_back(seg->getNegativeVertex());
+            bool  flag = true;
+            for (Vertex *v : segV) {
+                // cout << "source+ -> " << v->getInfo() << endl;
+                bool isBackwardSourceReachable = this->doesPathExists(mGraph->getSource()->getPositiveVertex(), v);
+                // cout << "sink- -> " << v->getInfo() << endl;
+                bool isBackwardSinkReachable = this->doesPathExists(mGraph->getSink()->getNegativeVertex(), v);
+                // cout << v->getInfo() << " -> source-" << endl;
+                bool isForwardSourceReachable = this->doesPathExists(v, mGraph->getSource()->getNegativeVertex());
+                // cout << v->getInfo() << " -> sink+" << endl;
+                bool isForwardSinkReachable = this->doesPathExists(v, mGraph->getSink()->getPositiveVertex());
+                if (isBackwardSinkReachable && isBackwardSourceReachable && isForwardSinkReachable &&
+                    isForwardSourceReachable) {
+                } else {
+                    flag = false;
+                }
+            }
+            if(flag) {
+                res->push_back(seg);
+            }
+        }
+    return res;
+}
+
 void LocalGenomicMap::addNormalJunctions() {
     for (int i = 0; i < mGraph->getSegments()->size() - 1; i++) {
         Vertex * sourceVertex = (*mGraph->getSegments())[i]->getPositiveVertex();
         Vertex * targetVertex = mGraph->getNextVertexById(sourceVertex);
+        if(sourceVertex->getSegment()->getChrom() != targetVertex->getSegment()->getChrom()) {
+            continue;
+        }
         try {
             mGraph->addJunction(sourceVertex, targetVertex, this->inferCoverage(sourceVertex, targetVertex), inferCredibility(sourceVertex, targetVertex), -1, true, false, false);
         } catch(DuplicateJunctionException& e) {
@@ -2204,8 +2287,12 @@ int LocalGenomicMap::findCircuit(Vertex * aVertex, VertexPath & pathVertices, Ed
 //     mCircuits->push_back(pathV);
 // }
 
-Edge * LocalGenomicMap::traverseNextEdge(Vertex * aStartVertex, JunctionDB * aJuncDB)  {
-    Edge * selectedEdge = NULL;
+Edge * LocalGenomicMap::traverseNextEdge(Vertex * aStartVertex, VertexPath* vp, JunctionDB * aJuncDB)  {
+    Edge * selectedEdge = nullptr;
+    if(this->hicMatrix != nullptr){
+        selectedEdge = traverseWithHic(vp);
+        if (selectedEdge != nullptr) return selectedEdge;
+    }
     Record * rec = aJuncDB->findRecord(aStartVertex->getSegment()->getChrom(), aStartVertex->getEnd(), aStartVertex->getDir());
     if (rec == NULL) {
         for (Edge * e: *(aStartVertex->getEdgesAsSource())) {
@@ -2236,6 +2323,36 @@ Edge * LocalGenomicMap::traverseNextEdge(Vertex * aStartVertex, JunctionDB * aJu
     return selectedEdge;
 }
 
+Edge * LocalGenomicMap::traverseWithHic(VertexPath *vp) {
+    auto currentVertex = vp->back();
+    Edge * maxEdge;
+    double maxV = 0;
+    for (auto * e : *(currentVertex->getEdgesAsSource())) {
+        if(!e->hasCopy()) continue;
+        double v = calculateHicInteraction(vp, e->getTarget());
+        if (v > maxV) {
+            maxEdge = e;
+            maxV = v;
+        }
+    }
+    if(maxV == 0) return nullptr;
+//    hic value decrease
+    int id1 = maxEdge->getSource()->getId();
+    int id2 = maxEdge->getTarget()->getId();
+//    TODO , A better decrease method may be
+    this->hicMatrix[id1][id2] = this->hicMatrix[id1][id2] - this->hicMatrix[id1][id2]/maxEdge->getWeight()->getCopyNum();
+    return maxEdge;
+}
+double LocalGenomicMap::calculateHicInteraction(VertexPath *vp, Vertex* currentVertex) {
+    double res = 0;
+    for (auto * v : *vp) {
+        int id1 = v->getId();
+        int id2 = currentVertex->getId();
+        double hicV = this->hicMatrix[id1][id2];
+        res += hicV;
+    }
+    return res;
+}
 void LocalGenomicMap::traverseWithLongFrag(Vertex * startVertex, JunctionDB * aJuncDB) {
 
 }
@@ -2246,7 +2363,7 @@ void LocalGenomicMap::traverse(Vertex * aStartVertex, JunctionDB * aJuncDB) {
     Vertex * currentVertex = aStartVertex;
     vp->push_back(currentVertex);
 
-    Edge * nextEdge = this->traverseNextEdge(currentVertex, aJuncDB);
+    Edge * nextEdge = this->traverseNextEdge(currentVertex,vp, aJuncDB);
     while (nextEdge != NULL) {
         if (currentVertex->getId() == 24) {
             cout << mGraph->getSegmentById(24)->getWeight()->getCopyNum() << endl;
@@ -2272,7 +2389,7 @@ void LocalGenomicMap::traverse(Vertex * aStartVertex, JunctionDB * aJuncDB) {
         // }
 
         currentVertex = nextEdge->getTarget();
-        nextEdge = this->traverseNextEdge(currentVertex, aJuncDB);
+        nextEdge = this->traverseNextEdge(currentVertex,vp, aJuncDB);
     }
 
     mCircuits->push_back(vp);

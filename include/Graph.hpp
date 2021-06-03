@@ -73,6 +73,7 @@ class Graph {
 
         void readGraph(const char * aFilename);
         void writeGraph(const char * aFilename);
+        void writePartialGraph(vector<Segment*> * segs, const char * aFilename);
         void checkOrphan();
         void calculateHapDepth();
         void calculateCopyNum();
@@ -81,7 +82,7 @@ class Graph {
         void resetVertexVisitFlag();
         void resetJunctionVisitFlag();
         void resetShortestPrevEdge();
-        void checkLowerBound();
+        void checkLowerBound(bool isTarget);
 
         Segment * getSegmentById(int aSegId);
         Segment * getSegmentByChromStart(string aChrom, int aStart);

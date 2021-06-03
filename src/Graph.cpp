@@ -199,6 +199,44 @@ void Graph::writeGraph(const char * aFilename) {
     fout.close();
 }
 
+void Graph::writePartialGraph(vector<Segment *> *segs, const char * aFilename) {
+    ofstream fout(aFilename);
+    fout << "SAMPLE_NAME " << mSampleName << endl
+         << "AVG_SEG_DP " << mAvgCoverage << endl
+         << "AVG_JUNC_DP " << mAvgCoverageJunc << endl
+         << "PURITY " << mPurity << endl
+         << "AVG_PLOIDY " << mAvgPloidy << endl
+         << "PLOIDY " << mPloidy << endl
+         << "SOURCE " << "H:" << mSource->getId() << endl
+         << "SINK " << "H:" << mSink->getId() << endl;
+    cout << "write seg" << endl;
+    for (Segment * seg : *segs) {
+        fout << "SEG " << "H:" << seg->getId() << ":" << seg->getChrom()
+             << ":" << seg->getStart() << ":" << seg->getEnd() << " "
+             << seg->getWeight()->getCoverage() << " "
+             << seg->getWeight()->getCopyNum() << " "
+             << (seg->hasLowerBoundLimit() ? "B" : "U") << endl;
+    }
+    for (Junction * junc : *mJunctions) {
+        bool sourceFlag = false;
+        bool targetFlag = false;
+        for(Segment* seg : *segs) {
+            if(seg->getId() == junc->getSource()->getId()) sourceFlag= true;
+            if(seg->getId() == junc->getTarget()->getId()) targetFlag= true;
+        }
+        if(sourceFlag && targetFlag) {
+            Edge * e = junc->getEdgeA();
+            fout << "JUNC " << "H:" << e->getSource()->getId() << ":" << e->getSource()->getDir() << " "
+                 << "H:" << e->getTarget()->getId() << ":" << e->getTarget()->getDir() << " "
+                 << junc->getWeight()->getCoverage() << " "
+                 << junc->getWeight()->getCopyNum() << " "
+                 << (junc->isInferred() ? "I" : "U") << " " << (junc->hasLowerBoundLimit() ? "B" : "U") << endl;
+        }
+    }
+    fout.close();
+}
+
+
 void Graph::checkOrphan() {
     for (Segment * seg : *mSegments) {
         seg->checkOrphan();
@@ -313,9 +351,13 @@ void Graph::resetShortestPrevEdge() {
     }
 }
 
-void Graph::checkLowerBound() {
+void Graph::checkLowerBound(bool isTarget) {
     this->checkOrphan();
     for (Segment * seg : *mSegments) {
+        if(isTarget) {
+            seg->setHasLowerBoundLimit();
+            continue;
+        }
         // seg->checkLowerBound();
         if (seg->isOrphan()) {
         if (seg->getWeight()->getCoverage() <= 0.25 * mAvgCoverage) {
