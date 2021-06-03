@@ -30,6 +30,7 @@ class LocalGenomicMap {
 
         bool usingLong;
 
+        double ** hicMatrix;
     public:
         LocalGenomicMap(Graph * aGraph);
         ~LocalGenomicMap();
@@ -47,7 +48,10 @@ class LocalGenomicMap {
         bool equal_frags(vector<VertexPath *> *f1, vector<VertexPath *> *f2);
         VertexPath *get_complement(VertexPath *path);
 
-        /* functionality */
+//        hic
+        void read_hic_matrix(const char *fn);
+
+    /* functionality */
         // double normalizeCoverage(double value, double mean, double std);
         vector<double> scaleILPCoef(vector<double> aCovs);
         int balancerILP(const char * lpFn);
@@ -71,13 +75,18 @@ class LocalGenomicMap {
         bool adjustReachability(VertexPath & notReachableVertices, Vertex * targetVertex, JunctionDB * aJuncDB, bool verbose = false);
         bool isReachable();
         void checkReachability(JunctionDB * aJuncDB, bool verbose = false);
+        vector<Segment*> * extractReachableGraph(bool verbose = false);
         void addNormalJunctions();
         void checkInferredJunctionCredibility();
         void clearSegmentJunctionCredibility(Segment * aSegment);
 
         int findCircuit(Vertex * aVertex, VertexPath & pathVertices, EdgePath & pathEdges);
         void traverse(Vertex * startVertex, JunctionDB * aJuncDB);
-        Edge * traverseNextEdge(Vertex * aStartVertex, JunctionDB * aJuncDB);
+        Edge * traverseNextEdge(Vertex * aStartVertex, VertexPath* vp, JunctionDB * aJuncDB);
+        Edge * traverseWithHic(VertexPath* vp);
+        double calculateHicInteraction(VertexPath* vp, Vertex* currentVertex);
+//        decrease hic matrix when traversing
+        void decreaseHicInteraction(VertexPath* vp, Edge* e);
         void traverseGraph(JunctionDB * aJuncDB);            // traverse all junctions and segments first
 //        Traverse long path first
         Vertex * traverseLongPath(Vertex * aStartVertex, VertexPath* vPath);

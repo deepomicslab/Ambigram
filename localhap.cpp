@@ -15,7 +15,8 @@ int main(int argc, char * argv[]) {
         const char * lhRawFn = argv[3];
         const char * lhCheckedFn = argv[4];
         const char * lpFn = argv[5];
-        bool verbose = (strcmp(argv[6], "--verbose") == 0) ? true : false;
+        const char * isTarget = argv[6];
+        bool verbose = (strcmp(argv[7], "--verbose") == 0) ? true : false;
         try {
             JunctionDB * db_sample = new JunctionDB(juncdbFn_sample);
             db_sample->sortRecordEntry();
@@ -23,12 +24,14 @@ int main(int argc, char * argv[]) {
 
             Graph * g = new Graph(lhRawFn); 
             g->calculateHapDepth();
-            g->checkLowerBound();
+            g->checkLowerBound(strcmp(isTarget, "True")==0);
             g->print();
 
             LocalGenomicMap * lgm = new LocalGenomicMap(g);
-            
-            // lgm->addNormalJunctions();
+
+            if((strcmp(isTarget, "True") == 0) ){
+//                 lgm->addNormalJunctions();
+            }
             lgm->addAllJuncsFromDB(db_sample);
             // lgm->reconnectNegativeToPositive(db_sample, true);
             cout << "checking reachability" << endl;
@@ -89,7 +92,8 @@ int main(int argc, char * argv[]) {
         const char * circuitsFn = argv[4];
         const char * hapFn = argv[5];
         bool verbose = (strcmp(argv[6], "--verbose") == 0) ? true : false;
-        const char * longFragFn = argv[7];
+         const char * longFragFn = argv[7];
+         const char * hicMatrix = argv[8];
         try {
             JunctionDB * db = new JunctionDB(juncdbFn);
             db->sortRecordEntry();
@@ -106,17 +110,15 @@ int main(int argc, char * argv[]) {
             g->print();
 
             LocalGenomicMap * lgm = new LocalGenomicMap(g);
-//
-             if(longFragFn != nullptr) {
-                 lgm->read_long_frags(longFragFn);
-                 lgm->setUsingLong(true);
-                 for (VertexPath *frag : *(lgm->get_long_frags())) {
-                     for (Vertex * v: *frag) {
-                         cout << v->getInfo() << " ";
-                     }
-                     cout << endl;
+            
+             lgm->read_long_frags(longFragFn);
+             for (VertexPath *frag : *(lgm->get_long_frags())) {
+                 for (Vertex * v: *frag) {
+                     cout << v->getInfo() << " ";
                  }
-             } else lgm->setUsingLong(false);
+                 cout << endl;
+             }
+             lgm->read_hic_matrix(hicMatrix);
 //             return 0;
             // TODO some problems on checking reachability
             // especially with inversion
@@ -199,5 +201,23 @@ int main(int argc, char * argv[]) {
             //     return 1 ;
         }
         return 0;
+    } else if (strcmp(argv[1], "split") == 0) {
+        const char *lhFn = argv[2];
+        const char *chrom = argv[3];
+        const char *lhOut = argv[4];
+        bool verbose = (strcmp(argv[6], "--verbose") == 0) ? true : false;
+        Graph * g = new Graph(lhFn);
+        g->calculateHapDepth();
+        g->print();
+
+        LocalGenomicMap * lgm = new LocalGenomicMap(g);
+
+        auto segs = lgm->extractReachableGraph(verbose);
+        g->writePartialGraph(segs,lhOut);
+        g->print();
+        cout << "write" << endl;
+        g->writeGraph(lhOut);
+        cout << "write done" << endl;
+
     }
 }
