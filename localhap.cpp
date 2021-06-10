@@ -136,7 +136,7 @@ int main(int argc, char * argv[]) {
 
             /* integer linear programming */
             try {
-                lgm->connectSourceSink();
+//                lgm->connectSourceSink();
             } catch (DuplicateJunctionException &e) {
                 cout << e.what() << endl;
             }
@@ -200,7 +200,6 @@ int main(int argc, char * argv[]) {
             //     cout << "Logic error." << endl;
             //     return 1 ;
         }
-        return 0;
     } else if (strcmp(argv[1], "split") == 0) {
         const char *lhFn = argv[2];
         const char *chrom = argv[3];

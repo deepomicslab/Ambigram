@@ -31,6 +31,7 @@ class LocalGenomicMap {
         bool usingLong;
 
         double ** hicMatrix;
+        double ** decreaseMatrix;
     public:
         LocalGenomicMap(Graph * aGraph);
         ~LocalGenomicMap();
@@ -86,7 +87,8 @@ class LocalGenomicMap {
         Edge * traverseWithHic(VertexPath* vp);
         double calculateHicInteraction(VertexPath* vp, Vertex* currentVertex);
 //        decrease hic matrix when traversing
-        void decreaseHicInteraction(VertexPath* vp, Edge* e);
+        void decreaseHicMatrix(VertexPath* vp, Edge* e);
+        void decreaseHicInteraction(Vertex* v1, Vertex* v2);
         void traverseGraph(JunctionDB * aJuncDB);            // traverse all junctions and segments first
 //        Traverse long path first
         Vertex * traverseLongPath(Vertex * aStartVertex, VertexPath* vPath);

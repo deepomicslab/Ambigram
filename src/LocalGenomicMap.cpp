@@ -102,19 +102,39 @@ void LocalGenomicMap::read_long_frags(const char *fn) {
 void LocalGenomicMap::read_hic_matrix(const char *fn) {
     int len = this->mGraph->getSegments()->size();
     this->hicMatrix = new double* [len+1];
-    for (int i = 1; i < len+1; i++){
+    this->decreaseMatrix = new double* [len+1];
+    for (int i = 0; i < len+1; i++){
         this->hicMatrix[i] = new double [len + 1];
+    }
+    for (int i = 0; i < len+1; i++){
+        this->decreaseMatrix[i] = new double [len + 1];
     }
     ifstream in(fn);
     string line, value;
     stringstream ss;
+//    The first line is the copy number information
+    int* copys = new int[len+1];
+    getline(in, line);
+    ss = stringstream(line);
+    while (ss >> value) {
+        int copy = stoi(value);
+        *(copys++) = copy;
+    }
+//    interactions
+    int i=0;
+    int j=0;
     while (getline(in, line)) {
-        this->hicMatrix++;
         ss = stringstream(line);
         while (ss >> value) {
             double matrixV = stod(value);
-            *(*(this->hicMatrix)++) = matrixV;
+            this->hicMatrix[i][j++] = matrixV;
+            this->decreaseMatrix[i][j++] = matrixV/(copys[i]);
+//            *(++(*(this->hicMatrix))) = matrixV;
+//            cout<<**(this->hicMatrix)<<endl;
+//            *(++(*(this->decreaseMatrix))) = matrixV/(*(++copys));
         }
+        i++;
+        j=0;
     }
 }
 
@@ -2340,11 +2360,11 @@ Edge * LocalGenomicMap::traverseWithHic(VertexPath *vp) {
         }
     }
     if(maxV == 0) return nullptr;
+    this->decreaseHicMatrix(vp, maxEdge);
 //    hic value decrease
-    int id1 = maxEdge->getSource()->getId();
-    int id2 = maxEdge->getTarget()->getId();
-//    TODO , A better decrease method may be
-    this->hicMatrix[id1][id2] = this->hicMatrix[id1][id2] - this->hicMatrix[id1][id2]/maxEdge->getWeight()->getCopyNum();
+//    int id1 = maxEdge->getSource()->getId();
+//    int id2 = maxEdge->getTarget()->getId();
+//    this->hicMatrix[id1][id2] = this->hicMatrix[id1][id2] - this->hicMatrix[id1][id2]/maxEdge->getWeight()->getCopyNum();
     return maxEdge;
 }
 double LocalGenomicMap::calculateHicInteraction(VertexPath *vp, Vertex* currentVertex) {
@@ -2352,13 +2372,11 @@ double LocalGenomicMap::calculateHicInteraction(VertexPath *vp, Vertex* currentV
     for (auto * v : *vp) {
         int id1 = v->getId();
         int id2 = currentVertex->getId();
-        double hicV = this->hicMatrix[id1][id2];
+        cout<< this->hicMatrix[1][1]<<endl;
+        double hicV = this->hicMatrix[id1-1][id2-1];
         res += hicV;
     }
     return res;
-}
-void LocalGenomicMap::traverseWithLongFrag(Vertex * startVertex, JunctionDB * aJuncDB) {
-
 }
 void LocalGenomicMap::traverse(Vertex * aStartVertex, JunctionDB * aJuncDB) {
     VertexPath *vp = new VertexPath();
@@ -2373,8 +2391,10 @@ void LocalGenomicMap::traverse(Vertex * aStartVertex, JunctionDB * aJuncDB) {
 
     Edge * nextEdge = this->traverseNextEdge(currentVertex,vp, aJuncDB);
     while (nextEdge != NULL) {
-        if (currentVertex->getId() == 24) {
-            cout << mGraph->getSegmentById(24)->getWeight()->getCopyNum() << endl;
+        if (!usingLong) {
+            currentVertex = aStartVertex;
+        } else {
+            currentVertex = traverseLongPath(aStartVertex, vp);
         }
         currentVertex->traverse();
         // if (nextEdge->getSource()->getSegment() == nextEdge->getTarget()->getSegment()) {
@@ -2407,6 +2427,22 @@ void LocalGenomicMap::traverse(Vertex * aStartVertex, JunctionDB * aJuncDB) {
         cout << v->getInfo() << " ";
     }
     cout << endl;
+}
+
+void LocalGenomicMap::decreaseHicMatrix(VertexPath *vp, Edge *e) {
+    this->decreaseHicInteraction(e->getSource(), e->getTarget());
+    for( auto* v : *vp) {
+        this->decreaseHicInteraction(v, e->getTarget());
+    }
+}
+
+void LocalGenomicMap::decreaseHicInteraction(Vertex *v1, Vertex *v2) {
+    int id1 = v1->getId();
+    int id2 = v2->getId();
+    double v = this->hicMatrix[id1][id2];
+    v = v - this->decreaseMatrix[id1][id2];
+    this->hicMatrix[id1][id2] = v;
+    this->hicMatrix[id2][id1] = v;
 }
 
 void LocalGenomicMap::traverseGraph(JunctionDB * aJuncDB) {
@@ -2487,7 +2523,7 @@ int LocalGenomicMap::longPathLenInGraph(VertexPath *longPath) {
 //                 if (flag < 0) {
 //                     for (Vertex * v : *pathV) v->recover();
 //                     for (Edge * e : pathE) e->recover();
-// 
+//
 //                     pathV->clear();
 //                     pathE.clear();
 //                     flag = this->findCircuit(seg->getPositiveVertex(), *pathV, pathE);
