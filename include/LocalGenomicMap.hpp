@@ -29,6 +29,7 @@ class LocalGenomicMap {
         vector<VertexPath *> * mLongFrags;
 
         bool usingLong;
+        bool usingHic;
 
         double ** hicMatrix;
         double ** decreaseMatrix;
@@ -40,7 +41,9 @@ class LocalGenomicMap {
         Graph * getGraph();
         void setGraph(Graph * aGraph);
         bool isUsingLong();
+        bool isUsingHic();
         void setUsingLong(bool v);
+        void setUsingHic(bool );
         
         /* Long fragments for TGS */
         vector<VertexPath *> *get_long_frags();

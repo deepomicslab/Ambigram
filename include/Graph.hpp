@@ -82,7 +82,7 @@ class Graph {
         void resetVertexVisitFlag();
         void resetJunctionVisitFlag();
         void resetShortestPrevEdge();
-        void checkLowerBound(bool isTarget);
+        void checkLowerBound();
 
         Segment * getSegmentById(int aSegId);
         Segment * getSegmentByChromStart(string aChrom, int aStart);

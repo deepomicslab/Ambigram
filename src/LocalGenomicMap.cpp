@@ -21,6 +21,7 @@ LocalGenomicMap::LocalGenomicMap(Graph * aGraph) {
     mCircuits = new vector< VertexPath *>();
     mHaploids = new vector< VertexPath *>();
     usingLong = false;
+    usingHic = false;
 }
 
 LocalGenomicMap::~LocalGenomicMap() {;}
@@ -29,7 +30,9 @@ Graph * LocalGenomicMap::getGraph() { return mGraph; }
 void LocalGenomicMap::setGraph(Graph * aGraph) { mGraph = aGraph; }
 
 bool LocalGenomicMap::isUsingLong() { return usingLong; }
+bool LocalGenomicMap::isUsingHic() { return usingHic; }
 void LocalGenomicMap::setUsingLong(bool v) {usingLong = v;}
+void LocalGenomicMap::setUsingHic(bool v) {usingHic = v;}
 
 vector<VertexPath *> *LocalGenomicMap::get_long_frags() {
     return mLongFrags;
@@ -2313,7 +2316,7 @@ int LocalGenomicMap::findCircuit(Vertex * aVertex, VertexPath & pathVertices, Ed
 
 Edge * LocalGenomicMap::traverseNextEdge(Vertex * aStartVertex, VertexPath* vp, JunctionDB * aJuncDB)  {
     Edge * selectedEdge = nullptr;
-    if(this->hicMatrix != nullptr){
+    if(this->isUsingHic()){
         selectedEdge = traverseWithHic(vp);
         if (selectedEdge != nullptr) return selectedEdge;
     }
@@ -2391,10 +2394,8 @@ void LocalGenomicMap::traverse(Vertex * aStartVertex, JunctionDB * aJuncDB) {
 
     Edge * nextEdge = this->traverseNextEdge(currentVertex,vp, aJuncDB);
     while (nextEdge != NULL) {
-        if (!usingLong) {
-            currentVertex = aStartVertex;
-        } else {
-            currentVertex = traverseLongPath(aStartVertex, vp);
+        if (usingLong) {
+            currentVertex = traverseLongPath(currentVertex, vp);
         }
         currentVertex->traverse();
         // if (nextEdge->getSource()->getSegment() == nextEdge->getTarget()->getSegment()) {

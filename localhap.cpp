@@ -5,38 +5,51 @@
 #include "Exceptions.hpp"
 #include "LocalGenomicMap.hpp"
 #include "JunctionDB.hpp"
+#include "cxxopts.hpp"
 
 using namespace std;
 
-int main(int argc, char * argv[]) {
-    if (strcmp(argv[1], "check") == 0) {
-        const char * juncdbFn_sample = argv[2];
-        // const char * juncdbFn_ref = argv[3];
-        const char * lhRawFn = argv[3];
-        const char * lhCheckedFn = argv[4];
-        const char * lpFn = argv[5];
-        const char * isTarget = argv[6];
-        bool verbose = (strcmp(argv[7], "--verbose") == 0) ? true : false;
+int main(int argc, char *argv[]) {
+    cxxopts::Options options("localhap", "Local Haplotype constructer");
+
+    options.add_options()
+            ("op", "operate: check or solve",cxxopts::value<std::string>())
+            ("juncdb", "Junction database",cxxopts::value<std::string>())
+            ("in_lh", "Input lh file",cxxopts::value<std::string>())
+            ("out_lh", "Checked local hap input file, lh format",cxxopts::value<std::string>())
+            ("lp_prefix", "ILP out file prefix, only for check",cxxopts::value<std::string>())
+            ("verbose", "Verbose output", cxxopts::value<bool>()->default_value("false"))
+            ("hic_matrix", "Segment Hic matrix file, only for solve",cxxopts::value<std::string>())
+            ("tgs_order", "Segment tgs local order file, only for solve",cxxopts::value<std::string>())
+            ("hap", "Haplotype out file, only for solve",cxxopts::value<std::string>())
+            ("circuits", "Circuits out file, only for solve",cxxopts::value<std::string>())
+            ("help", "Print usage");
+    auto result = options.parse(argc, argv);
+    if (result.count("help")) {
+        std::cout << options.help() << std::endl;
+        exit(0);
+    }
+    result["op"].as<std::string>().c_str();
+    std::cout<<result["op"].as<std::string>().c_str()<<std::endl;
+
+    if (strcmp(result["op"].as<std::string>().c_str(), "check") == 0) {
+        const char *juncdbFn_sample = result["juncdb"].as<std::string>().c_str();
+        const char *lhRawFn = result["in_lh"].as<std::string>().c_str();
+        const char *lhCheckedFn = result["out_checked_lh"].as<std::string>().c_str();
+        const char *lpFn = result["lp_prefix"].as<std::string>().c_str();
+        bool verbose = result["raw_lh"].as<bool>();
         try {
-            JunctionDB * db_sample = new JunctionDB(juncdbFn_sample);
+            auto *db_sample = new JunctionDB(juncdbFn_sample);
             db_sample->sortRecordEntry();
             db_sample->print();
 
-            Graph * g = new Graph(lhRawFn); 
+            Graph *g = new Graph(lhRawFn);
             g->calculateHapDepth();
-            g->checkLowerBound(strcmp(isTarget, "True")==0);
+            g->checkLowerBound();
             g->print();
-
-            LocalGenomicMap * lgm = new LocalGenomicMap(g);
-
-            if((strcmp(isTarget, "True") == 0) ){
-//                 lgm->addNormalJunctions();
-            }
-            lgm->addAllJuncsFromDB(db_sample);
-            // lgm->reconnectNegativeToPositive(db_sample, true);
+            LocalGenomicMap *lgm = new LocalGenomicMap(g);
             cout << "checking reachability" << endl;
             g->print();
-            // exit(1);
             lgm->checkReachability(db_sample, verbose);
 
             g->calculateCopyNum();
@@ -59,48 +72,52 @@ int main(int argc, char * argv[]) {
             int feasible = lgm->balancerILP(lpFn);
 
             cout << "Done" << endl;
-        } catch (DuplicateJunctionException& e) {
+        } catch (DuplicateJunctionException &e) {
             cout << e.what() << endl;
-            return 1 ;
-        } catch (SegmentDoesNotExistException& e) {
+            return 1;
+        } catch (SegmentDoesNotExistException &e) {
             cout << e.what() << endl;
-            return 1 ;
-        } catch (JunctionDoesNotExistException& e) {
+            return 1;
+        } catch (JunctionDoesNotExistException &e) {
             cout << e.what() << endl;
-            return 1 ;
-        } catch (BackwardReachSourceNegativeException & e) {
+            return 1;
+        } catch (BackwardReachSourceNegativeException &e) {
             cout << e.what() << endl;
-            return 1 ;
-        } catch (BackwardReachSinkPositiveException & e) {
+            return 1;
+        } catch (BackwardReachSinkPositiveException &e) {
             cout << e.what() << endl;
-            return 1 ;
-        } catch (ForwardReachSinkNegativeException & e) {
+            return 1;
+        } catch (ForwardReachSinkNegativeException &e) {
             cout << e.what() << endl;
-            return 1 ;
-        } catch (ForwardReachSourcePositiveException & e) {
+            return 1;
+        } catch (ForwardReachSourcePositiveException &e) {
             cout << e.what() << endl;
-            return 1 ;
+            return 1;
             // } catch (...) {
             //     cout << "Logic error." << endl;
             //     return 1 ;
         }
         return 0;
-    } else if (strcmp(argv[1], "solve") == 0) {
-        const char * juncdbFn = argv[2];
-        const char * lhFn = argv[3];
+    } else if (strcmp(result["op"].as<std::string>().c_str(), "solve") == 0) {
+        const char *juncdbFn = result["juncdb"].as<std::string>().c_str();
+        const char *lhFn = result["in_lh"].as<std::string>().c_str();
         // const char * lpOutFn = argv[4];
-        const char * circuitsFn = argv[4];
-        const char * hapFn = argv[5];
-        bool verbose = (strcmp(argv[6], "--verbose") == 0) ? true : false;
-         const char * longFragFn = argv[7];
-         const char * hicMatrix = argv[8];
+        const char *circuitsFn = result["circuits"].as<std::string>().c_str();
+        const char *hapFn = result["hap"].as<std::string>().c_str();
+        bool verbose = result["verbose"].as<bool>();
+        const char *longFragFn;
+        const char *hicMatrix;
+        if (result.count("tgs_order"))
+            longFragFn = result["tgs_order"].as<std::string>().c_str();
+        if (result.count("hic_matrix"))
+            hicMatrix = result["hic_matrix"].as<std::string>().c_str();
         try {
-            JunctionDB * db = new JunctionDB(juncdbFn);
+            JunctionDB *db = new JunctionDB(juncdbFn);
             db->sortRecordEntry();
             // db->writeDB("/home/tanbowen/LocalHap/test/test.db");
             // db->print();
 
-            Graph * g = new Graph(lhFn);
+            Graph *g = new Graph(lhFn);
             // g->checkOrphan();
             // g->print();
             // g->calculateCopyNum();
@@ -108,17 +125,24 @@ int main(int argc, char * argv[]) {
             // g->print();
             // g->calculateCopyNum();
             g->print();
+            LocalGenomicMap *lgm = new LocalGenomicMap(g);
+            if (result.count("tgs_order")){
+                    longFragFn = result["tgs_order"].as<std::string>().c_str();
+                    lgm->read_long_frags(longFragFn);
+                    lgm->setUsingLong(true);
+                    for (VertexPath *frag : *(lgm->get_long_frags())) {
+                        for (Vertex *v: *frag) {
+                            cout << v->getInfo() << " ";
+                        }
+                        cout << endl;
+                    }
+                }
+            if (result.count("hic_matrix")){
+                hicMatrix = result["hic_matrix"].as<std::string>().c_str();
 
-            LocalGenomicMap * lgm = new LocalGenomicMap(g);
-            
-             lgm->read_long_frags(longFragFn);
-             for (VertexPath *frag : *(lgm->get_long_frags())) {
-                 for (Vertex * v: *frag) {
-                     cout << v->getInfo() << " ";
-                 }
-                 cout << endl;
-             }
-             lgm->read_hic_matrix(hicMatrix);
+                lgm->read_hic_matrix(hicMatrix);
+            }
+//             lgm->read_hic_matrix(hicMatrix);
 //             return 0;
             // TODO some problems on checking reachability
             // especially with inversion
@@ -172,30 +196,30 @@ int main(int argc, char * argv[]) {
             // // lgm->printHaploids();
             lgm->writeHaploids(hapFn);
             // cout << "Done" << endl;
-        } catch (DuplicateJunctionException& e) {
+        } catch (DuplicateJunctionException &e) {
             cout << e.what() << endl;
-            return 1 ;
-        } catch (SegmentDoesNotExistException& e) {
+            return 1;
+        } catch (SegmentDoesNotExistException &e) {
             cout << e.what() << endl;
-            return 1 ;
-        } catch (JunctionDoesNotExistException& e) {
+            return 1;
+        } catch (JunctionDoesNotExistException &e) {
             cout << e.what() << endl;
-            return 1 ;
-        } catch (ILPBalancerInfeasibleException& e) {
+            return 1;
+        } catch (ILPBalancerInfeasibleException &e) {
             cout << e.what() << endl;
-            return 1 ;
-        } catch (BackwardReachSourceNegativeException & e) {
+            return 1;
+        } catch (BackwardReachSourceNegativeException &e) {
             cout << e.what() << endl;
-            return 1 ;
-        } catch (BackwardReachSinkPositiveException & e) {
+            return 1;
+        } catch (BackwardReachSinkPositiveException &e) {
             cout << e.what() << endl;
-            return 1 ;
-        } catch (ForwardReachSinkNegativeException & e) {
+            return 1;
+        } catch (ForwardReachSinkNegativeException &e) {
             cout << e.what() << endl;
-            return 1 ;
-        } catch (ForwardReachSourcePositiveException & e) {
+            return 1;
+        } catch (ForwardReachSourcePositiveException &e) {
             cout << e.what() << endl;
-            return 1 ;
+            return 1;
             // } catch (...) {
             //     cout << "Logic error." << endl;
             //     return 1 ;
@@ -205,14 +229,14 @@ int main(int argc, char * argv[]) {
         const char *chrom = argv[3];
         const char *lhOut = argv[4];
         bool verbose = (strcmp(argv[6], "--verbose") == 0) ? true : false;
-        Graph * g = new Graph(lhFn);
+        Graph *g = new Graph(lhFn);
         g->calculateHapDepth();
         g->print();
 
-        LocalGenomicMap * lgm = new LocalGenomicMap(g);
+        LocalGenomicMap *lgm = new LocalGenomicMap(g);
 
         auto segs = lgm->extractReachableGraph(verbose);
-        g->writePartialGraph(segs,lhOut);
+        g->writePartialGraph(segs, lhOut);
         g->print();
         cout << "write" << endl;
         g->writeGraph(lhOut);

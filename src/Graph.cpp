@@ -351,13 +351,13 @@ void Graph::resetShortestPrevEdge() {
     }
 }
 
-void Graph::checkLowerBound(bool isTarget) {
+void Graph::checkLowerBound() {
     this->checkOrphan();
     for (Segment * seg : *mSegments) {
-        if(isTarget) {
-            seg->setHasLowerBoundLimit();
-            continue;
-        }
+//        if(isTarget) {
+//            seg->setHasLowerBoundLimit();
+//            continue;
+//        }
         // seg->checkLowerBound();
         if (seg->isOrphan()) {
         if (seg->getWeight()->getCoverage() <= 0.25 * mAvgCoverage) {
