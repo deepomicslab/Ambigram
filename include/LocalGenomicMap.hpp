@@ -94,7 +94,8 @@ class LocalGenomicMap {
         void decreaseHicInteraction(Vertex* v1, Vertex* v2);
         void traverseGraph(JunctionDB * aJuncDB);            // traverse all junctions and segments first
 //        Traverse long path first
-        Vertex * traverseLongPath(Vertex * aStartVertex, VertexPath* vPath);
+        void traverseWithLong(Vertex * aStartVertex, JunctionDB * aJuncDB);
+        Vertex * traverseLongPath(Vertex * aStartVertex, VertexPath* vPath, bool skip_first);
 //        find if long path in current graph (return how far the path can be traversed in current graph)
         int longPathLenInGraph(VertexPath* longPath);
         void isCircuitSimple(VertexPath * circuit, pair<int, int> & notSimpleIdx);

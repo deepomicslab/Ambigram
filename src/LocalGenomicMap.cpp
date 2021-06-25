@@ -15,24 +15,28 @@
 
 using namespace std;
 
-LocalGenomicMap::LocalGenomicMap(Graph * aGraph) {
+LocalGenomicMap::LocalGenomicMap(Graph *aGraph) {
     mGraph = aGraph;
 
-    mCircuits = new vector< VertexPath *>();
-    mHaploids = new vector< VertexPath *>();
+    mCircuits = new vector<VertexPath *>();
+    mHaploids = new vector<VertexPath *>();
     usingLong = false;
     usingHic = false;
 }
 
-LocalGenomicMap::~LocalGenomicMap() {;}
+LocalGenomicMap::~LocalGenomicMap() { ; }
 
-Graph * LocalGenomicMap::getGraph() { return mGraph; }
-void LocalGenomicMap::setGraph(Graph * aGraph) { mGraph = aGraph; }
+Graph *LocalGenomicMap::getGraph() { return mGraph; }
+
+void LocalGenomicMap::setGraph(Graph *aGraph) { mGraph = aGraph; }
 
 bool LocalGenomicMap::isUsingLong() { return usingLong; }
+
 bool LocalGenomicMap::isUsingHic() { return usingHic; }
-void LocalGenomicMap::setUsingLong(bool v) {usingLong = v;}
-void LocalGenomicMap::setUsingHic(bool v) {usingHic = v;}
+
+void LocalGenomicMap::setUsingLong(bool v) { usingLong = v; }
+
+void LocalGenomicMap::setUsingHic(bool v) { usingHic = v; }
 
 vector<VertexPath *> *LocalGenomicMap::get_long_frags() {
     return mLongFrags;
@@ -78,7 +82,7 @@ void LocalGenomicMap::read_long_frags(const char *fn) {
     });
 
     in.close();
-    
+
     vector<VertexPath *> *long_frags_new = new vector<VertexPath *>();
     vector<VertexPath *> *temp;
     while (!this->equal_frags(mLongFrags, long_frags_new)) {
@@ -99,24 +103,25 @@ void LocalGenomicMap::read_long_frags(const char *fn) {
         });
     }
     sort(mLongFrags->begin(), mLongFrags->end(), [](VertexPath *p1, VertexPath *p2) {
-        return p1->size() > p2->size();        
+        return p1->size() > p2->size();
     });
 }
+
 void LocalGenomicMap::read_hic_matrix(const char *fn) {
     int len = this->mGraph->getSegments()->size();
-    this->hicMatrix = new double* [len+1];
-    this->decreaseMatrix = new double* [len+1];
-    for (int i = 0; i < len+1; i++){
-        this->hicMatrix[i] = new double [len + 1];
+    this->hicMatrix = new double *[len + 1];
+    this->decreaseMatrix = new double *[len + 1];
+    for (int i = 0; i < len + 1; i++) {
+        this->hicMatrix[i] = new double[len + 1];
     }
-    for (int i = 0; i < len+1; i++){
-        this->decreaseMatrix[i] = new double [len + 1];
+    for (int i = 0; i < len + 1; i++) {
+        this->decreaseMatrix[i] = new double[len + 1];
     }
     ifstream in(fn);
     string line, value;
     stringstream ss;
 //    The first line is the copy number information
-    int* copys = new int[len+1];
+    int *copys = new int[len + 1];
     getline(in, line);
     ss = stringstream(line);
     while (ss >> value) {
@@ -124,20 +129,20 @@ void LocalGenomicMap::read_hic_matrix(const char *fn) {
         *(copys++) = copy;
     }
 //    interactions
-    int i=0;
-    int j=0;
+    int i = 0;
+    int j = 0;
     while (getline(in, line)) {
         ss = stringstream(line);
         while (ss >> value) {
             double matrixV = stod(value);
             this->hicMatrix[i][j++] = matrixV;
-            this->decreaseMatrix[i][j++] = matrixV/(copys[i]);
+            this->decreaseMatrix[i][j++] = matrixV / (copys[i]);
 //            *(++(*(this->hicMatrix))) = matrixV;
 //            cout<<**(this->hicMatrix)<<endl;
 //            *(++(*(this->decreaseMatrix))) = matrixV/(*(++copys));
         }
         i++;
-        j=0;
+        j = 0;
     }
 }
 
@@ -151,13 +156,15 @@ void LocalGenomicMap::merge_long_frags(VertexPath *aFrag) {
                 found = true;
                 VertexPath *new_f = new VertexPath(mLongFrags->at(i)->begin(), found_iter);
                 new_f->insert(new_f->end(), aFrag->begin(), aFrag->end());
-                found_iter = find_end(mLongFrags->at(i)->begin(), mLongFrags->at(i)->end(), new_f->begin(), new_f->end());
+                found_iter = find_end(mLongFrags->at(i)->begin(), mLongFrags->at(i)->end(), new_f->begin(),
+                                      new_f->end());
                 if (found_iter == mLongFrags->at(i)->end()) {
                     // new_f in
-                //     break;
-                // } else {
+                    //     break;
+                    // } else {
                     // new_f not in
-                    found_iter = find_end(new_f->begin(), new_f->end(), mLongFrags->at(i)->begin(), mLongFrags->at(i)->end());
+                    found_iter = find_end(new_f->begin(), new_f->end(), mLongFrags->at(i)->begin(),
+                                          mLongFrags->at(i)->end());
                     if (found_iter != new_f->end()) {
                         // new_f include
                         mLongFrags->at(i)->clear();
@@ -183,13 +190,15 @@ void LocalGenomicMap::merge_long_frags(VertexPath *aFrag) {
                     found = true;
                     VertexPath *new_f = new VertexPath(mLongFrags->at(i)->begin(), found_iter);
                     new_f->insert(new_f->end(), comp->begin(), comp->end());
-                    found_iter = find_end(mLongFrags->at(i)->begin(), mLongFrags->at(i)->end(), new_f->begin(), new_f->end());
+                    found_iter = find_end(mLongFrags->at(i)->begin(), mLongFrags->at(i)->end(), new_f->begin(),
+                                          new_f->end());
                     if (found_iter == mLongFrags->at(i)->end()) {
                         // new_f in
-                    //     break;
-                    // } else {
+                        //     break;
+                        // } else {
                         // new_f not in
-                        found_iter = find_end(new_f->begin(), new_f->end(), mLongFrags->at(i)->begin(), mLongFrags->at(i)->end());
+                        found_iter = find_end(new_f->begin(), new_f->end(), mLongFrags->at(i)->begin(),
+                                              mLongFrags->at(i)->end());
                         if (found_iter != new_f->end()) {
                             // new_f include
                             mLongFrags->at(i)->clear();
@@ -236,30 +245,30 @@ vector<double> LocalGenomicMap::scaleILPCoef(vector<double> aCovs) {
     double mean = accumulate(aCovs.begin(), aCovs.end(), 0.0) / aCovs.size();
     vector<double> diff(aCovs.size());
     transform(aCovs.begin(), aCovs.end(), diff.begin(),
-              [mean](double v) {return v - mean + 1;});
+              [mean](double v) { return v - mean + 1; });
     vector<double> diff_s(diff.size());
     transform(diff.begin(), diff.end(), diff_s.begin(),
-              [](double v) {return pow(v, 2);});
+              [](double v) { return pow(v, 2); });
     double stdev = sqrt(accumulate(diff_s.begin(), diff_s.end(), 0.0) / diff_s.size());
     vector<double> scaled_cov(aCovs.size());
     transform(diff.begin(), diff.end(), scaled_cov.begin(),
-              [stdev](double v) {return abs(v / stdev);});
+              [stdev](double v) { return abs(v / stdev); });
     return scaled_cov;
 }
 
-int LocalGenomicMap::balancerILP(const char * lpFn) {
-    OsiClpSolverInterface * si = new OsiClpSolverInterface();
-    
+int LocalGenomicMap::balancerILP(const char *lpFn) {
+    OsiClpSolverInterface *si = new OsiClpSolverInterface();
+
     // variable structure:
     // {segments (nSeg), junctions (nJunc), segment epsilon, junction epsilon}
-    vector<Segment *> * segs = mGraph->getSegments();
-    vector<Junction *> * juncs = mGraph->getJunctions();
+    vector<Segment *> *segs = mGraph->getSegments();
+    vector<Junction *> *juncs = mGraph->getJunctions();
 
     int numSegsJuncs = segs->size() + juncs->size();
     int numEpsilons = numSegsJuncs + 2;    // e(t(seg), c(seg)) 
-                                           // e(t(junc), c(junc)) 
-                                           // e(source, 2) 
-                                           // e(sink, 2)
+    // e(t(junc), c(junc))
+    // e(source, 2)
+    // e(sink, 2)
     // int numEpsilons = segs->size() * 3 + juncs->size() * 3 + 2;    
     // e(t(seg), c(seg)) 
     // e(t(seg), 0.4c(seg)) 
@@ -270,7 +279,8 @@ int LocalGenomicMap::balancerILP(const char * lpFn) {
     // e(source, 2) 
     // e(sink, 2)
     int numVariables = numSegsJuncs + juncs->size() + numEpsilons;
-    int numConstrains = segs->size() * 4 + 4 * juncs->size() + 2;  // "2" for source & sink      ------  t(seg)+c(seg), t(seg)-c(seg), in=t(seg), out=t(seg, t(junc)+c(junc), t(junc)-c(junc), e, source, sink
+    int numConstrains = segs->size() * 4 + 4 * juncs->size() +
+                        2;  // "2" for source & sink      ------  t(seg)+c(seg), t(seg)-c(seg), in=t(seg), out=t(seg, t(junc)+c(junc), t(junc)-c(junc), e, source, sink
     // int numConstrains = segs->size() * 8 + juncs->size() * 6 + numEpsilons + 2;
     // t(seg)+c(seg), t(seg)-c(seg)
     // t(seg)+0.4c(seg), t(seg)-0.4c(seg)
@@ -282,14 +292,14 @@ int LocalGenomicMap::balancerILP(const char * lpFn) {
     // e
     // source, sink
 
-    double * objective = new double[numVariables];
-    double * variableLowerBound = new double[numVariables];
-    double * variableUpperBound = new double[numVariables];
-    double * constrainLowerBound = new double[numConstrains];
-    double * constrainUpperBound = new double[numConstrains];
+    double *objective = new double[numVariables];
+    double *variableLowerBound = new double[numVariables];
+    double *variableUpperBound = new double[numVariables];
+    double *constrainLowerBound = new double[numConstrains];
+    double *constrainUpperBound = new double[numConstrains];
     cout << "Declare done" << endl;
 
-    CoinPackedMatrix * matrix = new CoinPackedMatrix(false, 0, 0);
+    CoinPackedMatrix *matrix = new CoinPackedMatrix(false, 0, 0);
 
     double hap_cov = mGraph->getHaploidDepth();
     int maxCopy = 999999;
@@ -383,7 +393,7 @@ int LocalGenomicMap::balancerILP(const char * lpFn) {
         //     }
         // }
         constrain7.insert(i, 1);
-        for (Edge * e : *((*segs)[i]->getPositiveVertex()->getEdgesAsTarget())) {
+        for (Edge *e : *((*segs)[i]->getPositiveVertex()->getEdgesAsTarget())) {
             // cout << e->getInfo() << endl;
             int juncIndex = mGraph->getJunctionIndexByEdge(e);
             found = find(visitedIdx.begin(), visitedIdx.end(), juncIndex);
@@ -419,7 +429,7 @@ int LocalGenomicMap::balancerILP(const char * lpFn) {
         //     }
         // }
         constrain8.insert(i, 1);
-        for (Edge * e : *((*segs)[i]->getPositiveVertex()->getEdgesAsSource())) {
+        for (Edge *e : *((*segs)[i]->getPositiveVertex()->getEdgesAsSource())) {
             int juncIndex = mGraph->getJunctionIndexByEdge(e);
             found = find(visitedIdx.begin(), visitedIdx.end(), juncIndex);
             if (found == visitedIdx.end()) {
@@ -633,7 +643,7 @@ int LocalGenomicMap::balancerILP(const char * lpFn) {
     //     objective[numSegsJuncs + 3 * segs->size() + 3 * i + 1] = 100;
     //     objective[numSegsJuncs + 3 * segs->size() + 3 * i + 2] = 10000;
     // }
-    
+
     // lower & upper bounds for segments and corresponding epsilons variables
     for (int i = 0; i < segs->size(); i++) {
         if ((*segs)[i]->hasLowerBoundLimit()) {  // inferred junctions have lower bound 1
@@ -669,10 +679,12 @@ int LocalGenomicMap::balancerILP(const char * lpFn) {
         // if (!(*juncs)[i]->hasLowerBoundLimit()) {
         if ((*juncs)[i]->isInferred()) {
             variableLowerBound[numSegsJuncs + i] = 0;
-            cout << "infer info - 0: " << i << " " << segs->size() + i << " " << numSegsJuncs + i << " " << (*juncs)[i]->getInfo()[0] << " " << endl;
+            cout << "infer info - 0: " << i << " " << segs->size() + i << " " << numSegsJuncs + i << " "
+                 << (*juncs)[i]->getInfo()[0] << " " << endl;
         } else {
             variableLowerBound[numSegsJuncs + i] = 1;
-            cout << "infer info - 1: " << i << " " << segs->size() + i << " " << numSegsJuncs + i << " " << (*juncs)[i]->getInfo()[0] << " " << endl;
+            cout << "infer info - 1: " << i << " " << segs->size() + i << " " << numSegsJuncs + i << " "
+                 << (*juncs)[i]->getInfo()[0] << " " << endl;
         }
         variableUpperBound[numSegsJuncs + i] = 1;
 
@@ -689,12 +701,13 @@ int LocalGenomicMap::balancerILP(const char * lpFn) {
     cout << "LU junc done" << endl;
     variableLowerBound[numVariables - 2] = 0;
     variableUpperBound[numVariables - 2] = si->getInfinity();
-   //  variableUpperBound[numVariables - 2] = 0;
+    //  variableUpperBound[numVariables - 2] = 0;
     variableLowerBound[numVariables - 1] = 0;
     variableUpperBound[numVariables - 1] = si->getInfinity();
     // variableUpperBound[numVariables - 1] = 0;
 
-    si->loadProblem(*matrix, variableLowerBound, variableUpperBound, objective, constrainLowerBound, constrainUpperBound);
+    si->loadProblem(*matrix, variableLowerBound, variableUpperBound, objective, constrainLowerBound,
+                    constrainUpperBound);
     // set integer for segment and junction variables
     for (int i = 0; i < numSegsJuncs + juncs->size(); i++) {
         si->setInteger(i);
@@ -771,11 +784,11 @@ void LocalGenomicMap::addAllJuncsFromDB(JunctionDB *aJuncDB) {
             try {
                 if (rec->getStrand() == '+') {
                     currentVertex = mGraph->getSegmentByChromEnd(
-                        rec->getChrom(), rec->getPos()
+                            rec->getChrom(), rec->getPos()
                     )->getPositiveVertex();
                 } else {
                     currentVertex = mGraph->getSegmentByChromStart(
-                        rec->getChrom(), rec->getPos()
+                            rec->getChrom(), rec->getPos()
                     )->getNegativeVertex();
                 }
             } catch (SegmentDoesNotExistException &e) {
@@ -789,11 +802,11 @@ void LocalGenomicMap::addAllJuncsFromDB(JunctionDB *aJuncDB) {
             try {
                 if (ent->strand == '+') {
                     nextVertex = mGraph->getSegmentByChromStart(
-                        ent->chrom, ent->pos
+                            ent->chrom, ent->pos
                     )->getPositiveVertex();
                 } else {
                     nextVertex = mGraph->getSegmentByChromEnd(
-                        ent->chrom, ent->pos
+                            ent->chrom, ent->pos
                     )->getNegativeVertex();
                 }
             } catch (SegmentDoesNotExistException &e) {
@@ -804,10 +817,10 @@ void LocalGenomicMap::addAllJuncsFromDB(JunctionDB *aJuncDB) {
             }
             try {
                 Junction *inferredJunc = mGraph->addJunction(
-                    currentVertex, nextVertex,
-                    this->inferCoverage(currentVertex, nextVertex),
-                    this->inferCredibility(currentVertex, nextVertex),
-                    -1, true, false, false
+                        currentVertex, nextVertex,
+                        this->inferCoverage(currentVertex, nextVertex),
+                        this->inferCredibility(currentVertex, nextVertex),
+                        -1, true, false, false
                 );
                 if (inferredJunc == NULL) {
                     continue;
@@ -829,11 +842,11 @@ void LocalGenomicMap::addAllJuncsFromDB(JunctionDB *aJuncDB) {
             try {
                 if (rec->getStrand() == '+') {
                     currentVertex = mGraph->getSegmentByChromStart(
-                        rec->getChrom(), rec->getPos()
+                            rec->getChrom(), rec->getPos()
                     )->getPositiveVertex();
                 } else {
                     currentVertex = mGraph->getSegmentByChromEnd(
-                        rec->getChrom(), rec->getPos()
+                            rec->getChrom(), rec->getPos()
                     )->getNegativeVertex();
                 }
             } catch (SegmentDoesNotExistException &e) {
@@ -847,11 +860,11 @@ void LocalGenomicMap::addAllJuncsFromDB(JunctionDB *aJuncDB) {
             try {
                 if (ent->strand == '+') {
                     prevVertex = mGraph->getSegmentByChromEnd(
-                        ent->chrom, ent->pos
+                            ent->chrom, ent->pos
                     )->getPositiveVertex();
                 } else {
                     prevVertex = mGraph->getSegmentByChromStart(
-                        ent->chrom, ent->pos
+                            ent->chrom, ent->pos
                     )->getNegativeVertex();
                 }
             } catch (SegmentDoesNotExistException &e) {
@@ -862,10 +875,10 @@ void LocalGenomicMap::addAllJuncsFromDB(JunctionDB *aJuncDB) {
             }
             try {
                 Junction *inferredJunc = mGraph->addJunction(
-                    prevVertex, currentVertex,
-                    this->inferCoverage(prevVertex, currentVertex),
-                    this->inferCredibility(prevVertex, currentVertex),
-                    -1, true, false, false
+                        prevVertex, currentVertex,
+                        this->inferCoverage(prevVertex, currentVertex),
+                        this->inferCredibility(prevVertex, currentVertex),
+                        -1, true, false, false
                 );
                 if (inferredJunc == NULL) {
                     continue;
@@ -886,12 +899,12 @@ void LocalGenomicMap::addAllJuncsFromDB(JunctionDB *aJuncDB) {
     // }
 }
 
-int LocalGenomicMap::strandCross(Vertex * aVertex) {
+int LocalGenomicMap::strandCross(Vertex *aVertex) {
     int flag = 0;
-    Vertex * startVertex = aVertex;
+    Vertex *startVertex = aVertex;
     VertexPath vertexStack;
     vertexStack.push_back(startVertex);
-    Edge * prevEdge = this->selectPrevEdge(startVertex);
+    Edge *prevEdge = this->selectPrevEdge(startVertex);
     while (true) {
         if (prevEdge == NULL) {
             vertexStack.pop_back();
@@ -902,7 +915,7 @@ int LocalGenomicMap::strandCross(Vertex * aVertex) {
                 prevEdge = this->selectPrevEdge(startVertex);
             }
         } else {
-            Vertex * prevVertex = prevEdge->getSource();
+            Vertex *prevVertex = prevEdge->getSource();
             // cout << nextEdge->getInfo() << ", forward" << endl;
 
             if (prevVertex->getDir() != aVertex->getDir()) {
@@ -921,7 +934,7 @@ int LocalGenomicMap::strandCross(Vertex * aVertex) {
 
     startVertex = aVertex;
     vertexStack.push_back(startVertex);
-    Edge * nextEdge = this->selectNextEdge(startVertex);
+    Edge *nextEdge = this->selectNextEdge(startVertex);
     while (true) {
         if (nextEdge == NULL) {
             vertexStack.pop_back();
@@ -932,7 +945,7 @@ int LocalGenomicMap::strandCross(Vertex * aVertex) {
                 nextEdge = this->selectNextEdge(startVertex);
             }
         } else {
-            Vertex * nextVertex = nextEdge->getTarget();
+            Vertex *nextVertex = nextEdge->getTarget();
             // cout << nextEdge->getInfo() << ", forward" << endl;
 
             if (nextVertex->getDir() != aVertex->getDir()) {
@@ -952,12 +965,12 @@ int LocalGenomicMap::strandCross(Vertex * aVertex) {
     return flag;
 }
 
-bool LocalGenomicMap::doesPathExists(Vertex * aStartVertex, Vertex * aEndVertex) {
+bool LocalGenomicMap::doesPathExists(Vertex *aStartVertex, Vertex *aEndVertex) {
     bool isReach = false;
-    Vertex * startVertex = aStartVertex;
+    Vertex *startVertex = aStartVertex;
     VertexPath vertexStack;
     vertexStack.push_back(startVertex);
-    Edge * nextEdge = this->selectNextEdge(startVertex);
+    Edge *nextEdge = this->selectNextEdge(startVertex);
     while (true) {
         if (nextEdge == NULL) {
             vertexStack.pop_back();
@@ -968,7 +981,7 @@ bool LocalGenomicMap::doesPathExists(Vertex * aStartVertex, Vertex * aEndVertex)
                 nextEdge = this->selectNextEdge(startVertex);
             }
         } else {
-            Vertex * nextVertex = nextEdge->getTarget();
+            Vertex *nextVertex = nextEdge->getTarget();
             // cout << nextEdge->getInfo() << ", forward" << endl;
 
             // if (nextVertex == mGraph->getSink()->getNegativeVertex()) {
@@ -996,49 +1009,55 @@ bool LocalGenomicMap::doesPathExists(Vertex * aStartVertex, Vertex * aEndVertex)
     return isReach;
 }
 
-double LocalGenomicMap::inferCoverage(Vertex * aSource, Vertex * aTarget) {
+double LocalGenomicMap::inferCoverage(Vertex *aSource, Vertex *aTarget) {
     double inCoverage = aTarget->getWeight()->getCoverage() - aTarget->getInCoverage();
     double outCoverage = aSource->getWeight()->getCoverage() - aSource->getOutCoverage();
     return max(1.0, (inCoverage + outCoverage) / 2.0);
 }
 
-double LocalGenomicMap::weightedCredibility(Vertex * aVertex, bool aIsSource) {
+double LocalGenomicMap::weightedCredibility(Vertex *aVertex, bool aIsSource) {
     // the coefficient is modified by a constant setting
     if (aIsSource) {
-        return 1.0 * aVertex->getCredibility() * max(0.0, aVertex->getWeight()->getCoverage() - aVertex->getOutCoverage()) / mGraph->getAvgCoverage();
+        return 1.0 * aVertex->getCredibility() *
+               max(0.0, aVertex->getWeight()->getCoverage() - aVertex->getOutCoverage()) / mGraph->getAvgCoverage();
     } else {
-        return 1.0 * aVertex->getCredibility() * max(0.0, aVertex->getWeight()->getCoverage() - aVertex->getInCoverage()) / mGraph->getAvgCoverage();
+        return 1.0 * aVertex->getCredibility() *
+               max(0.0, aVertex->getWeight()->getCoverage() - aVertex->getInCoverage()) / mGraph->getAvgCoverage();
     }
 }
 
-double LocalGenomicMap::inferCredibility(Vertex * aSource, Vertex * aTarget) {
+double LocalGenomicMap::inferCredibility(Vertex *aSource, Vertex *aTarget) {
     return (this->weightedCredibility(aSource, true) + this->weightedCredibility(aTarget, false)) / 2;
 }
 
 void LocalGenomicMap::connectSourceSink() {
-    mGraph->addJunction(mGraph->getSink()->getPositiveVertex(), mGraph->getSource()->getPositiveVertex(), (mGraph->getSource()->getWeight()->getCoverage() + mGraph->getSink()->getWeight()->getCoverage()) / 2, 1.0, -1, true, false, true);
+    mGraph->addJunction(mGraph->getSink()->getPositiveVertex(), mGraph->getSource()->getPositiveVertex(),
+                        (mGraph->getSource()->getWeight()->getCoverage() +
+                         mGraph->getSink()->getWeight()->getCoverage()) / 2, 1.0, -1, true, false, true);
 }
 
-void LocalGenomicMap::countReachability(int * nReachability, VertexPath & notReachableVertices, Vertex * targetVertex) {
+void LocalGenomicMap::countReachability(int *nReachability, VertexPath &notReachableVertices, Vertex *targetVertex) {
     cout << "count reach" << endl;
     // mGraph->print();
-    vector< pair<Vertex *, int> > vertex_reach_count;
+    vector<pair<Vertex *, int> > vertex_reach_count;
     for (VertexPath::const_iterator i = notReachableVertices.begin(); i != notReachableVertices.end(); i++) {
         // cout << "Counting Reachability for " << (*i)->getInfo() << endl;
         int count = 0;
         for (VertexPath::const_iterator j = notReachableVertices.begin(); j != notReachableVertices.end(); j++) {
             if (j == i) continue;
-            if (targetVertex == mGraph->getSource()->getPositiveVertex() || targetVertex == mGraph->getSink()->getNegativeVertex()) {
+            if (targetVertex == mGraph->getSource()->getPositiveVertex() ||
+                targetVertex == mGraph->getSink()->getNegativeVertex()) {
                 if (mGraph->BFS(*i, *j) >= 0) {
-                // if (this->doesPathExists(*i, *j)) {
+                    // if (this->doesPathExists(*i, *j)) {
                     count++;
                     // cout << (*i)->getInfo() << "=>" << (*j)->getInfo() << " connectable" << endl;
                 } else {
                     // cout << (*i)->getInfo() << "=>" << (*j)->getInfo() << " unconnectable" << endl;
                 }
-            } else if (targetVertex == mGraph->getSource()->getNegativeVertex() || targetVertex == mGraph->getSink()->getPositiveVertex()) {
+            } else if (targetVertex == mGraph->getSource()->getNegativeVertex() ||
+                       targetVertex == mGraph->getSink()->getPositiveVertex()) {
                 if (mGraph->BFS(*j, *i) >= 0) {
-                // if (this->doesPathExists(*j, *i)) {
+                    // if (this->doesPathExists(*j, *i)) {
                     count++;
                     // cout << (*i)->getInfo() << "=>" << (*j)->getInfo() << " connectable" << endl;
                 } else {
@@ -1049,7 +1068,7 @@ void LocalGenomicMap::countReachability(int * nReachability, VertexPath & notRea
         vertex_reach_count.push_back(pair<Vertex *, int>(*i, count));
         nReachability[i - notReachableVertices.begin()] = count;
     }
-    sort(vertex_reach_count.begin(), vertex_reach_count.end(), [](pair<Vertex *, int> e1, pair<Vertex *, int> e2) { 
+    sort(vertex_reach_count.begin(), vertex_reach_count.end(), [](pair<Vertex *, int> e1, pair<Vertex *, int> e2) {
         if (e1.second < e2.second) {
             return true;
         } else if (e1.second == e2.second) {
@@ -1062,14 +1081,15 @@ void LocalGenomicMap::countReachability(int * nReachability, VertexPath & notRea
         }
         return false;
         // return e1.second < e2.second; 
-        });
+    });
     notReachableVertices.clear();
-    for (vector< pair<Vertex *, int> >::reverse_iterator i = vertex_reach_count.rbegin(); i != vertex_reach_count.rend(); i++) {
+    for (vector<pair<Vertex *, int> >::reverse_iterator i = vertex_reach_count.rbegin();
+         i != vertex_reach_count.rend(); i++) {
         notReachableVertices.push_back(i->first);
     }
 }
 
-void LocalGenomicMap::findWithReachability(int * nReachability, VertexPath & notReachableVertices, int reachability) {
+void LocalGenomicMap::findWithReachability(int *nReachability, VertexPath &notReachableVertices, int reachability) {
     VertexPath backup = notReachableVertices;
     notReachableVertices.clear();
     for (int i = 0; i < backup.size(); i++) {
@@ -1079,25 +1099,25 @@ void LocalGenomicMap::findWithReachability(int * nReachability, VertexPath & not
     }
 }
 
-void LocalGenomicMap::reconnectNegativeToPositive(JunctionDB * aJuncDB, bool verbose) {
-    Vertex * v;
-    Record * rec;
-    Junction * inferredJunc;
+void LocalGenomicMap::reconnectNegativeToPositive(JunctionDB *aJuncDB, bool verbose) {
+    Vertex *v;
+    Record *rec;
+    Junction *inferredJunc;
     VertexPath asSourceVertices, asTargetVertices;
-    for (Segment * seg: *(mGraph->getSegments())) {
+    for (Segment *seg: *(mGraph->getSegments())) {
         if (seg->getId() > mGraph->getSink()->getId()) {
             cout << "Continue: " << seg->getId() << endl;
             continue;
         }
         v = seg->getNegativeVertex();
         bool asTargetFromPositive = false, asSourceToPositive = false;
-        for (Edge * e: *(v->getEdgesAsSource())) {
+        for (Edge *e: *(v->getEdgesAsSource())) {
             if (e->getTarget()->getDir() == '+') {
                 asSourceToPositive = true;
                 break;
             }
         }
-        for (Edge * e: *(v->getEdgesAsTarget())) {
+        for (Edge *e: *(v->getEdgesAsTarget())) {
             if (e->getSource()->getDir() == '+') {
                 asTargetFromPositive = true;
                 break;
@@ -1115,14 +1135,15 @@ void LocalGenomicMap::reconnectNegativeToPositive(JunctionDB * aJuncDB, bool ver
     // int q;
     // cin >> q;
     while (asTargetVertices.size() > 0 || asSourceVertices.size() > 0) {
-    for (Vertex * v: asSourceVertices) {
-        cout << "Current vertex: " << v->getInfo() << " " << v->getSegment()->getChrom() << " " << v->getStart() << v->getDir() << endl;
-        cout << "Finding previous vertex" << endl;
-        // v = seg->getNegativeVertex();
-        Segment * seg = v->getSegment();
-        // for (Edge * e: *(v->getEdgesAsSource())) {
+        for (Vertex *v: asSourceVertices) {
+            cout << "Current vertex: " << v->getInfo() << " " << v->getSegment()->getChrom() << " " << v->getStart()
+                 << v->getDir() << endl;
+            cout << "Finding previous vertex" << endl;
+            // v = seg->getNegativeVertex();
+            Segment *seg = v->getSegment();
+            // for (Edge * e: *(v->getEdgesAsSource())) {
             // V- => V+, add junction s.t. V+ => V-
-            Vertex * prevVertex;
+            Vertex *prevVertex;
 
             // Add junction to prev and next segment
             // cout << "Seg id: " << seg->getId() << endl;
@@ -1151,22 +1172,28 @@ void LocalGenomicMap::reconnectNegativeToPositive(JunctionDB * aJuncDB, bool ver
             bool added = false;
             rec = aJuncDB->findRecord(v->getSegment()->getChrom(), v->getStart(), v->getDir());
             if (rec != NULL && rec->getBackwardEntries()->size() > 0) {
-                for (vector<entry_t *>::reverse_iterator riter = rec->getBackwardEntries()->rbegin(); riter != rec->getBackwardEntries()->rend(); riter++) {
+                for (vector<entry_t *>::reverse_iterator riter = rec->getBackwardEntries()->rbegin();
+                     riter != rec->getBackwardEntries()->rend(); riter++) {
                     cout << (*riter)->chrom << " " << (*riter)->pos << (*riter)->strand << endl;
                     if ((*riter)->strand == '+') {
                         try {
-                            prevVertex = mGraph->getSegmentByChromEnd((*riter)->chrom, (*riter)->pos)->getPositiveVertex();
+                            prevVertex = mGraph->getSegmentByChromEnd((*riter)->chrom,
+                                                                      (*riter)->pos)->getPositiveVertex();
                             if (verbose)
-                                cout << "prev: " << prevVertex->getInfo() << " " << prevVertex->getSegment()->getChrom() << " " << v->getEnd() << v->getDir() << endl;
-                            inferredJunc = mGraph->addJunction(prevVertex, v, this->inferCoverage(prevVertex,v ), this->inferCredibility(prevVertex, v), -1, true, false, false);
+                                cout << "prev: " << prevVertex->getInfo() << " " << prevVertex->getSegment()->getChrom()
+                                     << " " << v->getEnd() << v->getDir() << endl;
+                            inferredJunc = mGraph->addJunction(prevVertex, v, this->inferCoverage(prevVertex, v),
+                                                               this->inferCredibility(prevVertex, v), -1, true, false,
+                                                               false);
                             if (inferredJunc == NULL) continue;
                             if (verbose)
-                                cout << "add junction with juncdb: " << inferredJunc->getInfo()[0] << ", " << inferredJunc->getInfo()[1] << endl;
+                                cout << "add junction with juncdb: " << inferredJunc->getInfo()[0] << ", "
+                                     << inferredJunc->getInfo()[1] << endl;
                             added = true;
                             break;
-                        } catch (DuplicateJunctionException& e) {
+                        } catch (DuplicateJunctionException &e) {
                             cout << e.what() << endl;
-                        } catch (SegmentDoesNotExistException& e) {
+                        } catch (SegmentDoesNotExistException &e) {
                             cout << e.what() << endl;
                         }
                     }
@@ -1176,7 +1203,7 @@ void LocalGenomicMap::reconnectNegativeToPositive(JunctionDB * aJuncDB, bool ver
                 cout << " As source N2P not added" << endl;
                 prevVertex = v;
                 while (true) {
-                    if (prevVertex->getId() >= mGraph->getSink()->getId() ||prevVertex->getId() == 1) {
+                    if (prevVertex->getId() >= mGraph->getSink()->getId() || prevVertex->getId() == 1) {
                         // prevVertex = mGraph->getSink()->getPositiveVertex();
                         // prevVertex = mGraph->getSegmentById(mGraph->getSink()->getId() - 1)->getPositiveVertex();
                         prevVertex = mGraph->getSegmentById(mGraph->getSink()->getId() - 1)->getPositiveVertex();
@@ -1184,19 +1211,23 @@ void LocalGenomicMap::reconnectNegativeToPositive(JunctionDB * aJuncDB, bool ver
                     } else {
                         prevVertex = mGraph->getSegmentById(prevVertex->getId() - 1)->getPositiveVertex();
                     }
-                try {
-                    if (verbose)
-                        cout << "prev: " << prevVertex->getInfo() << " " << prevVertex->getSegment()->getChrom() << " " << v->getEnd() << v->getDir() << endl;
-                    inferredJunc = mGraph->addJunction(prevVertex, v, this->inferCoverage(prevVertex,v ), this->inferCredibility(prevVertex, v), -1, true, false, false);
-                    if (inferredJunc == NULL) {
-                        continue;
-                    };
-                    if (verbose)
-                        cout << "add junction without juncdb: " << inferredJunc->getInfo()[0] << ", " << inferredJunc->getInfo()[1] << endl;
-                    break;
-                } catch (DuplicateJunctionException& e) {
-                    cout << e.what() << endl;
-                }
+                    try {
+                        if (verbose)
+                            cout << "prev: " << prevVertex->getInfo() << " " << prevVertex->getSegment()->getChrom()
+                                 << " " << v->getEnd() << v->getDir() << endl;
+                        inferredJunc = mGraph->addJunction(prevVertex, v, this->inferCoverage(prevVertex, v),
+                                                           this->inferCredibility(prevVertex, v), -1, true, false,
+                                                           false);
+                        if (inferredJunc == NULL) {
+                            continue;
+                        };
+                        if (verbose)
+                            cout << "add junction without juncdb: " << inferredJunc->getInfo()[0] << ", "
+                                 << inferredJunc->getInfo()[1] << endl;
+                        break;
+                    } catch (DuplicateJunctionException &e) {
+                        cout << e.what() << endl;
+                    }
                 }
             }
             // if (rec == NULL || rec->getBackwardEntries()->size() == 0) {
@@ -1229,15 +1260,16 @@ void LocalGenomicMap::reconnectNegativeToPositive(JunctionDB * aJuncDB, bool ver
             //         }
             //     }
             // }
-        // }
-    }
-    for (Vertex * v: asTargetVertices) {
-        cout << "Current vertex: " << v->getInfo() << " " << v->getSegment()->getChrom() << " " << v->getEnd() << v->getDir() << endl;
-        cout << "Finding next vertex" << endl;
-        Segment * seg = v->getSegment();
-        // for (Edge * e: *(v->getEdgesAsTarget())) {
+            // }
+        }
+        for (Vertex *v: asTargetVertices) {
+            cout << "Current vertex: " << v->getInfo() << " " << v->getSegment()->getChrom() << " " << v->getEnd()
+                 << v->getDir() << endl;
+            cout << "Finding next vertex" << endl;
+            Segment *seg = v->getSegment();
+            // for (Edge * e: *(v->getEdgesAsTarget())) {
             // V- => V+, add junction s.t. V+ => V-
-            Vertex * nextVertex;
+            Vertex *nextVertex;
 
             // Add junction to prev and next segment
             // nextVertex = mGraph->getSegmentById(seg->getId() + 1) -> getPositiveVertex();
@@ -1264,22 +1296,28 @@ void LocalGenomicMap::reconnectNegativeToPositive(JunctionDB * aJuncDB, bool ver
             bool added = false;
             rec = aJuncDB->findRecord(seg->getChrom(), seg->getEnd(), '-');
             if (rec != NULL && rec->getForwardEntries()->size() > 0) {
-                for (vector<entry_t *>::reverse_iterator riter = rec->getForwardEntries()->rbegin(); riter != rec->getForwardEntries()->rend(); riter++) {
+                for (vector<entry_t *>::reverse_iterator riter = rec->getForwardEntries()->rbegin();
+                     riter != rec->getForwardEntries()->rend(); riter++) {
                     if ((*riter)->strand == '+') {
                         try {
-                            nextVertex = mGraph->getSegmentByChromStart((*riter)->chrom, (*riter)->pos)->getPositiveVertex();
+                            nextVertex = mGraph->getSegmentByChromStart((*riter)->chrom,
+                                                                        (*riter)->pos)->getPositiveVertex();
                             if (verbose)
-                                cout << "next: " << nextVertex->getInfo() << " " << nextVertex->getSegment()->getChrom() << " " << v->getStart() << v->getDir() << endl;
-                                // cout << "next: " << nextVertex->getInfo() << endl;
-                            inferredJunc = mGraph->addJunction(v, nextVertex, this->inferCoverage(v, nextVertex), this->inferCredibility(v, nextVertex), -1, true, false, false);
+                                cout << "next: " << nextVertex->getInfo() << " " << nextVertex->getSegment()->getChrom()
+                                     << " " << v->getStart() << v->getDir() << endl;
+                            // cout << "next: " << nextVertex->getInfo() << endl;
+                            inferredJunc = mGraph->addJunction(v, nextVertex, this->inferCoverage(v, nextVertex),
+                                                               this->inferCredibility(v, nextVertex), -1, true, false,
+                                                               false);
                             if (inferredJunc == NULL) continue;
                             if (verbose)
-                                cout << "add junction with juncdb: " << inferredJunc->getInfo()[0] << ", " << inferredJunc->getInfo()[1] << endl;
+                                cout << "add junction with juncdb: " << inferredJunc->getInfo()[0] << ", "
+                                     << inferredJunc->getInfo()[1] << endl;
                             added = true;
                             break;
-                        } catch (DuplicateJunctionException& e) {
+                        } catch (DuplicateJunctionException &e) {
                             cout << e.what() << endl;
-                        } catch (SegmentDoesNotExistException& e) {
+                        } catch (SegmentDoesNotExistException &e) {
                             cout << e.what() << endl;
                         }
                     }
@@ -1289,7 +1327,8 @@ void LocalGenomicMap::reconnectNegativeToPositive(JunctionDB * aJuncDB, bool ver
                 cout << " As target N2P not added" << endl;
                 nextVertex = v;
                 while (true) {
-                    if (nextVertex->getId() >= mGraph->getSink()->getId() || nextVertex->getId() == mGraph->getSink()->getId()) {
+                    if (nextVertex->getId() >= mGraph->getSink()->getId() ||
+                        nextVertex->getId() == mGraph->getSink()->getId()) {
                         // nextVertex = mGraph->getSource()->getPositiveVertex();
                         nextVertex = mGraph->getSegmentById(mGraph->getSource()->getId() + 1)->getPositiveVertex();
                     } else {
@@ -1302,20 +1341,24 @@ void LocalGenomicMap::reconnectNegativeToPositive(JunctionDB * aJuncDB, bool ver
                     // if (nextVertex->getId() == mGraph->getSink()->getId()) {
                     //     nextVertex = mGraph->getSource()->getPositiveVertex();
                     // }
-                // nextVertex = mGraph->getSegmentById(nextVertex->getId() + 1)->getPositiveVertex();
-                try {
-                    if (verbose)
-                        cout << "next: " << nextVertex->getInfo() << " " << nextVertex->getSegment()->getChrom() << " " << v->getStart() << v->getDir() << endl;
-                    inferredJunc = mGraph->addJunction(v, nextVertex, this->inferCoverage(v, nextVertex), this->inferCredibility(v, nextVertex), -1, true, false, false);
-                    if (inferredJunc == NULL) {
-                        continue;
-                    };
-                    if (verbose)
-                        cout << "add junction without juncdb: " << inferredJunc->getInfo()[0] << ", " << inferredJunc->getInfo()[1] << endl;
-                    break;
-                } catch (DuplicateJunctionException& e) {
-                    cout << e.what() << endl;
-                }
+                    // nextVertex = mGraph->getSegmentById(nextVertex->getId() + 1)->getPositiveVertex();
+                    try {
+                        if (verbose)
+                            cout << "next: " << nextVertex->getInfo() << " " << nextVertex->getSegment()->getChrom()
+                                 << " " << v->getStart() << v->getDir() << endl;
+                        inferredJunc = mGraph->addJunction(v, nextVertex, this->inferCoverage(v, nextVertex),
+                                                           this->inferCredibility(v, nextVertex), -1, true, false,
+                                                           false);
+                        if (inferredJunc == NULL) {
+                            continue;
+                        };
+                        if (verbose)
+                            cout << "add junction without juncdb: " << inferredJunc->getInfo()[0] << ", "
+                                 << inferredJunc->getInfo()[1] << endl;
+                        break;
+                    } catch (DuplicateJunctionException &e) {
+                        cout << e.what() << endl;
+                    }
                 }
             }
             // if (rec == NULL || rec->getForwardEntries()->size() == 0) {
@@ -1348,45 +1391,45 @@ void LocalGenomicMap::reconnectNegativeToPositive(JunctionDB * aJuncDB, bool ver
             //         }
             //     }
             // }
-        //}
-    }
-    asTargetVertices.clear();
-    asSourceVertices.clear();
-    for (Segment * seg: *(mGraph->getSegments())) {
-        v = seg->getNegativeVertex();
-        bool asTargetFromPositive = false, asSourceToPositive = false;
-        for (Edge * e: *(v->getEdgesAsSource())) {
-            if (e->getTarget()->getDir() == '+') {
-                asSourceToPositive = true;
-                break;
+            //}
+        }
+        asTargetVertices.clear();
+        asSourceVertices.clear();
+        for (Segment *seg: *(mGraph->getSegments())) {
+            v = seg->getNegativeVertex();
+            bool asTargetFromPositive = false, asSourceToPositive = false;
+            for (Edge *e: *(v->getEdgesAsSource())) {
+                if (e->getTarget()->getDir() == '+') {
+                    asSourceToPositive = true;
+                    break;
+                }
+            }
+            for (Edge *e: *(v->getEdgesAsTarget())) {
+                if (e->getSource()->getDir() == '+') {
+                    asTargetFromPositive = true;
+                    break;
+                }
+            }
+            if (asTargetFromPositive != asSourceToPositive) {
+                if (asTargetFromPositive) {
+                    asTargetVertices.push_back(v);
+                } else {
+                    asSourceVertices.push_back(v);
+                }
             }
         }
-        for (Edge * e: *(v->getEdgesAsTarget())) {
-            if (e->getSource()->getDir() == '+') {
-                asTargetFromPositive = true;
-                break;
-            }
-        }
-        if (asTargetFromPositive != asSourceToPositive) {
-            if (asTargetFromPositive) {
-                asTargetVertices.push_back(v);
-            } else {
-                asSourceVertices.push_back(v);
-            }
-        }
-    }
-    // cout << asTargetVertices.size() << " " << asSourceVertices.size() << endl;
-    // int t;
-    // cin >> t;
+        // cout << asTargetVertices.size() << " " << asSourceVertices.size() << endl;
+        // int t;
+        // cin >> t;
     }
 }
 
-Vertex * LocalGenomicMap::getMostReachable(VertexPath & notReachableVertices, Vertex * targetVertex) {
-    Vertex * mostReachable = NULL;
+Vertex *LocalGenomicMap::getMostReachable(VertexPath &notReachableVertices, Vertex *targetVertex) {
+    Vertex *mostReachable = NULL;
     if (targetVertex == mGraph->getSource()->getPositiveVertex()) {
         // use the least id
         int mostReachableId = mGraph->getSegments()->size();
-        for (Vertex * v : notReachableVertices) {
+        for (Vertex *v : notReachableVertices) {
             if (v->getId() < mostReachableId) {
                 mostReachable = v;
                 mostReachableId = v->getId();
@@ -1395,7 +1438,7 @@ Vertex * LocalGenomicMap::getMostReachable(VertexPath & notReachableVertices, Ve
     } else if (targetVertex == mGraph->getSink()->getNegativeVertex()) {
         // use the greatest id
         int mostReachableId = -1;
-        for (Vertex * v : notReachableVertices) {
+        for (Vertex *v : notReachableVertices) {
             if (v->getId() > mostReachableId) {
                 mostReachable = v;
                 mostReachableId = v->getId();
@@ -1404,7 +1447,7 @@ Vertex * LocalGenomicMap::getMostReachable(VertexPath & notReachableVertices, Ve
     } else if (targetVertex == mGraph->getSource()->getNegativeVertex()) {
         // use the least id
         int mostReachableId = mGraph->getSegments()->size();
-        for (Vertex * v : notReachableVertices) {
+        for (Vertex *v : notReachableVertices) {
             if (v->getId() < mostReachableId) {
                 mostReachable = v;
                 mostReachableId = v->getId();
@@ -1413,7 +1456,7 @@ Vertex * LocalGenomicMap::getMostReachable(VertexPath & notReachableVertices, Ve
     } else if (targetVertex == mGraph->getSink()->getPositiveVertex()) {
         // use the greatest id
         int mostReachableId = -1;
-        for (Vertex * v : notReachableVertices) {
+        for (Vertex *v : notReachableVertices) {
             if (v->getId() > mostReachableId) {
                 mostReachable = v;
                 mostReachableId = v->getId();
@@ -1423,13 +1466,14 @@ Vertex * LocalGenomicMap::getMostReachable(VertexPath & notReachableVertices, Ve
     return mostReachable;
 }
 
-bool LocalGenomicMap::adjustReachability(VertexPath & notReachableVertices, Vertex * targetVertex, JunctionDB * aJuncDB, bool verbose) {
+bool LocalGenomicMap::adjustReachability(VertexPath &notReachableVertices, Vertex *targetVertex, JunctionDB *aJuncDB,
+                                         bool verbose) {
     // sort(notReachableVertices.begin(), notReachableVertices.end(), [](Vertex *v1, Vertex *v2) { return v1->getWeight()->getCoverage() > v2->getWeight()->getCoverage(); });
     // for (Vertex * v: notReachableVertices) {
     //     cout << v->getInfo() << ":" << v->getWeight()->getCoverage() << " ";
     // }
     // cout << endl;
-    int * nReachability = new int[notReachableVertices.size()];
+    int *nReachability = new int[notReachableVertices.size()];
     this->countReachability(nReachability, notReachableVertices, targetVertex);
     if (verbose) {
         for (int i = 0; i < notReachableVertices.size(); i++) {
@@ -1460,51 +1504,61 @@ bool LocalGenomicMap::adjustReachability(VertexPath & notReachableVertices, Vert
         //     continue;
         // }
 
-        if (targetVertex == mGraph->getSource()->getPositiveVertex() || targetVertex == mGraph->getSink()->getNegativeVertex()) {
-            cout << "Current vertex: " << mostReachable->getId() << " " << mostReachable->getSegment()->getChrom() << " " << mostReachable->getStart() << mostReachable->getDir() << endl;
+        if (targetVertex == mGraph->getSource()->getPositiveVertex() ||
+            targetVertex == mGraph->getSink()->getNegativeVertex()) {
+            cout << "Current vertex: " << mostReachable->getId() << " " << mostReachable->getSegment()->getChrom()
+                 << " " << mostReachable->getStart() << mostReachable->getDir() << endl;
 
-            rec = aJuncDB->findRecord(mostReachable->getSegment()->getChrom(), mostReachable->getStart(), mostReachable->getDir());
+            rec = aJuncDB->findRecord(mostReachable->getSegment()->getChrom(), mostReachable->getStart(),
+                                      mostReachable->getDir());
             // cout << rec->getChrom() << " " << rec->getPos() << " " << rec->getStrand() << endl;
             Vertex *prevVertex;
             Junction *inferredJunc;
             // if (rec == NULL || rec->getBackwardEntries()->size() == 0) {
             if (rec != NULL && rec->getBackwardEntries()->size() > 0) {
-            //     cout << "Record is NULL" << endl;
-            //     if (mostReachable->getDir() == '+') {
-            //         prevVertex = mGraph->getSegmentById(mostReachable->getId() - 1)->getPositiveVertex();
-            //     } else {
-            //         prevVertex = mGraph->getSegmentById(mostReachable->getId() + 1)->getNegativeVertex();
-            //     }
-            //     try {
-            //         if (verbose)
-            //             cout << "prev: " << prevVertex->getInfo() << endl;
-            //         inferredJunc = mGraph->addJunction(prevVertex, mostReachable, this->inferCoverage(prevVertex, mostReachable), this->inferCredibility(prevVertex, mostReachable), true, false);
-            //         if (verbose)
-            //             cout << "add junction without juncdb: " << inferredJunc->getInfo()[0] << ", " << inferredJunc->getInfo()[1] << endl;
-            //         hasAdded = true;
-            //     } catch (DuplicateJunctionException& e) {
-            //         cout << e.what() << endl;
-            //     }
-            // } else {
-                for (vector<entry_t *>::reverse_iterator riter = rec->getBackwardEntries()->rbegin(); riter != rec->getBackwardEntries()->rend(); riter++) {
+                //     cout << "Record is NULL" << endl;
+                //     if (mostReachable->getDir() == '+') {
+                //         prevVertex = mGraph->getSegmentById(mostReachable->getId() - 1)->getPositiveVertex();
+                //     } else {
+                //         prevVertex = mGraph->getSegmentById(mostReachable->getId() + 1)->getNegativeVertex();
+                //     }
+                //     try {
+                //         if (verbose)
+                //             cout << "prev: " << prevVertex->getInfo() << endl;
+                //         inferredJunc = mGraph->addJunction(prevVertex, mostReachable, this->inferCoverage(prevVertex, mostReachable), this->inferCredibility(prevVertex, mostReachable), true, false);
+                //         if (verbose)
+                //             cout << "add junction without juncdb: " << inferredJunc->getInfo()[0] << ", " << inferredJunc->getInfo()[1] << endl;
+                //         hasAdded = true;
+                //     } catch (DuplicateJunctionException& e) {
+                //         cout << e.what() << endl;
+                //     }
+                // } else {
+                for (vector<entry_t *>::reverse_iterator riter = rec->getBackwardEntries()->rbegin();
+                     riter != rec->getBackwardEntries()->rend(); riter++) {
                     cout << "backward " << (*riter)->chrom << " " << (*riter)->pos << " " << (*riter)->strand << endl;
                     try {
                         if ((*riter)->strand == '+') {
-                            prevVertex = mGraph->getSegmentByChromEnd((*riter)->chrom, (*riter)->pos)->getPositiveVertex();
+                            prevVertex = mGraph->getSegmentByChromEnd((*riter)->chrom,
+                                                                      (*riter)->pos)->getPositiveVertex();
                         } else {
-                            prevVertex = mGraph->getSegmentByChromStart((*riter)->chrom, (*riter)->pos)->getNegativeVertex();
+                            prevVertex = mGraph->getSegmentByChromStart((*riter)->chrom,
+                                                                        (*riter)->pos)->getNegativeVertex();
                         }
                         if (verbose)
                             cout << "prev: " << prevVertex->getInfo() << endl;
-                        inferredJunc = mGraph->addJunction(prevVertex, mostReachable, this->inferCoverage(prevVertex, mostReachable), this->inferCredibility(prevVertex, mostReachable), -1, true, false, false);
+                        inferredJunc = mGraph->addJunction(prevVertex, mostReachable,
+                                                           this->inferCoverage(prevVertex, mostReachable),
+                                                           this->inferCredibility(prevVertex, mostReachable), -1, true,
+                                                           false, false);
                         if (inferredJunc == NULL) continue;
                         if (verbose)
-                            cout << "add junction with juncdb: " << inferredJunc->getInfo()[0] << ", " << inferredJunc->getInfo()[1] << endl;
+                            cout << "add junction with juncdb: " << inferredJunc->getInfo()[0] << ", "
+                                 << inferredJunc->getInfo()[1] << endl;
                         hasAdded = true;
                         break;
-                    } catch (SegmentDoesNotExistException& e) {
+                    } catch (SegmentDoesNotExistException &e) {
                         cout << e.what() << endl;
-                    } catch (DuplicateJunctionException& e) {
+                    } catch (DuplicateJunctionException &e) {
                         cout << e.what() << endl;
                     }
                 }
@@ -1514,83 +1568,95 @@ bool LocalGenomicMap::adjustReachability(VertexPath & notReachableVertices, Vert
                 // TODO: need refinement
                 prevVertex = mostReachable;
                 while (true) {
-                if (mostReachable->getDir() == '+') {
-                    // prevVertex = mGraph->getSegmentById(mostReachable->getId() - 1)->getPositiveVertex();
-                    if (prevVertex->getId() == mGraph->getSource()->getId()) {
-                        prevVertex = mGraph->getSink()->getPositiveVertex();
-                        // break;
-                    } else if (prevVertex->getId() > mGraph->getSink()->getId()) {
-                        break;
+                    if (mostReachable->getDir() == '+') {
+                        // prevVertex = mGraph->getSegmentById(mostReachable->getId() - 1)->getPositiveVertex();
+                        if (prevVertex->getId() == mGraph->getSource()->getId()) {
+                            prevVertex = mGraph->getSink()->getPositiveVertex();
+                            // break;
+                        } else if (prevVertex->getId() > mGraph->getSink()->getId()) {
+                            break;
+                        } else {
+                            prevVertex = mGraph->getSegmentById(prevVertex->getId() - 1)->getPositiveVertex();
+                        }
                     } else {
-                        prevVertex = mGraph->getSegmentById(prevVertex->getId() - 1)->getPositiveVertex();
+                        // prevVertex = mGraph->getSegmentById(mostReachable->getId() + 1)->getNegativeVertex();
+                        if (prevVertex->getId() == mGraph->getSink()->getId()) {
+                            prevVertex = mGraph->getSource()->getNegativeVertex();
+                            // break;
+                        } else if (prevVertex->getId() > mGraph->getSink()->getId()) {
+                            break;
+                        } else {
+                            prevVertex = mGraph->getSegmentById(prevVertex->getId() + 1)->getNegativeVertex();
+                        }
                     }
-                } else {
-                    // prevVertex = mGraph->getSegmentById(mostReachable->getId() + 1)->getNegativeVertex();
-                    if (prevVertex->getId() == mGraph->getSink()->getId()) {
-                        prevVertex = mGraph->getSource()->getNegativeVertex();
-                        // break;
-                    } else if (prevVertex->getId() > mGraph->getSink()->getId()) {
+                    try {
+                        if (verbose)
+                            cout << "prev: " << prevVertex->getInfo() << endl;
+                        inferredJunc = mGraph->addJunction(prevVertex, mostReachable,
+                                                           this->inferCoverage(prevVertex, mostReachable),
+                                                           this->inferCredibility(prevVertex, mostReachable), -1, true,
+                                                           false, false);
+                        if (inferredJunc == NULL) continue;
+                        if (verbose)
+                            cout << "add junction without juncdb: " << inferredJunc->getInfo()[0] << ", "
+                                 << inferredJunc->getInfo()[1] << endl;
+                        hasAdded = true;
                         break;
-                    } else {
-                        prevVertex = mGraph->getSegmentById(prevVertex->getId() + 1)->getNegativeVertex();
+                    } catch (DuplicateJunctionException &e) {
+                        cout << e.what() << endl;
                     }
-                }
-                try {
-                    if (verbose)
-                        cout << "prev: " << prevVertex->getInfo() << endl;
-                    inferredJunc = mGraph->addJunction(prevVertex, mostReachable, this->inferCoverage(prevVertex, mostReachable), this->inferCredibility(prevVertex, mostReachable), -1, true, false, false);
-                    if (inferredJunc == NULL) continue;
-                    if (verbose)
-                        cout << "add junction without juncdb: " << inferredJunc->getInfo()[0] << ", " << inferredJunc->getInfo()[1] << endl;
-                    hasAdded = true;
-                    break;
-                } catch (DuplicateJunctionException& e) {
-                    cout << e.what() << endl;
-                }
                 }
             }
         } else {
-            rec = aJuncDB->findRecord(mostReachable->getSegment()->getChrom(), mostReachable->getEnd(), mostReachable->getDir());
+            rec = aJuncDB->findRecord(mostReachable->getSegment()->getChrom(), mostReachable->getEnd(),
+                                      mostReachable->getDir());
             Vertex *nextVertex;
             Junction *inferredJunc;
             // if (rec == NULL || rec->getForwardEntries()->size() == 0) {
             if (rec != NULL && rec->getForwardEntries()->size() > 0) {
-            //     cout << "Record is NULL" << endl;
-            //     if (mostReachable->getDir() == '+') {
-            //         nextVertex = mGraph->getSegmentById(mostReachable->getId() + 1)->getPositiveVertex();
-            //     } else {
-            //         nextVertex = mGraph->getSegmentById(mostReachable->getId() - 1)->getNegativeVertex();
-            //     }
-            //     try {
-            //         if (verbose)
-            //             cout << "prev: " << nextVertex->getInfo() << endl;
-            //         inferredJunc = mGraph->addJunction(mostReachable, nextVertex, this->inferCoverage(mostReachable, nextVertex), this->inferCredibility(mostReachable, nextVertex), true, false);
-            //         if (verbose)
-            //             cout << "add junction without juncdb: " << inferredJunc->getInfo()[0] << ", " << inferredJunc->getInfo()[1] << endl;
-            //         hasAdded = true;
-            //     } catch (DuplicateJunctionException& e) {
-            //         cout << e.what() << endl;
-            //     }
-            // } else {
-                for (vector<entry_t *>::reverse_iterator riter = rec->getForwardEntries()->rbegin(); riter != rec->getForwardEntries()->rend(); riter++) {
+                //     cout << "Record is NULL" << endl;
+                //     if (mostReachable->getDir() == '+') {
+                //         nextVertex = mGraph->getSegmentById(mostReachable->getId() + 1)->getPositiveVertex();
+                //     } else {
+                //         nextVertex = mGraph->getSegmentById(mostReachable->getId() - 1)->getNegativeVertex();
+                //     }
+                //     try {
+                //         if (verbose)
+                //             cout << "prev: " << nextVertex->getInfo() << endl;
+                //         inferredJunc = mGraph->addJunction(mostReachable, nextVertex, this->inferCoverage(mostReachable, nextVertex), this->inferCredibility(mostReachable, nextVertex), true, false);
+                //         if (verbose)
+                //             cout << "add junction without juncdb: " << inferredJunc->getInfo()[0] << ", " << inferredJunc->getInfo()[1] << endl;
+                //         hasAdded = true;
+                //     } catch (DuplicateJunctionException& e) {
+                //         cout << e.what() << endl;
+                //     }
+                // } else {
+                for (vector<entry_t *>::reverse_iterator riter = rec->getForwardEntries()->rbegin();
+                     riter != rec->getForwardEntries()->rend(); riter++) {
                     cout << "forward " << (*riter)->chrom << " " << (*riter)->pos << endl;
                     try {
                         if ((*riter)->strand == '+') {
-                            nextVertex = mGraph->getSegmentByChromStart((*riter)->chrom, (*riter)->pos)->getPositiveVertex();
+                            nextVertex = mGraph->getSegmentByChromStart((*riter)->chrom,
+                                                                        (*riter)->pos)->getPositiveVertex();
                         } else {
-                            nextVertex = mGraph->getSegmentByChromEnd((*riter)->chrom, (*riter)->pos)->getNegativeVertex();
+                            nextVertex = mGraph->getSegmentByChromEnd((*riter)->chrom,
+                                                                      (*riter)->pos)->getNegativeVertex();
                         }
                         if (verbose)
                             cout << "prev: " << nextVertex->getInfo() << endl;
-                        inferredJunc = mGraph->addJunction(mostReachable, nextVertex, this->inferCoverage(mostReachable, nextVertex), this->inferCredibility(mostReachable, nextVertex), -1, true, false, false);
+                        inferredJunc = mGraph->addJunction(mostReachable, nextVertex,
+                                                           this->inferCoverage(mostReachable, nextVertex),
+                                                           this->inferCredibility(mostReachable, nextVertex), -1, true,
+                                                           false, false);
                         if (inferredJunc == NULL) continue;
                         if (verbose)
-                            cout << "add junction with juncdb: " << inferredJunc->getInfo()[0] << ", " << inferredJunc->getInfo()[1] << endl;
+                            cout << "add junction with juncdb: " << inferredJunc->getInfo()[0] << ", "
+                                 << inferredJunc->getInfo()[1] << endl;
                         hasAdded = true;
                         break;
-                    } catch (SegmentDoesNotExistException& e) {
+                    } catch (SegmentDoesNotExistException &e) {
                         cout << e.what() << endl;
-                    } catch (DuplicateJunctionException& e) {
+                    } catch (DuplicateJunctionException &e) {
                         cout << e.what() << endl;
                     }
                 }
@@ -1600,39 +1666,43 @@ bool LocalGenomicMap::adjustReachability(VertexPath & notReachableVertices, Vert
                 // TODO: need refinement
                 nextVertex = mostReachable;
                 while (true) {
-                if (mostReachable->getDir() == '+') {
-                    // nextVertex = mGraph->getSegmentById(mostReachable->getId() + 1)->getPositiveVertex();
-                    if (nextVertex->getId() == mGraph->getSink()->getId()) {
-                        nextVertex = mGraph->getSource()->getPositiveVertex();
-                        // break;
-                    } else if (nextVertex->getId() > mGraph->getSink()->getId()) {
-                        break;
+                    if (mostReachable->getDir() == '+') {
+                        // nextVertex = mGraph->getSegmentById(mostReachable->getId() + 1)->getPositiveVertex();
+                        if (nextVertex->getId() == mGraph->getSink()->getId()) {
+                            nextVertex = mGraph->getSource()->getPositiveVertex();
+                            // break;
+                        } else if (nextVertex->getId() > mGraph->getSink()->getId()) {
+                            break;
+                        } else {
+                            nextVertex = mGraph->getSegmentById(nextVertex->getId() + 1)->getPositiveVertex();
+                        }
                     } else {
-                        nextVertex = mGraph->getSegmentById(nextVertex->getId() + 1)->getPositiveVertex();
+                        // nextVertex = mGraph->getSegmentById(mostReachable->getId() - 1)->getNegativeVertex();
+                        if (nextVertex->getId() == mGraph->getSource()->getId()) {
+                            nextVertex = mGraph->getSink()->getNegativeVertex();
+                            // break;
+                        } else if (nextVertex->getId() > mGraph->getSink()->getId()) {
+                            break;
+                        } else {
+                            nextVertex = mGraph->getSegmentById(nextVertex->getId() - 1)->getNegativeVertex();
+                        }
                     }
-                } else {
-                    // nextVertex = mGraph->getSegmentById(mostReachable->getId() - 1)->getNegativeVertex();
-                    if (nextVertex->getId() == mGraph->getSource()->getId()) {
-                        nextVertex = mGraph->getSink()->getNegativeVertex();
-                        // break;
-                    } else if (nextVertex->getId() > mGraph->getSink()->getId()) {
+                    try {
+                        if (verbose)
+                            cout << "next: " << nextVertex->getInfo() << endl;
+                        inferredJunc = mGraph->addJunction(mostReachable, nextVertex,
+                                                           this->inferCoverage(mostReachable, nextVertex),
+                                                           this->inferCredibility(mostReachable, nextVertex), -1, true,
+                                                           false, false);
+                        if (inferredJunc == NULL) continue;
+                        if (verbose)
+                            cout << "add junction without juncdb: " << inferredJunc->getInfo()[0] << ", "
+                                 << inferredJunc->getInfo()[1] << endl;
+                        hasAdded = true;
                         break;
-                    } else {
-                        nextVertex = mGraph->getSegmentById(nextVertex->getId() - 1)->getNegativeVertex();
+                    } catch (DuplicateJunctionException &e) {
+                        cout << e.what() << endl;
                     }
-                }
-                try {
-                    if (verbose)
-                        cout << "next: " << nextVertex->getInfo() << endl;
-                    inferredJunc = mGraph->addJunction(mostReachable, nextVertex, this->inferCoverage(mostReachable, nextVertex), this->inferCredibility(mostReachable, nextVertex), -1, true, false, false);
-                    if (inferredJunc == NULL) continue;
-                    if (verbose)
-                        cout << "add junction without juncdb: " << inferredJunc->getInfo()[0] << ", " << inferredJunc->getInfo()[1] << endl;
-                    hasAdded = true;
-                    break;
-                } catch (DuplicateJunctionException& e) {
-                    cout << e.what() << endl;
-                }
                 }
             }
         }
@@ -1644,108 +1714,108 @@ bool LocalGenomicMap::adjustReachability(VertexPath & notReachableVertices, Vert
     // if (rec == NULL) {
     //     // no related records in database, add juntion to nearby segment
     // } else {
-        // if (targetVertex == mGraph->getSource()->getPositiveVertex()) {
-        //     // backward to source+
-        //     Vertex * prevVertex;
-        //     while (true) {
-        //         try {
-        //             Vertex * selectedVertex = this->selectPrevVertex(mostReachable, mGraph->getSource()->getPositiveVertex(), aJuncDB);
-        //             if (selectedVertex != NULL) {
-        //                 prevVertex = selectedVertex;
-        //             } else {
-        //                 cout << "No available record for backward source" << endl;
-        //                 if (mostReachable->getDir() == '+') {
-        //                     prevVertex = mGraph->getPrevVertexById(mostReachable);
-        //                 } else {
-        //                     prevVertex = mGraph->getPrevVertexById(mostReachable->getComplementVertex());
-        //                 }
-        //             }
-        //             if (verbose) cout << "prev: " << prevVertex->getInfo() << endl;
-        //             Junction * inferredJunc = mGraph->addJunction(prevVertex, mostReachable, this->inferCoverage(prevVertex, mostReachable), this->inferCredibility(prevVertex, mostReachable), true, false);
-        //             if (verbose) cout << "add junction: " << inferredJunc->getInfo()[0] << ", " << inferredJunc->getInfo()[1] << endl;
-        //             break;
-        //         } catch (DuplicateJunctionException& e) {
-        //             cout << e.what() << endl;
-        //             mostReachable = prevVertex;
-        //             // prevVertex = mGraph->getPrevVertexById(mostReachable);
-        //         }
-        //     }
-        // } else if (targetVertex == mGraph->getSink()->getNegativeVertex()) {
-        //     // backward to sink-
-        //     Vertex * prevVertex;
-        //     while (true) {
-        //         try {
-        //             Vertex * selectedVertex = this->selectPrevVertex(mostReachable, mGraph->getSink()->getNegativeVertex(), aJuncDB);
-        //             if (selectedVertex != NULL) {
-        //                 prevVertex = selectedVertex;
-        //             } else {
-        //                 if (mostReachable->getDir() == '+') {
-        //                     prevVertex = mGraph->getPrevVertexById(mostReachable->getComplementVertex());
-        //                 } else {
-        //                     prevVertex = mGraph->getPrevVertexById(mostReachable);
-        //                 }
-        //             }
-        //             if (verbose) cout << "prev: " << prevVertex->getInfo() << endl;
-        //             Junction * inferredJunc = mGraph->addJunction(prevVertex, mostReachable, this->inferCoverage(prevVertex, mostReachable), this->inferCredibility(prevVertex, mostReachable), true, false);
-        //             if (verbose) cout << "add junction: " << inferredJunc->getInfo()[0] << ", " << inferredJunc->getInfo()[1] << endl;
-        //             break;
-        //         } catch (DuplicateJunctionException& e) {
-        //             cout << e.what() << endl;
-        //             mostReachable = prevVertex;
-        //             // prevVertex = mGraph->getPrevVertexById(mostReachable);
-        //         }
-        //     }
-        // } else if (targetVertex == mGraph->getSink()->getPositiveVertex()) {
-        //     // forward to sink+
-        //     Vertex * nextVertex;
-        //     while (true) {
-        //         try {
-        //             Vertex * selectedVertex = this->selectNextVertex(mostReachable, mGraph->getSink()->getPositiveVertex(), aJuncDB);
-        //             if (selectedVertex != NULL) {
-        //                 nextVertex = selectedVertex;
-        //             } else {
-        //                 if (mostReachable->getDir() == '+') {
-        //                     nextVertex = mGraph->getNextVertexById(mostReachable);
-        //                 } else {
-        //                     nextVertex = mGraph->getNextVertexById(mostReachable->getComplementVertex());
-        //                 }
-        //             }
-        //             if (verbose) cout << "prev: " << nextVertex->getInfo() << endl;
-        //             Junction * inferredJunc = mGraph->addJunction(mostReachable, nextVertex, this->inferCoverage(mostReachable, nextVertex), this->inferCredibility(mostReachable, nextVertex), true, false);
-        //             if (verbose) cout << "add junction: " << inferredJunc->getInfo()[0] << ", " << inferredJunc->getInfo()[1] << endl;
-        //             break;
-        //         } catch (DuplicateJunctionException& e) {
-        //             cout << e.what() << endl;
-        //             mostReachable = nextVertex;
-        //             // prevVertex = mGraph->getPrevVertexById(mostReachable);
-        //         }
-        //     }
-        // } else if (targetVertex == mGraph->getSource()->getNegativeVertex()) {
-        //     // forward to source-
-        //     Vertex * nextVertex;
-        //     while (true) {
-        //         try {
-        //             Vertex * selectedVertex = this->selectNextVertex(mostReachable, mGraph->getSource()->getNegativeVertex(), aJuncDB);
-        //             if (selectedVertex != NULL) {
-        //                 nextVertex = selectedVertex;
-        //             } else {
-        //                 if (mostReachable->getDir() == '+') {
-        //                     nextVertex = mGraph->getNextVertexById(mostReachable->getComplementVertex());
-        //                 } else {
-        //                     nextVertex = mGraph->getNextVertexById(mostReachable);
-        //                 }
-        //             }
-        //             if (verbose) cout << "prev: " << nextVertex->getInfo() << endl;
-        //             Junction * inferredJunc = mGraph->addJunction(mostReachable, nextVertex, this->inferCoverage(mostReachable, nextVertex), this->inferCredibility(mostReachable, nextVertex), true, false);
-        //             if (verbose) cout << "add junction: " << inferredJunc->getInfo()[0] << ", " << inferredJunc->getInfo()[1] << endl;
-        //             break;
-        //         } catch (DuplicateJunctionException& e) {
-        //             cout << e.what() << endl;
-        //             mostReachable = nextVertex;
-        //             // prevVertex = mGraph->getPrevVertexById(mostReachable);
-        //         }
-        //     }
-        // }
+    // if (targetVertex == mGraph->getSource()->getPositiveVertex()) {
+    //     // backward to source+
+    //     Vertex * prevVertex;
+    //     while (true) {
+    //         try {
+    //             Vertex * selectedVertex = this->selectPrevVertex(mostReachable, mGraph->getSource()->getPositiveVertex(), aJuncDB);
+    //             if (selectedVertex != NULL) {
+    //                 prevVertex = selectedVertex;
+    //             } else {
+    //                 cout << "No available record for backward source" << endl;
+    //                 if (mostReachable->getDir() == '+') {
+    //                     prevVertex = mGraph->getPrevVertexById(mostReachable);
+    //                 } else {
+    //                     prevVertex = mGraph->getPrevVertexById(mostReachable->getComplementVertex());
+    //                 }
+    //             }
+    //             if (verbose) cout << "prev: " << prevVertex->getInfo() << endl;
+    //             Junction * inferredJunc = mGraph->addJunction(prevVertex, mostReachable, this->inferCoverage(prevVertex, mostReachable), this->inferCredibility(prevVertex, mostReachable), true, false);
+    //             if (verbose) cout << "add junction: " << inferredJunc->getInfo()[0] << ", " << inferredJunc->getInfo()[1] << endl;
+    //             break;
+    //         } catch (DuplicateJunctionException& e) {
+    //             cout << e.what() << endl;
+    //             mostReachable = prevVertex;
+    //             // prevVertex = mGraph->getPrevVertexById(mostReachable);
+    //         }
+    //     }
+    // } else if (targetVertex == mGraph->getSink()->getNegativeVertex()) {
+    //     // backward to sink-
+    //     Vertex * prevVertex;
+    //     while (true) {
+    //         try {
+    //             Vertex * selectedVertex = this->selectPrevVertex(mostReachable, mGraph->getSink()->getNegativeVertex(), aJuncDB);
+    //             if (selectedVertex != NULL) {
+    //                 prevVertex = selectedVertex;
+    //             } else {
+    //                 if (mostReachable->getDir() == '+') {
+    //                     prevVertex = mGraph->getPrevVertexById(mostReachable->getComplementVertex());
+    //                 } else {
+    //                     prevVertex = mGraph->getPrevVertexById(mostReachable);
+    //                 }
+    //             }
+    //             if (verbose) cout << "prev: " << prevVertex->getInfo() << endl;
+    //             Junction * inferredJunc = mGraph->addJunction(prevVertex, mostReachable, this->inferCoverage(prevVertex, mostReachable), this->inferCredibility(prevVertex, mostReachable), true, false);
+    //             if (verbose) cout << "add junction: " << inferredJunc->getInfo()[0] << ", " << inferredJunc->getInfo()[1] << endl;
+    //             break;
+    //         } catch (DuplicateJunctionException& e) {
+    //             cout << e.what() << endl;
+    //             mostReachable = prevVertex;
+    //             // prevVertex = mGraph->getPrevVertexById(mostReachable);
+    //         }
+    //     }
+    // } else if (targetVertex == mGraph->getSink()->getPositiveVertex()) {
+    //     // forward to sink+
+    //     Vertex * nextVertex;
+    //     while (true) {
+    //         try {
+    //             Vertex * selectedVertex = this->selectNextVertex(mostReachable, mGraph->getSink()->getPositiveVertex(), aJuncDB);
+    //             if (selectedVertex != NULL) {
+    //                 nextVertex = selectedVertex;
+    //             } else {
+    //                 if (mostReachable->getDir() == '+') {
+    //                     nextVertex = mGraph->getNextVertexById(mostReachable);
+    //                 } else {
+    //                     nextVertex = mGraph->getNextVertexById(mostReachable->getComplementVertex());
+    //                 }
+    //             }
+    //             if (verbose) cout << "prev: " << nextVertex->getInfo() << endl;
+    //             Junction * inferredJunc = mGraph->addJunction(mostReachable, nextVertex, this->inferCoverage(mostReachable, nextVertex), this->inferCredibility(mostReachable, nextVertex), true, false);
+    //             if (verbose) cout << "add junction: " << inferredJunc->getInfo()[0] << ", " << inferredJunc->getInfo()[1] << endl;
+    //             break;
+    //         } catch (DuplicateJunctionException& e) {
+    //             cout << e.what() << endl;
+    //             mostReachable = nextVertex;
+    //             // prevVertex = mGraph->getPrevVertexById(mostReachable);
+    //         }
+    //     }
+    // } else if (targetVertex == mGraph->getSource()->getNegativeVertex()) {
+    //     // forward to source-
+    //     Vertex * nextVertex;
+    //     while (true) {
+    //         try {
+    //             Vertex * selectedVertex = this->selectNextVertex(mostReachable, mGraph->getSource()->getNegativeVertex(), aJuncDB);
+    //             if (selectedVertex != NULL) {
+    //                 nextVertex = selectedVertex;
+    //             } else {
+    //                 if (mostReachable->getDir() == '+') {
+    //                     nextVertex = mGraph->getNextVertexById(mostReachable->getComplementVertex());
+    //                 } else {
+    //                     nextVertex = mGraph->getNextVertexById(mostReachable);
+    //                 }
+    //             }
+    //             if (verbose) cout << "prev: " << nextVertex->getInfo() << endl;
+    //             Junction * inferredJunc = mGraph->addJunction(mostReachable, nextVertex, this->inferCoverage(mostReachable, nextVertex), this->inferCredibility(mostReachable, nextVertex), true, false);
+    //             if (verbose) cout << "add junction: " << inferredJunc->getInfo()[0] << ", " << inferredJunc->getInfo()[1] << endl;
+    //             break;
+    //         } catch (DuplicateJunctionException& e) {
+    //             cout << e.what() << endl;
+    //             mostReachable = nextVertex;
+    //             // prevVertex = mGraph->getPrevVertexById(mostReachable);
+    //         }
+    //     }
+    // }
     // }
 }
 
@@ -1755,74 +1825,75 @@ bool LocalGenomicMap::isReachable() {
     VertexPath forwardSourceNotReachableVertices;
     VertexPath forwardSinkNotReachableVertices;
 
-        mGraph->checkOrphan();
+    mGraph->checkOrphan();
 
-        // check reachability for each vertex
-        bool isSinkSourceConnectedOriginally;
-        try {
-            this->connectSourceSink();
-            isSinkSourceConnectedOriginally = false;
-        } catch (DuplicateJunctionException &e) {
-            isSinkSourceConnectedOriginally = true;
+    // check reachability for each vertex
+    bool isSinkSourceConnectedOriginally;
+    try {
+        this->connectSourceSink();
+        isSinkSourceConnectedOriginally = false;
+    } catch (DuplicateJunctionException &e) {
+        isSinkSourceConnectedOriginally = true;
+    }
+    for (Segment *seg: *(mGraph->getSegments())) {
+        if (seg == mGraph->getSource() || seg == mGraph->getSink()) {
+            continue;
         }
-        for (Segment * seg: *(mGraph->getSegments())) {
-            if (seg == mGraph->getSource() || seg == mGraph->getSink()) {
+
+        // heuristic rule to keep a segment
+        if (seg->isOrphan()) {
+            if (seg->getWeight()->getCoverage() < 0.25 * mGraph->getAvgCoverage()) {
                 continue;
             }
+        }
 
-            // heuristic rule to keep a segment
-            if (seg->isOrphan()) {
-                if (seg->getWeight()->getCoverage() < 0.25 * mGraph->getAvgCoverage()) {
-                    continue;   
+
+        VertexPath segV;
+        segV.push_back(seg->getPositiveVertex());
+        segV.push_back(seg->getNegativeVertex());
+        for (Vertex *v : segV) {
+            // cout << "source+ -> " << v->getInfo() << endl;
+            bool isBackwardSourceReachable = this->doesPathExists(mGraph->getSource()->getPositiveVertex(), v);
+            // cout << "sink- -> " << v->getInfo() << endl;
+            bool isBackwardSinkReachable = this->doesPathExists(mGraph->getSink()->getNegativeVertex(), v);
+            // cout << v->getInfo() << " -> source-" << endl;
+            bool isForwardSourceReachable = this->doesPathExists(v, mGraph->getSource()->getNegativeVertex());
+            // cout << v->getInfo() << " -> sink+" << endl;
+            bool isForwardSinkReachable = this->doesPathExists(v, mGraph->getSink()->getPositiveVertex());
+            if (!isBackwardSourceReachable && !isForwardSinkReachable
+                && !isBackwardSinkReachable && !isForwardSourceReachable) {
+                if (v->getDir() == '+') {
+                    backwardSourceNotReachableVertices.push_back(v);
+                } else {
+                    backwardSinkNotReachableVertices.push_back(v);
                 }
             }
-
-            
-            VertexPath segV;
-            segV.push_back(seg->getPositiveVertex());
-            segV.push_back(seg->getNegativeVertex());
-            for (Vertex * v : segV) {
-                // cout << "source+ -> " << v->getInfo() << endl;
-                bool isBackwardSourceReachable = this->doesPathExists(mGraph->getSource()->getPositiveVertex(), v);
-                // cout << "sink- -> " << v->getInfo() << endl;
-                bool isBackwardSinkReachable = this->doesPathExists(mGraph->getSink()->getNegativeVertex(), v);
-                // cout << v->getInfo() << " -> source-" << endl;
-                bool isForwardSourceReachable = this->doesPathExists(v, mGraph->getSource()->getNegativeVertex());
-                // cout << v->getInfo() << " -> sink+" << endl;
-                bool isForwardSinkReachable = this->doesPathExists(v, mGraph->getSink()->getPositiveVertex());
-                if (!isBackwardSourceReachable && !isForwardSinkReachable
-                        && !isBackwardSinkReachable && !isForwardSourceReachable) {
-                    if (v->getDir() == '+') {
-                        backwardSourceNotReachableVertices.push_back(v);
-                    } else {
-                        backwardSinkNotReachableVertices.push_back(v);
-                    }
+            if ((isBackwardSourceReachable ^ isForwardSinkReachable) != 0) {
+                if (!isBackwardSourceReachable) {
+                    backwardSourceNotReachableVertices.push_back(v);
+                } else {
+                    forwardSinkNotReachableVertices.push_back(v);
                 }
-                if ((isBackwardSourceReachable ^ isForwardSinkReachable) != 0) {
-                    if (!isBackwardSourceReachable) {
-                        backwardSourceNotReachableVertices.push_back(v);
-                    } else {
-                        forwardSinkNotReachableVertices.push_back(v);
-                    }
-                }
-                if ((isBackwardSinkReachable ^ isForwardSourceReachable) != 0) {
-                    if (!isBackwardSinkReachable) {
-                        backwardSinkNotReachableVertices.push_back(v);
-                    } else {
-                        forwardSourceNotReachableVertices.push_back(v);
-                    }
+            }
+            if ((isBackwardSinkReachable ^ isForwardSourceReachable) != 0) {
+                if (!isBackwardSinkReachable) {
+                    backwardSinkNotReachableVertices.push_back(v);
+                } else {
+                    forwardSourceNotReachableVertices.push_back(v);
                 }
             }
         }
-        if (!isSinkSourceConnectedOriginally) {
-            delete mGraph->getJunctions()->back();
-            mGraph->getJunctions()->pop_back();
-        }
-    
-    return backwardSourceNotReachableVertices.size() + backwardSinkNotReachableVertices.size() + forwardSourceNotReachableVertices.size() + forwardSinkNotReachableVertices.size() == 0;
+    }
+    if (!isSinkSourceConnectedOriginally) {
+        delete mGraph->getJunctions()->back();
+        mGraph->getJunctions()->pop_back();
+    }
+
+    return backwardSourceNotReachableVertices.size() + backwardSinkNotReachableVertices.size() +
+           forwardSourceNotReachableVertices.size() + forwardSinkNotReachableVertices.size() == 0;
 }
 
-void LocalGenomicMap::checkReachability(JunctionDB * aJuncDB, bool verbose) {
+void LocalGenomicMap::checkReachability(JunctionDB *aJuncDB, bool verbose) {
     cout << "Checking reachability..." << endl;
     VertexPath backwardSourceNotReachableVertices;
     VertexPath backwardSinkNotReachableVertices;
@@ -1844,7 +1915,7 @@ void LocalGenomicMap::checkReachability(JunctionDB * aJuncDB, bool verbose) {
         } catch (DuplicateJunctionException &e) {
             isSinkSourceConnectedOriginally = true;
         }
-        for (Segment * seg: *(mGraph->getSegments())) {
+        for (Segment *seg: *(mGraph->getSegments())) {
             if (seg == mGraph->getSource() || seg == mGraph->getSink()) {
                 continue;
             }
@@ -1852,16 +1923,16 @@ void LocalGenomicMap::checkReachability(JunctionDB * aJuncDB, bool verbose) {
             // heuristic rule to keep a segment
             if (seg->isOrphan()) {
                 if (seg->getWeight()->getCoverage() < 0.25 * mGraph->getAvgCoverage()) {
-                    continue;   
+                    continue;
                 }
             }
 
             if (!seg->hasLowerBoundLimit()) continue;
-            
+
             VertexPath segV;
             segV.push_back(seg->getPositiveVertex());
             segV.push_back(seg->getNegativeVertex());
-            for (Vertex * v : segV) {
+            for (Vertex *v : segV) {
                 // cout << "source+ -> " << v->getInfo() << endl;
                 bool isBackwardSourceReachable = this->doesPathExists(mGraph->getSource()->getPositiveVertex(), v);
                 // cout << "sink- -> " << v->getInfo() << endl;
@@ -1871,7 +1942,7 @@ void LocalGenomicMap::checkReachability(JunctionDB * aJuncDB, bool verbose) {
                 // cout << v->getInfo() << " -> sink+" << endl;
                 bool isForwardSinkReachable = this->doesPathExists(v, mGraph->getSink()->getPositiveVertex());
                 if (!isBackwardSourceReachable && !isForwardSinkReachable
-                        && !isBackwardSinkReachable && !isForwardSourceReachable) {
+                    && !isBackwardSinkReachable && !isForwardSourceReachable) {
                     if (v->getDir() == '+') {
                         backwardSourceNotReachableVertices.push_back(v);
                     } else {
@@ -1899,7 +1970,7 @@ void LocalGenomicMap::checkReachability(JunctionDB * aJuncDB, bool verbose) {
             mGraph->getJunctions()->pop_back();
         }
         // mGraph->print();
-        
+
         if (verbose) {
             cout << "backwardSourceNotReachableVertices: ";
             this->print(backwardSourceNotReachableVertices);
@@ -1915,101 +1986,107 @@ void LocalGenomicMap::checkReachability(JunctionDB * aJuncDB, bool verbose) {
         bool hasAdded = false;
         if (!hasAdded && backwardSourceNotReachableVertices.size() > 0) {
             if (verbose) cout << "for backward source: " << endl;
-            hasAdded = this->adjustReachability(backwardSourceNotReachableVertices, mGraph->getSource()->getPositiveVertex(), aJuncDB, verbose);
+            hasAdded = this->adjustReachability(backwardSourceNotReachableVertices,
+                                                mGraph->getSource()->getPositiveVertex(), aJuncDB, verbose);
             // continue;
         }
         if (!hasAdded && backwardSinkNotReachableVertices.size() > 0) {
             if (verbose) cout << "for backward sink: " << endl;
-            hasAdded = this->adjustReachability(backwardSinkNotReachableVertices, mGraph->getSink()->getNegativeVertex(), aJuncDB, verbose);
+            hasAdded = this->adjustReachability(backwardSinkNotReachableVertices,
+                                                mGraph->getSink()->getNegativeVertex(), aJuncDB, verbose);
             // continue;
         }
         if (!hasAdded && forwardSourceNotReachableVertices.size() > 0) {
             if (verbose) cout << "for forward source: " << endl;
-            hasAdded = this->adjustReachability(forwardSourceNotReachableVertices, mGraph->getSource()->getNegativeVertex(), aJuncDB, verbose);
+            hasAdded = this->adjustReachability(forwardSourceNotReachableVertices,
+                                                mGraph->getSource()->getNegativeVertex(), aJuncDB, verbose);
             // continue;
         }
         if (!hasAdded && forwardSinkNotReachableVertices.size() > 0) {
             if (verbose) cout << "for forward sink: " << endl;
-            hasAdded = this->adjustReachability(forwardSinkNotReachableVertices, mGraph->getSink()->getPositiveVertex(), aJuncDB, verbose);
+            hasAdded = this->adjustReachability(forwardSinkNotReachableVertices, mGraph->getSink()->getPositiveVertex(),
+                                                aJuncDB, verbose);
         }
         // break;
-    } while (backwardSourceNotReachableVertices.size() + backwardSinkNotReachableVertices.size() + forwardSourceNotReachableVertices.size() + forwardSinkNotReachableVertices.size() > 0);
+    } while (backwardSourceNotReachableVertices.size() + backwardSinkNotReachableVertices.size() +
+             forwardSourceNotReachableVertices.size() + forwardSinkNotReachableVertices.size() > 0);
 
     cout << "Graph reachable." << endl;
 }
 
-vector<Segment*> * LocalGenomicMap::extractReachableGraph(bool verbose) {
-    vector<Segment*>* res = new vector<Segment*>();
+vector<Segment *> *LocalGenomicMap::extractReachableGraph(bool verbose) {
+    vector<Segment *> *res = new vector<Segment *>();
     cout << "Checking reachability..." << endl;
     VertexPath backwardSourceNotReachableVertices;
     VertexPath backwardSinkNotReachableVertices;
     VertexPath forwardSourceNotReachableVertices;
     VertexPath forwardSinkNotReachableVertices;
-        backwardSourceNotReachableVertices.clear();
-        backwardSinkNotReachableVertices.clear();
-        forwardSourceNotReachableVertices.clear();
-        forwardSinkNotReachableVertices.clear();
+    backwardSourceNotReachableVertices.clear();
+    backwardSinkNotReachableVertices.clear();
+    forwardSourceNotReachableVertices.clear();
+    forwardSinkNotReachableVertices.clear();
 
-        mGraph->checkOrphan();
+    mGraph->checkOrphan();
 
-        // check reachability for each vertex
-        bool isSinkSourceConnectedOriginally;
-        try {
-            this->connectSourceSink();
-            isSinkSourceConnectedOriginally = false;
-        } catch (DuplicateJunctionException &e) {
-            isSinkSourceConnectedOriginally = true;
+    // check reachability for each vertex
+    bool isSinkSourceConnectedOriginally;
+    try {
+        this->connectSourceSink();
+        isSinkSourceConnectedOriginally = false;
+    } catch (DuplicateJunctionException &e) {
+        isSinkSourceConnectedOriginally = true;
+    }
+    for (Segment *seg: *(mGraph->getSegments())) {
+        if (seg == mGraph->getSource() || seg == mGraph->getSink()) {
+            continue;
         }
-        for (Segment * seg: *(mGraph->getSegments())) {
-            if (seg == mGraph->getSource() || seg == mGraph->getSink()) {
+
+        // heuristic rule to keep a segment
+        if (seg->isOrphan()) {
+            if (seg->getWeight()->getCoverage() < 0.25 * mGraph->getAvgCoverage()) {
                 continue;
             }
+        }
 
-            // heuristic rule to keep a segment
-            if (seg->isOrphan()) {
-                if (seg->getWeight()->getCoverage() < 0.25 * mGraph->getAvgCoverage()) {
-                    continue;
-                }
-            }
+        if (!seg->hasLowerBoundLimit()) continue;
 
-            if (!seg->hasLowerBoundLimit()) continue;
-
-            VertexPath segV;
-            segV.push_back(seg->getPositiveVertex());
-            segV.push_back(seg->getNegativeVertex());
-            bool  flag = true;
-            for (Vertex *v : segV) {
-                // cout << "source+ -> " << v->getInfo() << endl;
-                bool isBackwardSourceReachable = this->doesPathExists(mGraph->getSource()->getPositiveVertex(), v);
-                // cout << "sink- -> " << v->getInfo() << endl;
-                bool isBackwardSinkReachable = this->doesPathExists(mGraph->getSink()->getNegativeVertex(), v);
-                // cout << v->getInfo() << " -> source-" << endl;
-                bool isForwardSourceReachable = this->doesPathExists(v, mGraph->getSource()->getNegativeVertex());
-                // cout << v->getInfo() << " -> sink+" << endl;
-                bool isForwardSinkReachable = this->doesPathExists(v, mGraph->getSink()->getPositiveVertex());
-                if (isBackwardSinkReachable && isBackwardSourceReachable && isForwardSinkReachable &&
-                    isForwardSourceReachable) {
-                } else {
-                    flag = false;
-                }
-            }
-            if(flag) {
-                res->push_back(seg);
+        VertexPath segV;
+        segV.push_back(seg->getPositiveVertex());
+        segV.push_back(seg->getNegativeVertex());
+        bool flag = true;
+        for (Vertex *v : segV) {
+            // cout << "source+ -> " << v->getInfo() << endl;
+            bool isBackwardSourceReachable = this->doesPathExists(mGraph->getSource()->getPositiveVertex(), v);
+            // cout << "sink- -> " << v->getInfo() << endl;
+            bool isBackwardSinkReachable = this->doesPathExists(mGraph->getSink()->getNegativeVertex(), v);
+            // cout << v->getInfo() << " -> source-" << endl;
+            bool isForwardSourceReachable = this->doesPathExists(v, mGraph->getSource()->getNegativeVertex());
+            // cout << v->getInfo() << " -> sink+" << endl;
+            bool isForwardSinkReachable = this->doesPathExists(v, mGraph->getSink()->getPositiveVertex());
+            if (isBackwardSinkReachable && isBackwardSourceReachable && isForwardSinkReachable &&
+                isForwardSourceReachable) {
+            } else {
+                flag = false;
             }
         }
+        if (flag) {
+            res->push_back(seg);
+        }
+    }
     return res;
 }
 
 void LocalGenomicMap::addNormalJunctions() {
     for (int i = 0; i < mGraph->getSegments()->size() - 1; i++) {
-        Vertex * sourceVertex = (*mGraph->getSegments())[i]->getPositiveVertex();
-        Vertex * targetVertex = mGraph->getNextVertexById(sourceVertex);
-        if(sourceVertex->getSegment()->getChrom() != targetVertex->getSegment()->getChrom()) {
+        Vertex *sourceVertex = (*mGraph->getSegments())[i]->getPositiveVertex();
+        Vertex *targetVertex = mGraph->getNextVertexById(sourceVertex);
+        if (sourceVertex->getSegment()->getChrom() != targetVertex->getSegment()->getChrom()) {
             continue;
         }
         try {
-            mGraph->addJunction(sourceVertex, targetVertex, this->inferCoverage(sourceVertex, targetVertex), inferCredibility(sourceVertex, targetVertex), -1, true, false, false);
-        } catch(DuplicateJunctionException& e) {
+            mGraph->addJunction(sourceVertex, targetVertex, this->inferCoverage(sourceVertex, targetVertex),
+                                inferCredibility(sourceVertex, targetVertex), -1, true, false, false);
+        } catch (DuplicateJunctionException &e) {
             continue;
         }
     }
@@ -2018,14 +2095,14 @@ void LocalGenomicMap::addNormalJunctions() {
 void LocalGenomicMap::checkInferredJunctionCredibility() {
     double maxCred = 1.0;
     cout << "Read" << endl;
-    for (Junction * junc : *(mGraph->getJunctions())) {
+    for (Junction *junc : *(mGraph->getJunctions())) {
         if (junc->isInferred()) {
             maxCred = max(pow(junc->getCredibility(), 0.5), maxCred);
         }
     }
 
     cout << "Assign" << endl;
-    for (Junction * junc : *(mGraph->getJunctions())) {
+    for (Junction *junc : *(mGraph->getJunctions())) {
         if (junc->isInferred()) {
             cout << junc->getInfo()[0] << endl;
             junc->setCredibility(pow(junc->getCredibility(), 0.5) / maxCred);
@@ -2034,45 +2111,47 @@ void LocalGenomicMap::checkInferredJunctionCredibility() {
     cout << "Assign done" << endl;
 }
 
-void LocalGenomicMap::clearSegmentJunctionCredibility(Segment * aSegment) {
+void LocalGenomicMap::clearSegmentJunctionCredibility(Segment *aSegment) {
     cout << "Clear credibility of segment " << aSegment->getId() << " and its related junctions" << endl;
     aSegment->setCredibility(0);
     aSegment->resetHasLowerBoundLimit();
-    for (Edge * e : *(aSegment->getPositiveVertex()->getEdgesAsSource())) {
-        Junction * junc = e->getJunction();
-        junc->setCredibility(0);
-        junc->resetHasLowerBoundLimit();
-        e->setCredibility(0);
-    }
-    
-    for (Edge * e : *(aSegment->getPositiveVertex()->getEdgesAsTarget())) {
-        Junction * junc = e->getJunction();
+    for (Edge *e : *(aSegment->getPositiveVertex()->getEdgesAsSource())) {
+        Junction *junc = e->getJunction();
         junc->setCredibility(0);
         junc->resetHasLowerBoundLimit();
         e->setCredibility(0);
     }
 
-    for (Edge * e : *(aSegment->getNegativeVertex()->getEdgesAsSource())) {
-        Junction * junc = e->getJunction();
+    for (Edge *e : *(aSegment->getPositiveVertex()->getEdgesAsTarget())) {
+        Junction *junc = e->getJunction();
         junc->setCredibility(0);
         junc->resetHasLowerBoundLimit();
         e->setCredibility(0);
     }
-    
-    for (Edge * e : *(aSegment->getNegativeVertex()->getEdgesAsTarget())) {
-        Junction * junc = e->getJunction();
+
+    for (Edge *e : *(aSegment->getNegativeVertex()->getEdgesAsSource())) {
+        Junction *junc = e->getJunction();
+        junc->setCredibility(0);
+        junc->resetHasLowerBoundLimit();
+        e->setCredibility(0);
+    }
+
+    for (Edge *e : *(aSegment->getNegativeVertex()->getEdgesAsTarget())) {
+        Junction *junc = e->getJunction();
         junc->setCredibility(0);
         junc->resetHasLowerBoundLimit();
         e->setCredibility(0);
     }
 }
 
-Vertex * LocalGenomicMap::selectPrevVertex(Vertex * currentVertex, Vertex * targetVertex, JunctionDB * aJuncDB) {
+Vertex *LocalGenomicMap::selectPrevVertex(Vertex *currentVertex, Vertex *targetVertex, JunctionDB *aJuncDB) {
     Record *rec;
-    rec = aJuncDB->findRecord(currentVertex->getSegment()->getChrom(), currentVertex->getStart(), currentVertex->getDir());
-    Vertex * selectedVertex = NULL;
-    for (vector<entry_t *>::reverse_iterator riter = rec->getBackwardEntries()->rbegin(); riter != rec->getBackwardEntries()->rend(); riter++) {
-        Segment * seg = mGraph->getSegmentByChromEnd((*riter)->chrom, (*riter)->pos);
+    rec = aJuncDB->findRecord(currentVertex->getSegment()->getChrom(), currentVertex->getStart(),
+                              currentVertex->getDir());
+    Vertex *selectedVertex = NULL;
+    for (vector<entry_t *>::reverse_iterator riter = rec->getBackwardEntries()->rbegin();
+         riter != rec->getBackwardEntries()->rend(); riter++) {
+        Segment *seg = mGraph->getSegmentByChromEnd((*riter)->chrom, (*riter)->pos);
         if (targetVertex == mGraph->getSource()->getPositiveVertex()) {
             if ((*riter)->strand == '+') {
                 // prefer the positive vertex that directly connects to + strand
@@ -2103,12 +2182,14 @@ Vertex * LocalGenomicMap::selectPrevVertex(Vertex * currentVertex, Vertex * targ
     return selectedVertex;
 }
 
-Vertex * LocalGenomicMap::selectNextVertex(Vertex * currentVertex, Vertex * targetVertex, JunctionDB * aJuncDB) {
+Vertex *LocalGenomicMap::selectNextVertex(Vertex *currentVertex, Vertex *targetVertex, JunctionDB *aJuncDB) {
     Record *rec;
-    rec = aJuncDB->findRecord(currentVertex->getSegment()->getChrom(), currentVertex->getEnd(), currentVertex->getDir());
-    Vertex * selectedVertex = NULL;
-    for (vector<entry_t *>::reverse_iterator riter = rec->getForwardEntries()->rbegin(); riter != rec->getForwardEntries()->rend(); riter++) {
-        Segment * seg = mGraph->getSegmentByChromStart((*riter)->chrom, (*riter)->pos);
+    rec = aJuncDB->findRecord(currentVertex->getSegment()->getChrom(), currentVertex->getEnd(),
+                              currentVertex->getDir());
+    Vertex *selectedVertex = NULL;
+    for (vector<entry_t *>::reverse_iterator riter = rec->getForwardEntries()->rbegin();
+         riter != rec->getForwardEntries()->rend(); riter++) {
+        Segment *seg = mGraph->getSegmentByChromStart((*riter)->chrom, (*riter)->pos);
         if (targetVertex == mGraph->getSink()->getPositiveVertex()) {
             if ((*riter)->strand == '+') {
                 // prefer positive vertex
@@ -2138,8 +2219,8 @@ Vertex * LocalGenomicMap::selectNextVertex(Vertex * currentVertex, Vertex * targ
     return selectedVertex;
 }
 
-Edge * LocalGenomicMap::selectPrevEdge(Vertex * aTargetVertex, bool isTraversing) {
-    for (Edge * e : *(aTargetVertex->getEdgesAsTarget())) {
+Edge *LocalGenomicMap::selectPrevEdge(Vertex *aTargetVertex, bool isTraversing) {
+    for (Edge *e : *(aTargetVertex->getEdgesAsTarget())) {
         if (!e->isVisited()) {
             if (isTraversing) {
                 if (e->hasCopy()) {
@@ -2164,8 +2245,8 @@ Edge * LocalGenomicMap::selectPrevEdge(Vertex * aTargetVertex, bool isTraversing
     return NULL;
 }
 
-Edge * LocalGenomicMap::selectNextEdge(Vertex * aSourceVertex, bool isTraversing) {
-    for (Edge * e : *(aSourceVertex->getEdgesAsSource())) {
+Edge *LocalGenomicMap::selectNextEdge(Vertex *aSourceVertex, bool isTraversing) {
+    for (Edge *e : *(aSourceVertex->getEdgesAsSource())) {
         if (!e->isVisited()) {
             if (isTraversing) {
                 if (e->hasCopy()) {
@@ -2190,10 +2271,10 @@ Edge * LocalGenomicMap::selectNextEdge(Vertex * aSourceVertex, bool isTraversing
     return NULL;
 }
 
-int LocalGenomicMap::findCircuit(Vertex * aVertex, VertexPath & pathVertices, EdgePath & pathEdges) {
+int LocalGenomicMap::findCircuit(Vertex *aVertex, VertexPath &pathVertices, EdgePath &pathEdges) {
     cout << "Search start: " << aVertex->getInfo() << endl;
-    Vertex * currentVertex = aVertex;
-    Edge * currentEdge = this->selectNextEdge(currentVertex, true);
+    Vertex *currentVertex = aVertex;
+    Edge *currentEdge = this->selectNextEdge(currentVertex, true);
 
     pathVertices.push_back(currentVertex);
     currentVertex->traverse();
@@ -2203,7 +2284,7 @@ int LocalGenomicMap::findCircuit(Vertex * aVertex, VertexPath & pathVertices, Ed
             // return to last vertex and search again
             currentVertex->recover();  // recover the copy
             pathVertices.pop_back();
-            
+
             if (pathVertices.size() == 0) {
                 // no vertex left that can continue being used
                 return -1;
@@ -2216,8 +2297,8 @@ int LocalGenomicMap::findCircuit(Vertex * aVertex, VertexPath & pathVertices, Ed
             }
         } else {
             // cout << "Attempt: " << currentEdge->getInfo() << endl;
-            Vertex * nextVertex = currentEdge->getTarget();
-            
+            Vertex *nextVertex = currentEdge->getTarget();
+
             if (nextVertex == aVertex) {
                 // found
                 // DO NOT traverse the vertex again
@@ -2314,15 +2395,16 @@ int LocalGenomicMap::findCircuit(Vertex * aVertex, VertexPath & pathVertices, Ed
 //     mCircuits->push_back(pathV);
 // }
 
-Edge * LocalGenomicMap::traverseNextEdge(Vertex * aStartVertex, VertexPath* vp, JunctionDB * aJuncDB)  {
-    Edge * selectedEdge = nullptr;
-    if(this->isUsingHic()){
+Edge *LocalGenomicMap::traverseNextEdge(Vertex *aStartVertex, VertexPath *vp, JunctionDB *aJuncDB) {
+    Edge *selectedEdge = nullptr;
+    if (this->isUsingHic()) {
         selectedEdge = traverseWithHic(vp);
         if (selectedEdge != nullptr) return selectedEdge;
     }
-    Record * rec = aJuncDB->findRecord(aStartVertex->getSegment()->getChrom(), aStartVertex->getEnd(), aStartVertex->getDir());
+    Record *rec = aJuncDB->findRecord(aStartVertex->getSegment()->getChrom(), aStartVertex->getEnd(),
+                                      aStartVertex->getDir());
     if (rec == NULL) {
-        for (Edge * e: *(aStartVertex->getEdgesAsSource())) {
+        for (Edge *e: *(aStartVertex->getEdgesAsSource())) {
             if (e->hasCopy()) {
                 selectedEdge = e;
                 break;
@@ -2330,10 +2412,11 @@ Edge * LocalGenomicMap::traverseNextEdge(Vertex * aStartVertex, VertexPath* vp, 
         }
     } else {
         int support = 0;
-        entry_t * entry;
-        for (Edge * e: *(aStartVertex->getEdgesAsSource())) {
+        entry_t *entry;
+        for (Edge *e: *(aStartVertex->getEdgesAsSource())) {
             if (!e->hasCopy()) continue;
-            entry = rec->findForwardEntry(e->getTarget()->getSegment()->getChrom(), e->getTarget()->getStart(), e->getTarget()->getDir());
+            entry = rec->findForwardEntry(e->getTarget()->getSegment()->getChrom(), e->getTarget()->getStart(),
+                                          e->getTarget()->getDir());
             if (entry != NULL) {
                 if (entry->support > support) {
                     support = entry->support;
@@ -2350,19 +2433,19 @@ Edge * LocalGenomicMap::traverseNextEdge(Vertex * aStartVertex, VertexPath* vp, 
     return selectedEdge;
 }
 
-Edge * LocalGenomicMap::traverseWithHic(VertexPath *vp) {
+Edge *LocalGenomicMap::traverseWithHic(VertexPath *vp) {
     auto currentVertex = vp->back();
-    Edge * maxEdge;
+    Edge *maxEdge;
     double maxV = 0;
-    for (auto * e : *(currentVertex->getEdgesAsSource())) {
-        if(!e->hasCopy()) continue;
+    for (auto *e : *(currentVertex->getEdgesAsSource())) {
+        if (!e->hasCopy()) continue;
         double v = calculateHicInteraction(vp, e->getTarget());
         if (v > maxV) {
             maxEdge = e;
             maxV = v;
         }
     }
-    if(maxV == 0) return nullptr;
+    if (maxV == 0) return nullptr;
     this->decreaseHicMatrix(vp, maxEdge);
 //    hic value decrease
 //    int id1 = maxEdge->getSource()->getId();
@@ -2370,61 +2453,56 @@ Edge * LocalGenomicMap::traverseWithHic(VertexPath *vp) {
 //    this->hicMatrix[id1][id2] = this->hicMatrix[id1][id2] - this->hicMatrix[id1][id2]/maxEdge->getWeight()->getCopyNum();
     return maxEdge;
 }
-double LocalGenomicMap::calculateHicInteraction(VertexPath *vp, Vertex* currentVertex) {
+
+double LocalGenomicMap::calculateHicInteraction(VertexPath *vp, Vertex *currentVertex) {
     double res = 0;
-    for (auto * v : *vp) {
+    for (auto *v : *vp) {
         int id1 = v->getId();
         int id2 = currentVertex->getId();
-        cout<< this->hicMatrix[1][1]<<endl;
-        double hicV = this->hicMatrix[id1-1][id2-1];
+        cout << this->hicMatrix[1][1] << endl;
+        double hicV = this->hicMatrix[id1 - 1][id2 - 1];
         res += hicV;
     }
     return res;
 }
-void LocalGenomicMap::traverse(Vertex * aStartVertex, JunctionDB * aJuncDB) {
+
+void LocalGenomicMap::traverse(Vertex *aStartVertex, JunctionDB *aJuncDB) {
     VertexPath *vp = new VertexPath();
     EdgePath *ep = new EdgePath();
-    Vertex * currentVertex;
-    if (!usingLong) {
-        currentVertex = aStartVertex;
-    } else {
-        currentVertex = traverseLongPath(aStartVertex, vp);
-    }
-    vp->push_back(currentVertex);
-
-    Edge * nextEdge = this->traverseNextEdge(currentVertex,vp, aJuncDB);
-    while (nextEdge != NULL) {
-        if (usingLong) {
-            currentVertex = traverseLongPath(currentVertex, vp);
-        }
-        currentVertex->traverse();
-        // if (nextEdge->getSource()->getSegment() == nextEdge->getTarget()->getSegment()) {
-        //     nextEdge->traverse();
-        //     nextEdge->traverse();
-        // } else {
+    Vertex *currentVertex;
+//    if (!usingLong) {
+//        currentVertex = aStartVertex;
+//        vp->push_back(currentVertex);
+//    } else {
+//        currentVertex = traverseLongPath(aStartVertex, vp, false);
+//    }
+    bool start = true;
+    currentVertex = aStartVertex;
+    if (isUsingLong()) {
+        while (true) {
+            currentVertex = traverseLongPath(currentVertex, vp, false);
+            Edge *nextEdge = this->traverseNextEdge(currentVertex, vp, aJuncDB);
+            if (nextEdge == nullptr) break;
             nextEdge->traverse();
-        // }
-        ep->push_back(nextEdge);
-        vp->push_back(nextEdge->getTarget());
-        // if (currentVertex->getId() == 24) {
-        //     int vcount = 0;
-        //     for (VertexPath::iterator it = vp->begin(); it < vp->end() - 1; it++) {
-        //         if ((*it)->getId() == 24) {
-        //             vcount++;
-        //         }
-        //     }
-        //     this->print(*vp);
-        //     cout << "\033[1;31m" << vcount << "\033[0m " << mGraph->getSegmentById(24)->getWeight()->getCopyNum() << endl;
-        // }
-
-        currentVertex = nextEdge->getTarget();
-        nextEdge = this->traverseNextEdge(currentVertex,vp, aJuncDB);
+            currentVertex = nextEdge->getTarget();
+            ep->push_back(nextEdge);
+        }
+    } else {
+        while (true) {
+            auto nextEdge = this->traverseNextEdge(currentVertex, vp, aJuncDB);
+            if (nextEdge == nullptr) break;
+            currentVertex->traverse();
+            nextEdge->traverse();
+            ep->push_back(nextEdge);
+            vp->push_back(nextEdge->getTarget());
+            currentVertex = nextEdge->getTarget();
+        }
     }
 
     mCircuits->push_back(vp);
 
     cout << "Traversed path: ";
-    for (Vertex * v: *vp) {
+    for (Vertex *v: *vp) {
         cout << v->getInfo() << " ";
     }
     cout << endl;
@@ -2432,7 +2510,7 @@ void LocalGenomicMap::traverse(Vertex * aStartVertex, JunctionDB * aJuncDB) {
 
 void LocalGenomicMap::decreaseHicMatrix(VertexPath *vp, Edge *e) {
     this->decreaseHicInteraction(e->getSource(), e->getTarget());
-    for( auto* v : *vp) {
+    for (auto *v : *vp) {
         this->decreaseHicInteraction(v, e->getTarget());
     }
 }
@@ -2446,10 +2524,10 @@ void LocalGenomicMap::decreaseHicInteraction(Vertex *v1, Vertex *v2) {
     this->hicMatrix[id2][id1] = v;
 }
 
-void LocalGenomicMap::traverseGraph(JunctionDB * aJuncDB) {
-    Vertex * currentVertex;
+void LocalGenomicMap::traverseGraph(JunctionDB *aJuncDB) {
+    Vertex *currentVertex;
     while (!mGraph->isCopyExhaustive()) {
-        for (Segment * seg : *(mGraph->getSegments())) {
+        for (Segment *seg : *(mGraph->getSegments())) {
             if (seg->hasCopy()) {
                 currentVertex = seg->getPositiveVertex();
                 break;
@@ -2459,12 +2537,13 @@ void LocalGenomicMap::traverseGraph(JunctionDB * aJuncDB) {
         // mGraph->print();
     }
 }
-Vertex * LocalGenomicMap::traverseLongPath(Vertex *aStartVertex, VertexPath* vPath) {
+
+Vertex *LocalGenomicMap::traverseLongPath(Vertex *aStartVertex, VertexPath *vPath, bool skip_first) {
     int pathN = -1;
     int maxL = 0;
     int i = 0;
 //    find longest path that current graph can cover, choose this graph to traverse.
-    for(auto path: *this->mLongFrags) {
+    for (auto path: *this->mLongFrags) {
         if (path[0][0] == aStartVertex) {
             int l = longPathLenInGraph(path);
             if (l > maxL) {
@@ -2476,36 +2555,43 @@ Vertex * LocalGenomicMap::traverseLongPath(Vertex *aStartVertex, VertexPath* vPa
     }
     i = 0;
     if (maxL <= 0) {
+        if (!skip_first) {
+            vPath->push_back(aStartVertex);
+            aStartVertex->traverse();
+        }
         return aStartVertex;
     }
 //    auto m = this->mLongFrags[pathN][0];
-    for (i = 0; i < maxL - 1; i++) {
+    i = 0;
+    if (skip_first)
+        i = 0;
+    for (; i < maxL; i++) {
         auto v = (*((*this->mLongFrags)[pathN]))[i];
         vPath->push_back(v);
         v->traverse();
-        auto vNext = (*((*this->mLongFrags)[pathN]))[i+1];
-        for(Edge* e: *(v->getEdgesAsSource())) {
+        auto vNext = (*((*this->mLongFrags)[pathN]))[i + 1];
+        for (Edge *e: *(v->getEdgesAsSource())) {
             if (e->getTarget() == vNext) {
                 e->traverse();
                 break;
             }
         }
     }
-    return (*(this->mLongFrags)[0][pathN])[maxL-1];
+    return (*(this->mLongFrags)[0][pathN])[maxL - 1];
 }
 
 int LocalGenomicMap::longPathLenInGraph(VertexPath *longPath) {
     int n = 1;
-    for (auto v = longPath->begin(); v != longPath->end()-1;v++) {
+    for (auto v = longPath->begin(); v != longPath->end() - 1; v++) {
         bool flag = false;
 //        auto t = *(v+1);
-        for (Edge * e : *(*v)->getEdgesAsSource()) {
-            if (e->getTarget() == *(v+1)) {
+        for (Edge *e : *(*v)->getEdgesAsSource()) {
+            if (e->getTarget() == *(v + 1) and e->hasCopy()) {
                 flag = true;
                 break;
             }
         }
-        if(flag) n++;
+        if (flag) n++;
     }
     return n;
 }
@@ -2559,7 +2645,7 @@ int LocalGenomicMap::longPathLenInGraph(VertexPath *longPath) {
 //     // mGraph->print();
 // }
 
-void LocalGenomicMap::isCircuitSimple(VertexPath * circuit, pair<int, int> & notSimpleIdx) {
+void LocalGenomicMap::isCircuitSimple(VertexPath *circuit, pair<int, int> &notSimpleIdx) {
     notSimpleIdx = make_pair(-1, -1);
     VertexPath::iterator it;
     for (int i = 0; i < circuit->size(); i++) {
@@ -2573,7 +2659,7 @@ void LocalGenomicMap::isCircuitSimple(VertexPath * circuit, pair<int, int> & not
     }
 }
 
-void LocalGenomicMap::allCircuitsSimple(vector< tuple<int, int, int> > & notSimpleIdx) {
+void LocalGenomicMap::allCircuitsSimple(vector<tuple<int, int, int> > &notSimpleIdx) {
     for (int i = 0; i < mCircuits->size(); i++) {
         pair<int, int> notSimpleVertexIdx;
         this->isCircuitSimple((*mCircuits)[i], notSimpleVertexIdx);
@@ -2584,15 +2670,17 @@ void LocalGenomicMap::allCircuitsSimple(vector< tuple<int, int, int> > & notSimp
 }
 
 void LocalGenomicMap::extractCircuits() {
-    vector< tuple<int, int, int> > notSimpleCircuitIdx;
+    vector<tuple<int, int, int> > notSimpleCircuitIdx;
     this->allCircuitsSimple(notSimpleCircuitIdx);
     while (notSimpleCircuitIdx.size() > 0) {
         for (tuple<int, int, int> idxPair : notSimpleCircuitIdx) {
             int circuitIdx, begin, end;
             tie(circuitIdx, begin, end) = idxPair;
-            VertexPath * subCircuit = new VertexPath((*mCircuits)[circuitIdx]->begin() + begin, (*mCircuits)[circuitIdx]->begin() + end + 1);
+            VertexPath *subCircuit = new VertexPath((*mCircuits)[circuitIdx]->begin() + begin,
+                                                    (*mCircuits)[circuitIdx]->begin() + end + 1);
             mCircuits->push_back(subCircuit);
-            (*mCircuits)[circuitIdx]->erase((*mCircuits)[circuitIdx]->begin() + begin + 1, (*mCircuits)[circuitIdx]->begin() + end + 1);
+            (*mCircuits)[circuitIdx]->erase((*mCircuits)[circuitIdx]->begin() + begin + 1,
+                                            (*mCircuits)[circuitIdx]->begin() + end + 1);
         }
         notSimpleCircuitIdx.clear();
         this->allCircuitsSimple(notSimpleCircuitIdx);
@@ -2600,18 +2688,19 @@ void LocalGenomicMap::extractCircuits() {
 }
 
 void LocalGenomicMap::sortCircuits() {
-    sort(mCircuits->begin(), mCircuits->end(), [](VertexPath * c1, VertexPath * c2) { return (*c1)[0]->getId() < (*c2)[0]->getId(); });
+    sort(mCircuits->begin(), mCircuits->end(),
+         [](VertexPath *c1, VertexPath *c2) { return (*c1)[0]->getId() < (*c2)[0]->getId(); });
 }
 
-void LocalGenomicMap::writeCircuits(const char * outFn) {
+void LocalGenomicMap::writeCircuits(const char *outFn) {
     cout << "Write circuits" << endl;
     ofstream fout(outFn);
     if (!fout) {
         cout << "Cannot open file " << outFn << ": no such file or directory" << endl;
         exit(1);
     }
-    for (VertexPath * pathV : *mCircuits) {
-        for (Vertex * v : *pathV) {
+    for (VertexPath *pathV : *mCircuits) {
+        for (Vertex *v : *pathV) {
             fout << v->getInfo() << " ";
         }
         fout << endl;
@@ -2628,8 +2717,8 @@ void LocalGenomicMap::generateHaploids() {
     is_inserted[0] = true;
     VertexPath *mainPath = (*mCircuits)[0];
     int i = 1;
-    VertexPath * current_circuit = new VertexPath();
-    VertexPath * comp_circuit;
+    VertexPath *current_circuit = new VertexPath();
+    VertexPath *comp_circuit;
     bool is_comp = false;
     bool all_inserted = false;
     while (!all_inserted) {
@@ -2638,7 +2727,7 @@ void LocalGenomicMap::generateHaploids() {
                 i++;
                 continue;
             }
-        // for (int i = 1; i < mCircuits->size(); i++) {
+            // for (int i = 1; i < mCircuits->size(); i++) {
             if (!is_comp) {
                 current_circuit->assign(mCircuits->at(i)->begin(), mCircuits->at(i)->end());
             } else {
@@ -2651,14 +2740,14 @@ void LocalGenomicMap::generateHaploids() {
             VertexPath::iterator cItr;
             VertexPath::iterator foundItr;
             for (int j = 0; j <= vq.size(); j++) {
-                Vertex * startV = vq.front();
+                Vertex *startV = vq.front();
                 // while (!isInserted) {
                 cItr = mainPath->begin();
                 // cout << "i=" << i << ": " << startV->getInfo() << " " << (*cItr)->getInfo() << endl;
                 while (cItr != mainPath->end() && cItr - 1 != mainPath->end()) {
                     foundItr = find(cItr, mainPath->end(), startV);
                     if (foundItr != mainPath->end()) {
-                    // if (rand() * 1.0 / RAND_MAX < 0.5 && foundItr != mainPath->end()) {
+                        // if (rand() * 1.0 / RAND_MAX < 0.5 && foundItr != mainPath->end()) {
                         cout << "Insert at " << (*foundItr)->getInfo() << endl;
                         isInserted = true;
                         break;
@@ -2678,8 +2767,8 @@ void LocalGenomicMap::generateHaploids() {
                     // cout << count << endl;
                     break;
                     // mainPath->insert(foundItr + 1, (*mCircuits)[i]->begin() + 1, (*mCircuits)[i]->end());
-                // } else {
-                //     mHaploids->push_back((*mCircuits)[i]);
+                    // } else {
+                    //     mHaploids->push_back((*mCircuits)[i]);
                 }
                 vq.pop_front();
                 vq.push_back(startV);
@@ -2714,7 +2803,7 @@ void LocalGenomicMap::generateHaploids() {
     cout << "Mainpath done" << endl;
     cout << mHaploids->size() << endl;
 
-    for (Vertex * v: *mainPath) {
+    for (Vertex *v: *mainPath) {
         cout << v->getInfo() << " ";
     }
     cout << endl;
@@ -2756,14 +2845,14 @@ void LocalGenomicMap::generateHaploids() {
 //     }
 // }
 
-void LocalGenomicMap::writeHaploids(const char * outFn) {
+void LocalGenomicMap::writeHaploids(const char *outFn) {
     ofstream fout(outFn);
     if (!fout) {
         cout << "Cannot open file " << outFn << " : no such file or directory" << endl;
         exit(1);
     }
-    for (VertexPath * pathV : *mHaploids) {
-        for (Vertex * v : *pathV) {
+    for (VertexPath *pathV : *mHaploids) {
+        for (Vertex *v : *pathV) {
             fout << v->getInfo() << " ";
         }
         fout << endl;
@@ -2771,15 +2860,15 @@ void LocalGenomicMap::writeHaploids(const char * outFn) {
     fout.close();
 }
 
-void LocalGenomicMap::print(VertexPath& path) {
-    for (Vertex * v : path) {
+void LocalGenomicMap::print(VertexPath &path) {
+    for (Vertex *v : path) {
         cout << v->getInfo() << " ";
     }
     cout << endl;
 }
 
-void LocalGenomicMap::print(EdgePath& path) {
-    for (Edge * e : path) {
+void LocalGenomicMap::print(EdgePath &path) {
+    for (Edge *e : path) {
         cout << e->getInfo() << " ";
     }
     cout << endl;
@@ -2787,7 +2876,7 @@ void LocalGenomicMap::print(EdgePath& path) {
 
 void LocalGenomicMap::printCircuits() {
     int count = 1;
-    for (VertexPath * pathV : *mCircuits) {
+    for (VertexPath *pathV : *mCircuits) {
         cout << count << " ---- ";
         count++;
         this->print(*pathV);
@@ -2795,7 +2884,7 @@ void LocalGenomicMap::printCircuits() {
 }
 
 void LocalGenomicMap::printHaploids() {
-    for (VertexPath * pathV : *mHaploids) {
+    for (VertexPath *pathV : *mHaploids) {
         this->print(*pathV);
     }
 }
