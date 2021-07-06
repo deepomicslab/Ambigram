@@ -9,8 +9,11 @@ set(CMAKE_CXX_FLAGS_DEBUG "$ENV{CXX_FLAGS} -O0 -Wall -ggdb -fkeep-inline-functio
 set(CMAKE_CXX_FLAGS_RELEASE "$ENV{CXXFLAGS} -O3 ")
 set(seqGraph_DIR /home/caronkey/.apps/localLibs/share/seqGraph/cmake)
 #find_package(seqGraph REQUIRED)
-aux_source_directory(./src  LOCAL_HAP_SRC)
+aux_source_directory(./src LOCAL_HAP_SRC)
 include_directories(${PROJECT_SOURCE_DIR}/include)
 add_executable(localHap localhap.cpp ${LOCAL_HAP_SRC})
+add_executable(findPath findPath.cpp ${LOCAL_HAP_SRC})
+
 target_link_libraries(localHap -lCbcSolver -lCbc -lOsi -lOsiCbc -lCgl -lOsiClp -lClp -lCoinUtils -llapack -lbz2 -lz -lhts)
-install (TARGETS localHap DESTINATION bin)
+target_link_libraries(findPath -lCbcSolver -lCbc -lOsi -lOsiCbc -lCgl -lOsiClp -lClp -lCoinUtils -llapack -lbz2 -lz -lhts)
+install(TARGETS localHap DESTINATION bin)

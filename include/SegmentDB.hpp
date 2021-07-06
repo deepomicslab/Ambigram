@@ -7,6 +7,7 @@
 using namespace std;
 
 struct locus;
+
 class SVprofile;
 
 struct seg {
@@ -19,28 +20,32 @@ struct seg {
 };
 
 class SegmentDB {
-    protected:
-        string mChr;
-        int mRegionStart;
-        int mRegionEnd;
+protected:
+    string mChr;
+    int mRegionStart;
+    int mRegionEnd;
 
-        vector<int> * mBps;
-        vector<seg *> * mSegs;
-        
-    public:
-        SegmentDB(string aChr, int aRegionStart, int aRegionEnd);
-        ~SegmentDB();
+    vector<int> *mBps;
+    vector<seg *> *mSegs;
 
-        vector<seg *> * getSegs();
-        vector<int> * getBps();
+public:
+    SegmentDB(string aChr, int aRegionStart, int aRegionEnd);
 
-        void readSegs(const char * aFilename);
-        void updateBps(SVprofile * aSVprofile);
-        void constructSegsFromBps();
+    ~SegmentDB();
 
-        void writeSegs(const char * outFn);
+    vector<seg *> *getSegs();
 
-        void print();
+    vector<int> *getBps();
+
+    void readSegs(const char *aFilename);
+
+    void updateBps(SVprofile *aSVprofile);
+
+    void constructSegsFromBps();
+
+    void writeSegs(const char *outFn);
+
+    void print();
 };
 
 #endif

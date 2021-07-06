@@ -1,9 +1,12 @@
 import argparse
-import sys, os
+
+import os
+import sys
 
 os.environ["MKL_NUM_THREADS"] = "1"
 os.environ["NUMEXPR_NUM_THREADS"] = "1"
 os.environ["OMP_NUM_THREADS"] = "1"
+
 
 class MainArgParser:
     def __init__(self):
@@ -12,7 +15,6 @@ class MainArgParser:
         args = parser.parse_args(sys.argv[1:2])
         getattr(self, args.subfunc)()
 
-        
     def unmap2ins(self):
         import pandas as pd
         parser = argparse.ArgumentParser(description='Convert unmapped segments to insertions')
@@ -33,19 +35,19 @@ class MainArgParser:
                             required=True,
                             help='Output path for SV.')
         args = parser.parse_args(sys.argv[2:])
-        
+
         sv = pd.read_csv(args.sv_file, sep='\t',
-           names=['chrom_5p', 'pos_5p', 'strand_5p',
-                  'chrom_3p', 'pos_3p', 'strand_3p',
-                  'inner_ins', 'span_reads', 'junc_reads',
-                  'id', 'qual', 'filter', 'meta_info', 'anno_info'])
-    
+                         names=['chrom_5p', 'pos_5p', 'strand_5p',
+                                'chrom_3p', 'pos_3p', 'strand_3p',
+                                'inner_ins', 'span_reads', 'junc_reads',
+                                'id', 'qual', 'filter', 'meta_info', 'anno_info'])
+
         segs = set(sv.query(f'chrom_3p.str.contains("{args.unmapped_common_str}")').chrom_3p) \
-                .union(sv.query(f'chrom_5p.str.contains("{args.unmapped_common_str}")').chrom_5p)
+            .union(sv.query(f'chrom_5p.str.contains("{args.unmapped_common_str}")').chrom_5p)
 
         d = []
         for s in segs:
-    #         print(f'{sample} {s}')
+            #         print(f'{sample} {s}')
             df = sv.query(f'chrom_5p == "{s}" | chrom_3p == "{s}"')
             if df.chrom_5p.unique().size == 1 or df.chrom_3p.unique().size == 1:
                 new = df.iloc[0]
@@ -67,9 +69,10 @@ class MainArgParser:
             d.append(new)
 
         d = pd.DataFrame(d)
-        d = d.append(sv.query(f'chrom_3p.str.contains("{args.ref_common_str}") & chrom_5p.str.contains("{args.ref_common_str}")'))
+        d = d.append(sv.query(
+            f'chrom_3p.str.contains("{args.ref_common_str}") & chrom_5p.str.contains("{args.ref_common_str}")'))
         d.to_csv(args.out_sv, index=False, header=False, sep='\t')
-    
+
     def bpsmap(self):
         import bpsmap
         import numpy as np
@@ -114,8 +117,8 @@ class MainArgParser:
                                      names=[
                                          'chrom_5p', 'pos_5p', 'strand_5p',
                                          'chrom_3p', 'pos_3p', 'strand_3p', 'count'
-                                         ]
-                                    )
+                                     ]
+                                     )
         else:
             chrom_junc = None
         seek_sv = False
@@ -127,7 +130,7 @@ class MainArgParser:
             # sv_df = pd.read_csv(args.sv_list)
         else:
             sv_df = bpsmap.concat_sv(args.sv_list)
-        chrom_infos = pd.read_csv(args.chrom_info,dtype={'end':np.int64}, sep='\t')
+        chrom_infos = pd.read_csv(args.chrom_info, dtype={'end': np.int64}, sep='\t')
         # print(chrom_junc.head())
         # print(sv_df.head())
         # print(chrom_infos.head())
@@ -148,8 +151,10 @@ class MainArgParser:
             chroms = sorted(set(chroms))
             bps_map = []
             for chrom in chroms:
-                sv_5p = bpsmap.get_precise_sv(sv_df, chrom_5p=chrom, drop_imprecise=not args.keep_imprecise, drop_insertions=not args.keep_insertions)
-                sv_3p = bpsmap.get_precise_sv(sv_df, chrom_3p=chrom, drop_imprecise=not args.keep_imprecise, drop_insertions=not args.keep_insertions)
+                sv_5p = bpsmap.get_precise_sv(sv_df, chrom_5p=chrom, drop_imprecise=not args.keep_imprecise,
+                                              drop_insertions=not args.keep_insertions)
+                sv_3p = bpsmap.get_precise_sv(sv_df, chrom_3p=chrom, drop_imprecise=not args.keep_imprecise,
+                                              drop_insertions=not args.keep_insertions)
                 if chrom_junc is not None:
                     chrom_junc_5p = chrom_junc.loc[lambda df: df.chrom_5p == chrom]
                     chrom_junc_3p = chrom_junc.loc[lambda df: df.chrom_3p == chrom]
@@ -160,12 +165,11 @@ class MainArgParser:
                     bps = np.array(sorted(set(
                         bps +
                         bpsmap.get_breakpoints(chrom_junc_5p, chrom_junc_3p)
-                        )))
+                    )))
                 else:
                     bps = np.array(sorted(set(bps)))
                 bps_map.extend([(chrom, *t) for t in bpsmap.map_bps(bps, 10)])
             bpsmap.write_bps_map(args.bps_map_out, bps_map)
-
 
         # chrom = args.region.split(':')[0]
         # start, end = [int(i) for i in args.region.split(':')[1].split('-')]
@@ -178,7 +182,6 @@ class MainArgParser:
         import config
         import pysam
         import pandas as pd
-        import numpy as np
         parser = argparse.ArgumentParser(description='Generate localhap config for each individual')
         parser.add_argument('-f', '--sv-file',
                             dest='sv_file',
@@ -259,14 +262,15 @@ class MainArgParser:
         print('Reading SV')
         if not args.is_seeksv:
             sv = bpsmap.read_sv(args.sv_file)
-            sv = bpsmap.get_precise_sv(sv, drop_imprecise=not args.keep_imprecise, drop_insertions=not args.keep_insertions)
-    # sv = bpsmap.get_precise_sv_svaba(sv, chrom, start, end)
+            sv = bpsmap.get_precise_sv(sv, drop_imprecise=not args.keep_imprecise,
+                                       drop_insertions=not args.keep_insertions)
+        # sv = bpsmap.get_precise_sv_svaba(sv, chrom, start, end)
         # n, nc, sv = bpsmap.merge_sv_tgs2sgs(sv, sv, 10)
         else:
             sv = pd.read_table(args.sv_file, skiprows=1, header=None,
-                                  usecols=[0, 1, 2, 3, 4, 5, 6, 7],
-                                  names=['chrom_5p', 'pos_5p', 'strand_5p', 'left_read',
-                                         'chrom_3p', 'pos_3p', 'strand_3p', 'right_read'])
+                               usecols=[0, 1, 2, 3, 4, 5, 6, 7],
+                               names=['chrom_5p', 'pos_5p', 'strand_5p', 'left_read',
+                                      'chrom_3p', 'pos_3p', 'strand_3p', 'right_read'])
         # config.map_bps_sv(sv, bps_map)
         config.map_bps_chrom_infos(chrom_infos, bps_map)
         sv = config.dedup(sv)
@@ -274,7 +278,9 @@ class MainArgParser:
         segs = pd.DataFrame()
         id_start = 1
         for row in chrom_infos.itertuples():
-            seg, id_start = config.segmentation(sv, row.chrom, row.start, row.end, id_start, drop_imprecise=not args.keep_imprecise, drop_insertions=not args.keep_insertions)
+            seg, id_start = config.segmentation(sv, row.chrom, row.start, row.end, id_start,
+                                                drop_imprecise=not args.keep_imprecise,
+                                                drop_insertions=not args.keep_insertions)
             segs = segs.append(seg)
 
         # segs = config.segmentation(sv, chrom, start, end)
@@ -300,7 +306,8 @@ class MainArgParser:
         junc_db = config.update_junc_db_by_seg_in_chrom(segs, junc_db, bam, args.ext)
         config.write_junc_db(args.junc_db, junc_db)
 
-        config.generate_config(args.out_config, args.sample_name, sv, segs, depth_tabix, bam, ext=args.ext, ploidy=args.ploidy)
+        config.generate_config(args.out_config, args.sample_name, sv, segs, depth_tabix, bam, ext=args.ext,
+                               ploidy=args.ploidy)
 
     def mergedb(self):
         import pandas as pd
@@ -329,11 +336,11 @@ class MainArgParser:
             seg_junc = None
         else:
             seg_junc = pd.read_csv(args.seg_junc, sep='\t',
-                                     names=[
-                                         'chrom_5p', 'pos_5p', 'strand_5p',
-                                         'chrom_3p', 'pos_3p', 'strand_3p', 'count'
-                                         ]
-            )
+                                   names=[
+                                       'chrom_5p', 'pos_5p', 'strand_5p',
+                                       'chrom_3p', 'pos_3p', 'strand_3p', 'count'
+                                   ]
+                                   )
             config.map_bps_junc(seg_junc, bps_map)
         merged = pd.DataFrame(columns=['chrom_5p', 'pos_5p', 'strand_5p', 'chrom_3p', 'pos_3p', 'strand_3p', 'count'])
         with open(args.junc_list, 'r') as fin:
@@ -343,12 +350,12 @@ class MainArgParser:
                 # print(f'{n} {line}')
                 junc = pd.read_csv(line, sep='\t')
                 for row in junc.itertuples():
-                    idx1 = merged.loc[lambda r: r.chrom_5p == row.chrom_5p]\
-                                 .loc[lambda r: r.pos_5p == row.pos_5p]\
-                                 .loc[lambda r: r.strand_5p == row.strand_5p]\
-                                 .loc[lambda r: r.chrom_3p == row.chrom_3p]\
-                                 .loc[lambda r: r.pos_3p == row.pos_3p]\
-                                 .loc[lambda r: r.strand_3p == row.strand_3p].index
+                    idx1 = merged.loc[lambda r: r.chrom_5p == row.chrom_5p] \
+                        .loc[lambda r: r.pos_5p == row.pos_5p] \
+                        .loc[lambda r: r.strand_5p == row.strand_5p] \
+                        .loc[lambda r: r.chrom_3p == row.chrom_3p] \
+                        .loc[lambda r: r.pos_3p == row.pos_3p] \
+                        .loc[lambda r: r.strand_3p == row.strand_3p].index
                     if idx1.empty:
                         merged = merged.append({'chrom_5p': row.chrom_5p,
                                                 'pos_5p': row.pos_5p,
@@ -362,12 +369,12 @@ class MainArgParser:
                 n += 1
         if seg_junc is not None:
             for row in seg_junc.itertuples():
-                idx1 = merged.loc[lambda r: r.chrom_5p == row.chrom_5p]\
-                             .loc[lambda r: r.pos_5p == row.pos_5p]\
-                             .loc[lambda r: r.strand_5p == row.strand_5p]\
-                             .loc[lambda r: r.chrom_3p == row.chrom_3p]\
-                             .loc[lambda r: r.pos_3p == row.pos_3p]\
-                             .loc[lambda r: r.strand_3p == row.strand_3p].index
+                idx1 = merged.loc[lambda r: r.chrom_5p == row.chrom_5p] \
+                    .loc[lambda r: r.pos_5p == row.pos_5p] \
+                    .loc[lambda r: r.strand_5p == row.strand_5p] \
+                    .loc[lambda r: r.chrom_3p == row.chrom_3p] \
+                    .loc[lambda r: r.pos_3p == row.pos_3p] \
+                    .loc[lambda r: r.strand_3p == row.strand_3p].index
                 if idx1.empty:
                     merged = merged.append({'chrom_5p': row.chrom_5p,
                                             'pos_5p': row.pos_5p,
@@ -399,6 +406,7 @@ class MainArgParser:
 
         sol = parseILP.parse_ilp_result(args.sol_file)
         parseILP.generate_balanced_lh(args.balanced_lh, args.checked_lh, sol)
+
 
 if __name__ == '__main__':
     MainArgParser()

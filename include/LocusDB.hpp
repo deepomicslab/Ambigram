@@ -13,43 +13,51 @@ struct locus {
     char ref;
     char alt;
 
-    seg * belongSeg;
+    seg *belongSeg;
 };
 
 class SegmentDB;
 
 class LocusDB {
-    protected:
-        string mChrom;
-        int mStart;
-        int mEnd;
+protected:
+    string mChrom;
+    int mStart;
+    int mEnd;
 
-        vector<locus *> * mLoci;
-        vector<int> * mPos;
+    vector<locus *> *mLoci;
+    vector<int> *mPos;
 
-        SegmentDB * mSegRef;
+    SegmentDB *mSegRef;
 
-        void readVCF(const char * aVCF);
-        void readLegend(const char * aLegend);
+    void readVCF(const char *aVCF);
 
-    public:
-        LocusDB(string aChrom, int aStart, int aEnd);
-        ~LocusDB();
+    void readLegend(const char *aLegend);
 
-        string getChr();
-        int getStart();
-        int getEnd();
-        vector<locus *> * getLoci();
-        
-        void read(const char * aFileName, const int mode);
-        void findLociInRange(int startPos, int endPos, vector<locus *>::const_iterator & begin, vector<locus *>::const_iterator & end);
-        
-        void setSegRef(SegmentDB * aSegDB);
-        void assignLocusToSeg();
+public:
+    LocusDB(string aChrom, int aStart, int aEnd);
 
-        void print();
+    ~LocusDB();
 
-        static const int MODE_VCF = 0, MODE_LEGEND = 1;
+    string getChr();
+
+    int getStart();
+
+    int getEnd();
+
+    vector<locus *> *getLoci();
+
+    void read(const char *aFileName, const int mode);
+
+    void findLociInRange(int startPos, int endPos, vector<locus *>::const_iterator &begin,
+                         vector<locus *>::const_iterator &end);
+
+    void setSegRef(SegmentDB *aSegDB);
+
+    void assignLocusToSeg();
+
+    void print();
+
+    static const int MODE_VCF = 0, MODE_LEGEND = 1;
 };
 
 #endif

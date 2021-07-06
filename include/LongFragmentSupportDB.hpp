@@ -4,8 +4,8 @@
 using namespace std;
 
 class LongFragmentSupportDB {
-  protected:
-    
+protected:
+
 };
 
 #endif

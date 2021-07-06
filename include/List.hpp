@@ -3,11 +3,12 @@
 
 using namespace std;
 
-template <typename T>
+template<typename T>
 class List {
-  protected:
-  public:
+protected:
+public:
     List();
+
     ~List();
 
 };

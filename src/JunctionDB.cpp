@@ -3,6 +3,8 @@
 #include <fstream>
 #include <sstream>
 #include <functional>
+#include <algorithm>
+
 
 #include "JunctionDB.hpp"
 
@@ -19,7 +21,7 @@ using namespace std;
 //     mRecordUUID = new vector<int>();
 // }
 
-JunctionDB::JunctionDB(const char * aFilename) {
+JunctionDB::JunctionDB(const char *aFilename) {
     // mEntries = new vector<junc_entry_t *>();
     // mEntryId = new vector<int>();
     mRecords = new vector<Record *>();
@@ -31,13 +33,13 @@ JunctionDB::JunctionDB(const char * aFilename) {
 JunctionDB::~JunctionDB() {
     // delete [] mEntries;
     // delete [] mEntryId;
-    delete [] mRecords;
-    delete [] mRecordUUID;
+    delete[] mRecords;
+    delete[] mRecordUUID;
 }
 
 vector<Record *> *JunctionDB::getRecords() { return mRecords; }
 
-void JunctionDB::readDB(const char * aFilename) {
+void JunctionDB::readDB(const char *aFilename) {
     ifstream dbFile(aFilename);
     if (!dbFile) {
         cerr << "Cannot open file " << aFilename << endl;
@@ -47,7 +49,7 @@ void JunctionDB::readDB(const char * aFilename) {
     cout << "Reading database..." << endl;
 
     char line[8192];
-    char * token;
+    char *token;
     dbFile.getline(line, 8192);
     while (!dbFile.eof()) {
         dbFile.getline(line, 8192);
@@ -63,7 +65,7 @@ void JunctionDB::readDB(const char * aFilename) {
         // cout << chrom5p << " " << pos5p << " " << strand5p << " " << chrom3p << " " << pos3p << " " << strand3p << " " << support << endl;
         if (support > 0) {
             // cout << support << endl;
-            this->insertRecord(chrom5p, pos5p, strand5p, 
+            this->insertRecord(chrom5p, pos5p, strand5p,
                                chrom3p, pos3p, strand3p,
                                support);
         }
@@ -112,8 +114,8 @@ void JunctionDB::readDB(const char * aFilename) {
 //     }
 // }
 
-void JunctionDB::insertRecord(string aChrom_5p, int aPos_5p, char aStrand_5p, 
-                              string aChrom_3p, int aPos_3p, char aStrand_3p, 
+void JunctionDB::insertRecord(string aChrom_5p, int aPos_5p, char aStrand_5p,
+                              string aChrom_3p, int aPos_3p, char aStrand_3p,
                               int aSupport) {
     int id = (aStrand_5p == '+') ? aPos_5p : -aPos_5p;
     string uuid = aChrom_5p + ':' + to_string(id);
@@ -123,7 +125,7 @@ void JunctionDB::insertRecord(string aChrom_5p, int aPos_5p, char aStrand_5p,
     // for first segment
     if (iterUUID == mRecordUUID->end() || *iterUUID != uuid) {
         // new record
-        Record * rec = new Record(aChrom_5p, aPos_5p, aStrand_5p);
+        Record *rec = new Record(aChrom_5p, aPos_5p, aStrand_5p);
         mRecordUUID->insert(iterUUID, uuid);
         mRecords->insert(iterRec, rec);
         rec->insertForwardEntry(aChrom_3p, aPos_3p, aStrand_3p, aSupport, false);
@@ -137,7 +139,7 @@ void JunctionDB::insertRecord(string aChrom_5p, int aPos_5p, char aStrand_5p,
     iterRec = iterUUID - mRecordUUID->begin() + mRecords->begin();
     if (iterUUID == mRecordUUID->end() || *iterUUID != uuid) {
         // new record
-        Record * rec = new Record(aChrom_5p, aPos_5p, (aStrand_5p == '+') ? '-' : '+');
+        Record *rec = new Record(aChrom_5p, aPos_5p, (aStrand_5p == '+') ? '-' : '+');
         mRecordUUID->insert(iterUUID, uuid);
         mRecords->insert(iterRec, rec);
         rec->insertBackwardEntry(aChrom_3p, aPos_3p, (aStrand_3p == '+') ? '-' : '+', aSupport, true);
@@ -153,7 +155,7 @@ void JunctionDB::insertRecord(string aChrom_5p, int aPos_5p, char aStrand_5p,
     iterRec = iterUUID - mRecordUUID->begin() + mRecords->begin();
     if (iterUUID == mRecordUUID->end() || *iterUUID != uuid) {
         // new record
-        Record * rec = new Record(aChrom_3p, aPos_3p, aStrand_3p);
+        Record *rec = new Record(aChrom_3p, aPos_3p, aStrand_3p);
         mRecordUUID->insert(iterUUID, uuid);
         mRecords->insert(iterRec, rec);
         rec->insertBackwardEntry(aChrom_5p, aPos_5p, aStrand_5p, aSupport, false);
@@ -166,7 +168,7 @@ void JunctionDB::insertRecord(string aChrom_5p, int aPos_5p, char aStrand_5p,
     iterRec = iterUUID - mRecordUUID->begin() + mRecords->begin();
     if (iterUUID == mRecordUUID->end() || *iterUUID != uuid) {
         // new record
-        Record * rec = new Record(aChrom_3p, aPos_3p, (aStrand_3p == '+') ? '-' : '+');
+        Record *rec = new Record(aChrom_3p, aPos_3p, (aStrand_3p == '+') ? '-' : '+');
         mRecordUUID->insert(iterUUID, uuid);
         mRecords->insert(iterRec, rec);
         rec->insertForwardEntry(aChrom_5p, aPos_5p, (aStrand_5p == '+') ? '-' : '+', aSupport, true);
@@ -176,12 +178,12 @@ void JunctionDB::insertRecord(string aChrom_5p, int aPos_5p, char aStrand_5p,
 }
 
 void JunctionDB::sortRecordEntry() {
-    for (Record * r : *mRecords) {
+    for (Record *r : *mRecords) {
         r->sortEntry();
     }
 }
 
-Record * JunctionDB::findRecord(string aChrom, int aPos, char aStrand) {
+Record *JunctionDB::findRecord(string aChrom, int aPos, char aStrand) {
     int id = (aStrand == '+') ? aPos : -aPos;
     string uuid = aChrom + ':' + to_string(id);
     // int uuid = (aStrand == '+') ? aPos : -aPos;
@@ -201,6 +203,23 @@ Record * JunctionDB::findRecord(string aChrom, int aPos, char aStrand) {
     // }
 }
 
+vector<Record *> *JunctionDB::findRecords(string aChrom, int aPos, char aStrand) {
+    auto *recs = new vector<Record *>();
+    int id = (aStrand == '+') ? aPos : -aPos;
+    string uuid = aChrom + ':' + to_string(id);
+    // int uuid = (aStrand == '+') ? aPos : -aPos;
+    auto iterId = lower_bound(mRecordUUID->begin(), mRecordUUID->end(), uuid);
+    auto upperId = upper_bound(mRecordUUID->begin(), mRecordUUID->end(), uuid);
+    auto iterRecord = iterId - mRecordUUID->begin() + mRecords->begin();
+    if (iterId == mRecordUUID->end() || *iterId != uuid) {
+        return NULL;
+    } else {
+        for (auto it = iterRecord; it != mRecords->end(); it++) {
+            recs->push_back(*it);
+        }
+        return recs;
+    }
+}
 // void JunctionDB::updateRecordsFromFile(const char * aAbnormalFn) {
 //     ifstream fin(aAbnormalFn);
 //     if (!fin) {
@@ -243,15 +262,17 @@ Record * JunctionDB::findRecord(string aChrom, int aPos, char aStrand) {
 
 void JunctionDB::print() {
     cout << "Junction database: " << endl;
-    for (Record * r : *mRecords) {
-        vector<entry_t *> * eForward = r->getForwardEntries();
-        vector<entry_t *> * eBackward = r->getBackwardEntries();
-        for (entry_t * e : *eForward) {
-            cout << r->getChrom() << ':' << r->getPos() << (char)(r->getStrand()) << " => " << e->chrom << ':' << e->pos << e->strand << " " << e->support << endl;
+    for (Record *r : *mRecords) {
+        vector<entry_t *> *eForward = r->getForwardEntries();
+        vector<entry_t *> *eBackward = r->getBackwardEntries();
+        for (entry_t *e : *eForward) {
+            cout << r->getChrom() << ':' << r->getPos() << (char) (r->getStrand()) << " => " << e->chrom << ':'
+                 << e->pos << e->strand << " " << e->support << endl;
         }
         cout << "forward done" << endl;
-        for (entry_t * e : *eBackward) {
-            cout << r->getChrom() << ':' << r->getPos() << (char)(r->getStrand()) << " <= " << e->chrom << ':' << e->pos << e->strand << " " << e->support << endl;
+        for (entry_t *e : *eBackward) {
+            cout << r->getChrom() << ':' << r->getPos() << (char) (r->getStrand()) << " <= " << e->chrom << ':'
+                 << e->pos << e->strand << " " << e->support << endl;
         }
         cout << "backward done" << endl;
     }

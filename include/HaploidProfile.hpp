@@ -10,13 +10,13 @@ using namespace std;
 struct SignedSeg;
 
 struct Variant {
-    locus * l;
+    locus *l;
     int type;
 };
 
 struct Strand {
     // SignedSeg * belongSeg;
-    seg * belongSeg;
+    seg *belongSeg;
     char sign;
     vector<Variant *> variants;
 
@@ -30,31 +30,37 @@ struct Strand {
 // };
 
 class HaploidProfile {
-    protected:
-        string mSampleName;
+protected:
+    string mSampleName;
 
-        SegmentDB * mSegRef;
-        bool * mSegNormal;
+    SegmentDB *mSegRef;
+    bool *mSegNormal;
 
-        vector<Strand *> * mHaploid1;
-        vector<Strand *> * mHaploid2;
+    vector<Strand *> *mHaploid1;
+    vector<Strand *> *mHaploid2;
 
-        SupportProfile * mSp;
+    SupportProfile *mSp;
 
-    public:
-        HaploidProfile(string aSampleName);
-        ~HaploidProfile();
+public:
+    HaploidProfile(string aSampleName);
 
-        void readHaploids(const char * aFilename);
-        void setSegRef(SegmentDB * aSegDB);
-        void identifyNormal();
-    
-        void setSupportProfile(SupportProfile * sp);
-        void placeVariantsInSeg(seg * aSeg);
-        void placeVariants();
+    ~HaploidProfile();
 
-        void print();
-        void printNormal();
+    void readHaploids(const char *aFilename);
+
+    void setSegRef(SegmentDB *aSegDB);
+
+    void identifyNormal();
+
+    void setSupportProfile(SupportProfile *sp);
+
+    void placeVariantsInSeg(seg *aSeg);
+
+    void placeVariants();
+
+    void print();
+
+    void printNormal();
 };
 
 #endif

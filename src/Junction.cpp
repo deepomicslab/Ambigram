@@ -4,12 +4,13 @@
 
 using namespace std;
 
-Junction::Junction(Segment * aSource, Segment * aTarget, char aSourceDir, char aTargetDir, double aCoverage, double aCredibility, double aCopy, bool aInferred, bool aIsBounded, bool aIsSourceSinkJunction) {
+Junction::Junction(Segment *aSource, Segment *aTarget, char aSourceDir, char aTargetDir, double aCoverage,
+                   double aCredibility, double aCopy, bool aInferred, bool aIsBounded, bool aIsSourceSinkJunction) {
     mSourceDir = aSourceDir;
     mTargetDir = aTargetDir;
 
     mCredibility = aCredibility;
-    
+
     mIsInferred = aInferred;
     mHasLowerBoundLimit = aIsBounded;
     // aSource->setHasLowerBoundLimit();
@@ -21,7 +22,7 @@ Junction::Junction(Segment * aSource, Segment * aTarget, char aSourceDir, char a
 
     mSource = aSource;
     mTarget = aTarget;
-    
+
     if (aSourceDir == '+' && aTargetDir == '+') {
         mEdgeA = new Edge(mSource->getPositiveVertex(), mTarget->getPositiveVertex(), mWeight, mCredibility);
         mEdgeB = new Edge(mTarget->getNegativeVertex(), mSource->getNegativeVertex(), mWeight, mCredibility);
@@ -54,24 +55,38 @@ vector<string> Junction::getInfo() {
 }
 
 double Junction::getCredibility() { return mCredibility; }
+
 double Junction::setCredibility(double aCredibility) { mCredibility = aCredibility; }
 
 bool Junction::isInferred() { return mIsInferred; }
+
 bool Junction::hasLowerBoundLimit() { return mHasLowerBoundLimit; }
+
 bool Junction::hasCopy() { return mEdgeA->hasCopy(); }
+
 void Junction::setInferred() { mIsInferred = true; }
+
 void Junction::resetInferred() { mIsInferred = false; }
+
 void Junction::setHasLowerBoundLimit() { mHasLowerBoundLimit = true; }
+
 void Junction::resetHasLowerBoundLimit() { mHasLowerBoundLimit = false; }
+
 void Junction::checkLowerBound() { mHasLowerBoundLimit = mWeight->getCopyNum() >= 0 && !mIsInferred; }
+
 void Junction::restoreCopy() { mWeight->restore(); }
+
 void Junction::backupCopy() { mWeight->backup(); }
 
-Weight * Junction::getWeight() { return mWeight; }
-Segment * Junction::getSource() { return mSource; }
-Segment * Junction::getTarget() { return mTarget; }
-Edge * Junction::getEdgeA() { return mEdgeA; }
-Edge * Junction::getEdgeB() { return mEdgeB; }
+Weight *Junction::getWeight() { return mWeight; }
+
+Segment *Junction::getSource() { return mSource; }
+
+Segment *Junction::getTarget() { return mTarget; }
+
+Edge *Junction::getEdgeA() { return mEdgeA; }
+
+Edge *Junction::getEdgeB() { return mEdgeB; }
 
 // functionality
 void Junction::insertEdgesToVertices() {

@@ -8,57 +8,74 @@
 #include "Weight.hpp"
 
 class Segment;
+
 class Edge;
 
 using namespace std;
 
 class Junction {
-    protected:
-        char mSourceDir;
-        char mTargetDir;
+protected:
+    char mSourceDir;
+    char mTargetDir;
 
-        double mCredibility;
+    double mCredibility;
 
-        bool mIsInferred;
-        bool mHasLowerBoundLimit;     // used in ILP processing, if true then lower bound is 1, otherwise 0
+    bool mIsInferred;
+    bool mHasLowerBoundLimit;     // used in ILP processing, if true then lower bound is 1, otherwise 0
 
-        Weight * mWeight;
-        Segment * mSource;
-        Segment * mTarget;
+    Weight *mWeight;
+    Segment *mSource;
+    Segment *mTarget;
 
-        Edge * mEdgeA;         //
-        Edge * mEdgeB;
+    Edge *mEdgeA;         //
+    Edge *mEdgeB;
 
-    public:
-        Junction(Segment * aSource, Segment * aTarget, char aSourceDir, char aTargetDir, double aCoverage, double aCredibility, double aCopy, bool aInferred, bool aIsBounded, bool aIsSourceSinkJunction);
-        ~Junction();
-        
-        vector<string> getInfo();
+public:
+    Junction(Segment *aSource, Segment *aTarget, char aSourceDir, char aTargetDir, double aCoverage,
+             double aCredibility, double aCopy, bool aInferred, bool aIsBounded, bool aIsSourceSinkJunction);
 
-        double getCredibility();
-        double setCredibility(double aCredibility);
+    ~Junction();
 
-        bool isInferred();
-        bool hasLowerBoundLimit();
-        bool hasCopy();
-        void setInferred();
-        void resetInferred();
-        void setHasLowerBoundLimit();
-        void resetHasLowerBoundLimit();
-        void checkLowerBound();
-        void restoreCopy();
-        void backupCopy();
+    vector<string> getInfo();
 
-        Weight * getWeight();
-        Segment * getSource();
-        Segment * getTarget();
-        Edge * getEdgeA();
-        Edge * getEdgeB();
+    double getCredibility();
 
-        // functionality
-        void insertEdgesToVertices();
+    double setCredibility(double aCredibility);
 
-        void print();
+    bool isInferred();
+
+    bool hasLowerBoundLimit();
+
+    bool hasCopy();
+
+    void setInferred();
+
+    void resetInferred();
+
+    void setHasLowerBoundLimit();
+
+    void resetHasLowerBoundLimit();
+
+    void checkLowerBound();
+
+    void restoreCopy();
+
+    void backupCopy();
+
+    Weight *getWeight();
+
+    Segment *getSource();
+
+    Segment *getTarget();
+
+    Edge *getEdgeA();
+
+    Edge *getEdgeB();
+
+    // functionality
+    void insertEdgesToVertices();
+
+    void print();
 };
 
 #endif

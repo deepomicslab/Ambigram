@@ -4,6 +4,7 @@
 #include <cmath>
 #include <queue>
 #include <iomanip>
+#include <assert.h>
 
 #include "Graph.hpp"
 #include "Exceptions.hpp"
@@ -17,25 +18,26 @@ Graph::Graph() {
 
     mSegments = new vector<Segment *>();
     mJunctions = new vector<Junction *>();
+    mSources = new vector<Segment *>();
+    mSinks = new vector<Segment *>();
 }
-Graph::Graph(const char * aFilename) {
+
+Graph::Graph(const char *aFilename) {
     mPurity = -1;
     mAvgPloidy = -1;
     mAvgTumorPloidy = -1;
-
-    mSource = NULL;
-    mSink = NULL;
 
     mSegments = new vector<Segment *>();
     mJunctions = new vector<Junction *>();
 
     this->readGraph(aFilename);
 }
-Graph::~Graph() {;}
+
+Graph::~Graph() { ; }
 
 string Graph::getSampleName() { return mSampleName; }
 
-int Graph::getJunctionIndexByEdge(Edge * aEdge) {
+int Graph::getJunctionIndexByEdge(Edge *aEdge) {
     int idx = 0;
     while (true) {
         if ((*mJunctions)[idx] == aEdge->getJunction())
@@ -48,41 +50,55 @@ int Graph::getJunctionIndexByEdge(Edge * aEdge) {
 int Graph::getExpectedPloidy() { return mExpectedPloidy; }
 
 double Graph::getPurity() { return mPurity; }
+
 double Graph::getAvgPloidy() { return mAvgPloidy; }
+
 double Graph::getAvgTumorPloidy() { return mAvgTumorPloidy; }
+
 double Graph::getAvgCoverage() { return mAvgCoverage; }
+
 double Graph::getAvgRawCoverage() { return mAvgCoverageRaw; }
+
 double Graph::getAvgCoverageJunc() { return mAvgCoverageJunc; }
+
 double Graph::getAvgRawCoverageJunc() { return mAvgCoverageRawJunc; }
+
 double Graph::getHaploidDepth() { return mHaploidDepth; }
+
 void Graph::setPurity(double aPurity) { mPurity = aPurity; }
+
 void Graph::setAvgPloidy(double aAvgPloidy) { mAvgPloidy = aAvgPloidy; }
+
 void Graph::setAvgTumorPloidy(double aAvgTumorPloidy) { mAvgTumorPloidy = aAvgTumorPloidy; }
+
 void Graph::setAvgCoverage(double aAvgCoverage) { mAvgCoverage = aAvgCoverage; }
+
 void Graph::setAvgRawCoverage(double aAvgRawCoverage) { mAvgCoverageRaw = aAvgRawCoverage; }
 
-Segment * Graph::getSource() { return mSource; }
-Segment * Graph::getSink() { return mSink; }
+Segment *Graph::getFirstSource() { return (*mSources)[0]; }
 
-vector<Segment *> * Graph::getSegments() { return mSegments; }
-vector<Junction *> * Graph::getJunctions() { return mJunctions; }
+Segment *Graph::getFirstSink() { return (*mSources)[0]; }
+
+vector<Segment *> *Graph::getSegments() { return mSegments; }
+
+vector<Junction *> *Graph::getJunctions() { return mJunctions; }
 
 // functionality
-void Graph::readGraph(const char * aFilename) {
+void Graph::readGraph(const char *aFilename) {
     ifstream graphFile(aFilename);
     if (!graphFile) {
         cerr << "Cannot open file " << aFilename << endl;
         exit(1);
     }
-    
+
     cout << "Reading graph..." << endl;
     char line[8192];
-    char * token;
+    char *token;
     int sourceId, sinkId;
     while (!graphFile.eof()) {
         graphFile.getline(line, 8192);
-        
-        char * line_p = line;
+
+        char *line_p = line;
         while (*line_p != '\0') {
             if (*line_p != '\t' && *line_p != ' ') {
                 break;
@@ -118,14 +134,18 @@ void Graph::readGraph(const char * aFilename) {
             mExpectedPloidy = atoi(strtok(token, "m"));
         } else if (strcmp(token, "SOURCE") == 0) {
             token = strtok(NULL, " ");
-            strtok(token, ":");
-            sourceId = atoi(strtok(NULL, ":"));
+            while (token != NULL) {
+                mSources->push_back(this->getSegmentById(atoi(token)));
+                token = strtok(NULL, ",");
+            }
         } else if (strcmp(token, "SINK") == 0) {
             token = strtok(NULL, " ");
-            strtok(token, ":");
-            sinkId = atoi(strtok(NULL, ":"));
+            while (token != NULL) {
+                mSinks->push_back(this->getSegmentById(atoi(token)));
+                token = strtok(NULL, ",");
+            }
         } else if (strcmp(token, "SEG") == 0) {
-            char * node = strtok(NULL, " ");
+            char *node = strtok(NULL, " ");
             double segCoverage = max(atof(strtok(NULL, " ")), 0.0);
             double segCopy = atof(strtok(NULL, " "));
 
@@ -135,11 +155,14 @@ void Graph::readGraph(const char * aFilename) {
             int start = atoi(strtok(NULL, ":"));
             int end = atoi(strtok(NULL, ":"));
             double segCred = 1.0;
-            
-            this->addSegment(segId, chrom, start, end, segCoverage, segCred, segCopy);
+            auto seg = this->addSegment(segId, chrom, start, end, segCoverage, segCred, segCopy);
+            for (auto source :  *mSources) {
+                if (source->getId() > segId) break;
+                seg->setPartition(source->getId());
+            }
         } else if (strcmp(token, "JUNC") == 0) {
-            char * sourceNode = strtok(NULL, " ");
-            char * targetNode = strtok(NULL, " ");
+            char *sourceNode = strtok(NULL, " ");
+            char *targetNode = strtok(NULL, " ");
             double junCoverage = atof(strtok(NULL, " "));
             double junCopy = atof(strtok(NULL, " "));
             token = strtok(NULL, " ");
@@ -150,7 +173,7 @@ void Graph::readGraph(const char * aFilename) {
             bool isBounded = (token[0] == 'B') ? true : false;
             // cout << (isBounded ? "yes" : "no") << endl;
             if (junCoverage <= 0 && junCopy <= 0) continue;
-            
+
             strtok(sourceNode, ":");
             int sourceId = atoi(strtok(NULL, ":"));
             char sourceDir = strtok(NULL, ":")[0];
@@ -160,17 +183,19 @@ void Graph::readGraph(const char * aFilename) {
             char targetDir = strtok(NULL, ":")[0];
 
             double junCred = 1.0;
-            
-            this->addJunction(sourceId, sourceDir, targetId, targetDir, junCoverage, junCred, junCopy, isInferred, isBounded, false);
+
+            this->addJunction(sourceId, sourceDir, targetId, targetDir, junCoverage, junCred, junCopy, isInferred,
+                              isBounded, false);
         }
     }
+    assert(mSources->size() == mSinks->size());
     mInferredBegin = mJunctions->end();
-    
-    mSource = this->getSegmentById(sourceId);
-    mSink = this->getSegmentById(sinkId);
+//
+//    mSource = this->getSegmentById(sourceId);
+//    mSink = this->getSegmentById(sinkId);
 }
 
-void Graph::writeGraph(const char * aFilename) {
+void Graph::writeGraph(const char *aFilename) {
     ofstream fout(aFilename);
     fout << "SAMPLE_NAME " << mSampleName << endl
          << "AVG_SEG_DP " << mAvgCoverage << endl
@@ -178,54 +203,54 @@ void Graph::writeGraph(const char * aFilename) {
          << "PURITY " << mPurity << endl
          << "AVG_PLOIDY " << mAvgPloidy << endl
          << "PLOIDY " << mPloidy << endl
-         << "SOURCE " << "H:" << mSource->getId() << endl
-         << "SINK " << "H:" << mSink->getId() << endl;
+         << "SOURCE " << getSourcesIds() << endl
+         << "SINK " << getSinksIds() << endl;
     cout << "write seg" << endl;
-    for (Segment * seg : *mSegments) {
-        fout << "SEG " << "H:" << seg->getId() << ":" << seg->getChrom() 
-             << ":" << seg->getStart() << ":" << seg->getEnd() << " " 
-             << seg->getWeight()->getCoverage() << " " 
-             << seg->getWeight()->getCopyNum() << " "
-             << (seg->hasLowerBoundLimit() ? "B" : "U") << endl;
-    }
-    for (Junction * junc : *mJunctions) {
-        Edge * e = junc->getEdgeA();
-        fout << "JUNC " << "H:" << e->getSource()->getId() << ":" << e->getSource()->getDir() << " "
-             << "H:" << e->getTarget()->getId() << ":" << e->getTarget()->getDir() << " " 
-             << junc->getWeight()->getCoverage() << " " 
-             << junc->getWeight()->getCopyNum() << " " 
-             << (junc->isInferred() ? "I" : "U") << " " << (junc->hasLowerBoundLimit() ? "B" : "U") << endl;
-    }
-    fout.close();
-}
-
-void Graph::writePartialGraph(vector<Segment *> *segs, const char * aFilename) {
-    ofstream fout(aFilename);
-    fout << "SAMPLE_NAME " << mSampleName << endl
-         << "AVG_SEG_DP " << mAvgCoverage << endl
-         << "AVG_JUNC_DP " << mAvgCoverageJunc << endl
-         << "PURITY " << mPurity << endl
-         << "AVG_PLOIDY " << mAvgPloidy << endl
-         << "PLOIDY " << mPloidy << endl
-         << "SOURCE " << "H:" << mSource->getId() << endl
-         << "SINK " << "H:" << mSink->getId() << endl;
-    cout << "write seg" << endl;
-    for (Segment * seg : *segs) {
+    for (Segment *seg : *mSegments) {
         fout << "SEG " << "H:" << seg->getId() << ":" << seg->getChrom()
              << ":" << seg->getStart() << ":" << seg->getEnd() << " "
              << seg->getWeight()->getCoverage() << " "
              << seg->getWeight()->getCopyNum() << " "
              << (seg->hasLowerBoundLimit() ? "B" : "U") << endl;
     }
-    for (Junction * junc : *mJunctions) {
+    for (Junction *junc : *mJunctions) {
+        Edge *e = junc->getEdgeA();
+        fout << "JUNC " << "H:" << e->getSource()->getId() << ":" << e->getSource()->getDir() << " "
+             << "H:" << e->getTarget()->getId() << ":" << e->getTarget()->getDir() << " "
+             << junc->getWeight()->getCoverage() << " "
+             << junc->getWeight()->getCopyNum() << " "
+             << (junc->isInferred() ? "I" : "U") << " " << (junc->hasLowerBoundLimit() ? "B" : "U") << endl;
+    }
+    fout.close();
+}
+
+void Graph::writePartialGraph(vector<Segment *> *segs, const char *aFilename) {
+    ofstream fout(aFilename);
+    fout << "SAMPLE_NAME " << mSampleName << endl
+         << "AVG_SEG_DP " << mAvgCoverage << endl
+         << "AVG_JUNC_DP " << mAvgCoverageJunc << endl
+         << "PURITY " << mPurity << endl
+         << "AVG_PLOIDY " << mAvgPloidy << endl
+         << "PLOIDY " << mPloidy << endl
+         << "SOURCE " << getSourcesIds() << endl
+         << "SINK " << getSinksIds() << endl;
+    cout << "write seg" << endl;
+    for (Segment *seg : *segs) {
+        fout << "SEG " << "H:" << seg->getId() << ":" << seg->getChrom()
+             << ":" << seg->getStart() << ":" << seg->getEnd() << " "
+             << seg->getWeight()->getCoverage() << " "
+             << seg->getWeight()->getCopyNum() << " "
+             << (seg->hasLowerBoundLimit() ? "B" : "U") << endl;
+    }
+    for (Junction *junc : *mJunctions) {
         bool sourceFlag = false;
         bool targetFlag = false;
-        for(Segment* seg : *segs) {
-            if(seg->getId() == junc->getSource()->getId()) sourceFlag= true;
-            if(seg->getId() == junc->getTarget()->getId()) targetFlag= true;
+        for (Segment *seg : *segs) {
+            if (seg->getId() == junc->getSource()->getId()) sourceFlag = true;
+            if (seg->getId() == junc->getTarget()->getId()) targetFlag = true;
         }
-        if(sourceFlag && targetFlag) {
-            Edge * e = junc->getEdgeA();
+        if (sourceFlag && targetFlag) {
+            Edge *e = junc->getEdgeA();
             fout << "JUNC " << "H:" << e->getSource()->getId() << ":" << e->getSource()->getDir() << " "
                  << "H:" << e->getTarget()->getId() << ":" << e->getTarget()->getDir() << " "
                  << junc->getWeight()->getCoverage() << " "
@@ -238,7 +263,7 @@ void Graph::writePartialGraph(vector<Segment *> *segs, const char * aFilename) {
 
 
 void Graph::checkOrphan() {
-    for (Segment * seg : *mSegments) {
+    for (Segment *seg : *mSegments) {
         seg->checkOrphan();
     }
 }
@@ -248,10 +273,12 @@ void Graph::calculateHapDepth() {
      * average ploidy = purity * average tumor ploidy + (1 - purity) * 2
      * purity * segment copy * haploytye depth + (1 - purity) * 2 * haploid depth = segment depth
     */
-    
+
     if (mAvgPloidy < 0) {
         if (mAvgTumorPloidy < 0) {
-            cerr << "input error: there is no ploidy information provided. There must be at least one of \"AVG_PLOIDY\" and \"AVG_TUMOR_PLOIDY\"." << endl;
+            cerr
+                    << "input error: there is no ploidy information provided. There must be at least one of \"AVG_PLOIDY\" and \"AVG_TUMOR_PLOIDY\"."
+                    << endl;
             exit(1);
         } else {
             if (mPurity < 0) {
@@ -270,10 +297,14 @@ void Graph::calculateHapDepth() {
             } else {
                 double avgPloidy = mPurity * mAvgTumorPloidy + (1 - mPurity) * 2;
                 if (abs(mAvgPloidy - avgPloidy) <= 0.1) {
-                    cout << "calculated AVG_PLOIDY using AVG_TUMOR_PLOIDY is close enough to the given AVG_PLOIDY, use the given AVG_PLOIDY" << endl;
+                    cout
+                            << "calculated AVG_PLOIDY using AVG_TUMOR_PLOIDY is close enough to the given AVG_PLOIDY, use the given AVG_PLOIDY"
+                            << endl;
                 } else {
                     mAvgPloidy = avgPloidy;
-                    cout << "calculated AVG_PLOIDY using AVG_TUMOR_PLOIDY is distinguishable from the given AVG_PLOIDY, use the calculated AVG_PLOIDY" << endl;
+                    cout
+                            << "calculated AVG_PLOIDY using AVG_TUMOR_PLOIDY is distinguishable from the given AVG_PLOIDY, use the calculated AVG_PLOIDY"
+                            << endl;
                 }
             }
         } else {
@@ -286,21 +317,21 @@ void Graph::calculateHapDepth() {
     mHaploidDepth = mAvgCoverageRaw / mAvgPloidy;
     mHaploidDepthJunc = mHaploidDepth;
     cout << "Average ploidy: " << mAvgPloidy << endl
-        << "Haploid depth: " << mHaploidDepth << endl;
+         << "Haploid depth: " << mHaploidDepth << endl;
     mAvgCoverage = mAvgPloidy * mHaploidDepth;
     mAvgCoverageJunc = mAvgPloidy * mHaploidDepthJunc;
 
 }
 
 void Graph::calculateCopyNum() {
-    for (Segment * seg : *mSegments) {
+    for (Segment *seg : *mSegments) {
         double segCopy = (seg->getWeight()->getCoverage() - (1 - mPurity) * mAvgCoverage) / (mPurity * mHaploidDepth);
         // seg->getWeight()->setAdjustedCoverage(max(segAdjustedCoverage, 0.0));
         // seg->getWeight()->setCoverage(seg->getWeight()->getAdjustedCoverage());
         seg->getWeight()->setCopyNum(max(segCopy, 0.0));
     }
 
-    for (Junction * junc : *mJunctions) {
+    for (Junction *junc : *mJunctions) {
         double juncCopy = junc->getWeight()->getCoverage() / mHaploidDepthJunc;
         // junc->getWeight()->setAdjustedCoverage(max(juncAdjustedCoverage, 0.0));
         // junc->getWeight()->setCoverage(junc->getWeight()->getAdjustedCoverage());
@@ -309,25 +340,25 @@ void Graph::calculateCopyNum() {
 }
 
 void Graph::restoreCopy() {
-    for (Segment * seg : *mSegments) {
+    for (Segment *seg : *mSegments) {
         seg->restoreCopy();
     }
-    for (Junction * junc : *mJunctions) {
+    for (Junction *junc : *mJunctions) {
         junc->restoreCopy();
     }
 }
 
 void Graph::backupCopy() {
-    for (Segment * seg : *mSegments) {
+    for (Segment *seg : *mSegments) {
         seg->backupCopy();
     }
-    for (Junction * junc : *mJunctions) {
+    for (Junction *junc : *mJunctions) {
         junc->backupCopy();
     }
 }
 
 void Graph::resetVertexVisitFlag() {
-    for (Segment * seg : *mSegments) {
+    for (Segment *seg : *mSegments) {
         seg->getPositiveVertex()->resetVisited();
         seg->getNegativeVertex()->resetVisited();
         // seg->getPositiveVertex()->clearShortestPrevVertex();
@@ -338,7 +369,7 @@ void Graph::resetVertexVisitFlag() {
 }
 
 void Graph::resetJunctionVisitFlag() {
-    for (Junction * junc : *mJunctions) {
+    for (Junction *junc : *mJunctions) {
         junc->getEdgeA()->resetVisited();
         junc->getEdgeB()->resetVisited();
     }
@@ -353,23 +384,23 @@ void Graph::resetShortestPrevEdge() {
 
 void Graph::checkLowerBound() {
     this->checkOrphan();
-    for (Segment * seg : *mSegments) {
+    for (Segment *seg : *mSegments) {
 //        if(isTarget) {
 //            seg->setHasLowerBoundLimit();
 //            continue;
 //        }
         // seg->checkLowerBound();
         if (seg->isOrphan()) {
-        if (seg->getWeight()->getCoverage() <= 0.25 * mAvgCoverage) {
-            seg->resetHasLowerBoundLimit();
-        // } else {
-        //     seg->resetHasLowerBoundLimit();
-        }
+            if (seg->getWeight()->getCoverage() <= 0.25 * mAvgCoverage) {
+                seg->resetHasLowerBoundLimit();
+                // } else {
+                //     seg->resetHasLowerBoundLimit();
+            }
         } else {
             seg->setHasLowerBoundLimit();
         }
     }
-    for (Junction * junc : *mJunctions) {
+    for (Junction *junc : *mJunctions) {
         if (junc->getWeight()->getCoverage() > 0.25 * mAvgCoverageJunc) {
             junc->setHasLowerBoundLimit();
         } else {
@@ -382,7 +413,7 @@ void Graph::checkLowerBound() {
 }
 
 bool Graph::isCopyExhaustive() {
-    for (Segment * seg : *mSegments) {
+    for (Segment *seg : *mSegments) {
         if (seg->hasCopy()) {
             return false;
         }
@@ -390,19 +421,20 @@ bool Graph::isCopyExhaustive() {
     return true;
 }
 
-bool Graph::doesJunctionExist(Junction * aJunction) {
+bool Graph::doesJunctionExist(Junction *aJunction) {
     vector<string> aJuncInfo = aJunction->getInfo();
-    for (Junction * junc : *mJunctions) {
+    for (Junction *junc : *mJunctions) {
         vector<string> juncInfo = junc->getInfo();
-        if ((juncInfo[0] == aJuncInfo[0] && juncInfo[1] == aJuncInfo[1]) || (juncInfo[0] == aJuncInfo[1] && juncInfo[1] == aJuncInfo[0])) {
+        if ((juncInfo[0] == aJuncInfo[0] && juncInfo[1] == aJuncInfo[1]) ||
+            (juncInfo[0] == aJuncInfo[1] && juncInfo[1] == aJuncInfo[0])) {
             return true;
         }
     }
     return false;
 }
 
-Segment * Graph::getSegmentById(int aSegId) {
-    for (Segment * seg : *mSegments) {
+Segment *Graph::getSegmentById(int aSegId) {
+    for (Segment *seg : *mSegments) {
         if (seg->getId() == aSegId) {
             return seg;
         }
@@ -410,8 +442,8 @@ Segment * Graph::getSegmentById(int aSegId) {
     throw SegmentDoesNotExistException(aSegId);
 }
 
-Segment * Graph::getSegmentByChromStart(string aChrom, int aStart) {
-    for (Segment * seg : *mSegments) {
+Segment *Graph::getSegmentByChromStart(string aChrom, int aStart) {
+    for (Segment *seg : *mSegments) {
         if (seg->getChrom() == aChrom && seg->getStart() == aStart) {
             return seg;
         }
@@ -419,8 +451,8 @@ Segment * Graph::getSegmentByChromStart(string aChrom, int aStart) {
     throw SegmentDoesNotExistException(aStart);
 }
 
-Segment * Graph::getSegmentByChromEnd(string aChrom, int aEnd) {
-    for (Segment * seg : *mSegments) {
+Segment *Graph::getSegmentByChromEnd(string aChrom, int aEnd) {
+    for (Segment *seg : *mSegments) {
         if (seg->getChrom() == aChrom && seg->getEnd() == aEnd) {
             return seg;
         }
@@ -428,15 +460,17 @@ Segment * Graph::getSegmentByChromEnd(string aChrom, int aEnd) {
     throw SegmentDoesNotExistException(aEnd);
 }
 
-Segment * Graph::addSegment(int aId, string aChrom, int aStart, int aEnd, double aCoverage, double aCredibility, double aCopy) {
-    Segment * seg = new Segment(aId, aChrom, aStart, aEnd, aCoverage, aCredibility, aCopy);
+Segment *
+Graph::addSegment(int aId, string aChrom, int aStart, int aEnd, double aCoverage, double aCredibility, double aCopy) {
+    Segment *seg = new Segment(aId, aChrom, aStart, aEnd, aCoverage, aCredibility, aCopy);
     mSegments->push_back(seg);
     return seg;
 }
 
-Junction * Graph::addJunction(Vertex * aSource, Vertex * aTarget, double aCoverage, double aCredibility, double aCopy, bool aInferred, bool aIsBounded, bool aIsSourceSinkJunction) {
-    Segment * sourceSeg = aSource->getSegment();
-    Segment * targetSeg = aTarget->getSegment();
+Junction *Graph::addJunction(Vertex *aSource, Vertex *aTarget, double aCoverage, double aCredibility, double aCopy,
+                             bool aInferred, bool aIsBounded, bool aIsSourceSinkJunction) {
+    Segment *sourceSeg = aSource->getSegment();
+    Segment *targetSeg = aTarget->getSegment();
 
     if (!sourceSeg->hasLowerBoundLimit() || !targetSeg->hasLowerBoundLimit()) {
         // cout << (sourceSeg->hasLowerBoundLimit() ? "s yes" : "s no") << endl;
@@ -444,7 +478,8 @@ Junction * Graph::addJunction(Vertex * aSource, Vertex * aTarget, double aCovera
         return NULL;
     }
 
-    Junction * junc = new Junction(sourceSeg, targetSeg, aSource->getDir(), aTarget->getDir(), aCoverage, aCredibility, aCopy, aInferred, aIsBounded, aIsSourceSinkJunction);
+    Junction *junc = new Junction(sourceSeg, targetSeg, aSource->getDir(), aTarget->getDir(), aCoverage, aCredibility,
+                                  aCopy, aInferred, aIsBounded, aIsSourceSinkJunction);
     if (this->doesJunctionExist(junc)) {
         throw DuplicateJunctionException(junc);
     }
@@ -464,16 +499,19 @@ Junction * Graph::addJunction(Vertex * aSource, Vertex * aTarget, double aCovera
     // if mInferred, append to a vector storing inferred junctions
 }
 
-Junction * Graph::addJunction(int aSourceId, char aSourceDir, int aTargetId, char aTargetDir, double aCoverage, double aCredibility, double aCopy, bool aInferred, bool aIsBounded, bool aIsSourceSinkJunction) {
-    Segment * sourceSeg = this->getSegmentById(aSourceId);
-    Segment * targetSeg = this->getSegmentById(aTargetId);
+Junction *Graph::addJunction(int aSourceId, char aSourceDir, int aTargetId, char aTargetDir, double aCoverage,
+                             double aCredibility, double aCopy, bool aInferred, bool aIsBounded,
+                             bool aIsSourceSinkJunction) {
+    Segment *sourceSeg = this->getSegmentById(aSourceId);
+    Segment *targetSeg = this->getSegmentById(aTargetId);
 
     if (!sourceSeg->hasLowerBoundLimit() || !targetSeg->hasLowerBoundLimit()) {
         // cout << "dd" << endl;
         return NULL;
     }
 
-    Junction * junc = new Junction(sourceSeg, targetSeg, aSourceDir, aTargetDir, aCoverage, aCredibility, aCopy, aInferred, aIsBounded, aIsSourceSinkJunction);
+    Junction *junc = new Junction(sourceSeg, targetSeg, aSourceDir, aTargetDir, aCoverage, aCredibility, aCopy,
+                                  aInferred, aIsBounded, aIsSourceSinkJunction);
     if (this->doesJunctionExist(junc)) {
         // throw DuplicateJunctionException(junc);
         return junc;
@@ -494,8 +532,8 @@ Junction * Graph::addJunction(int aSourceId, char aSourceDir, int aTargetId, cha
     // if mInferred, append to a vector storing inferred junctions
 }
 
-Vertex * Graph::getNextVertexById(Vertex * aSourceVertex) {
-    Segment * nextSegment;
+Vertex *Graph::getNextVertexById(Vertex *aSourceVertex) {
+    Segment *nextSegment;
     if (aSourceVertex->getDir() == '+') {
         nextSegment = this->getSegmentById(aSourceVertex->getId() + 1);
         // if (nextSegment == NULL) {
@@ -512,8 +550,8 @@ Vertex * Graph::getNextVertexById(Vertex * aSourceVertex) {
     // return nextSegment->getNegativeVertex();
 }
 
-Vertex * Graph::getPrevVertexById(Vertex * aTargetVertex) {
-    Segment * prevSegment;
+Vertex *Graph::getPrevVertexById(Vertex *aTargetVertex) {
+    Segment *prevSegment;
     if (aTargetVertex->getDir() == '+') {
         prevSegment = this->getSegmentById(aTargetVertex->getId() - 1);
         // if (prevSegment == NULL) {
@@ -530,17 +568,17 @@ Vertex * Graph::getPrevVertexById(Vertex * aTargetVertex) {
     // return prevSegment->getNegativeVertex();
 }
 
-int Graph::BFS(Vertex * aStartVertex, Vertex * aTargetVertex) {
+int Graph::BFS(Vertex *aStartVertex, Vertex *aTargetVertex) {
     queue<Vertex *> vertexQueue;
     vertexQueue.push(aStartVertex);
 
     while (!vertexQueue.empty()) {
-        Vertex * currentVertex = vertexQueue.front();
+        Vertex *currentVertex = vertexQueue.front();
         vertexQueue.pop();
-        
-        for (Edge * e : *(currentVertex->getEdgesAsSource())) {
+
+        for (Edge *e : *(currentVertex->getEdgesAsSource())) {
             // if (e->hasCopy()) {
-            Vertex * nextVertex = e->getTarget();
+            Vertex *nextVertex = e->getTarget();
             if (!nextVertex->isVisited()) {
                 nextVertex->setVisited();
                 nextVertex->setShortestPrevEdge(e);
@@ -551,9 +589,9 @@ int Graph::BFS(Vertex * aStartVertex, Vertex * aTargetVertex) {
     }
     this->resetVertexVisitFlag();
 
-    Edge * prevEdge;
-    Vertex * prevVertex;
-    Vertex * currentVertex = aTargetVertex;
+    Edge *prevEdge;
+    Vertex *prevVertex;
+    Vertex *currentVertex = aTargetVertex;
     int found;
     while (true) {
         prevEdge = currentVertex->getShortestPrevEdge();
@@ -585,7 +623,7 @@ int Graph::BFS(Vertex * aStartVertex, Vertex * aTargetVertex) {
 //             return -1;  // no path from aStartVertex to aTargetVertex
 //         }
 
-//         prevVertex = prevEdge->getSource();
+//         prevVertex = prevEdge->getFirstSource();
 //         if (prevVertex == aStartVertex) {
 //             return 0;
 //         }
@@ -600,52 +638,80 @@ void Graph::print() {
     cout << "Avg coverage: " << mAvgCoverage << endl;
     cout << "Haploid coverage: " << mHaploidDepth << endl;
     cout << "Haploid junc coverage: " << mHaploidDepthJunc << endl;
-    cout << "Source: " << to_string(mSource->getId()) << endl;
-    cout << "Sink: " << to_string(mSink->getId()) << endl;
+    cout << "Source: " << getSourcesIds() << endl;
+    cout << "Sink: " << getSinksIds() << endl;
     cout << "Segments: " << mSegments->size() << endl;
     cout << "Junctions: " << mJunctions->size() << endl;
     cout << "``````````````````````````````````````````````````````````````````````````````````````````" << endl;
-    for (Segment * seg : *mSegments) {
+    for (Segment *seg : *mSegments) {
         cout << fixed << setprecision(4)
-            << "SEG" << "\t"
-            << seg->getId() << "\t" 
-            << seg->getChrom() << "\t" 
-            << seg->getStart() << "\t" 
-            << seg->getEnd() << "\t" 
-            << seg->getWeight()->getCoverage() << "\t"
-            // << seg->getWeight()->getOriginalCoverage() << "\t" 
-            // << seg->getWeight()->getAdjustedCoverage() << "\t" 
-            << seg->getWeight()->getCoverage() / mHaploidDepth << "\t" 
-            << "\033[1;31m" << seg->getWeight()->getCopyNum() << "\033[0m" << "\t" 
-            << seg->getCredibility() << "\t" 
-            << (seg->isOrphan() ? "OO" : "ONO") << "\t" 
-            << (seg->getPositiveVertex()->isOrphan() ? "OO" : "ONO") << "\t"
-            << (seg->getNegativeVertex()->isOrphan() ? "OO" : "ONO") << "\t"
-            << (seg->isOrphan(false) ? "O" : "NO") << "\t" 
-            << (seg->getPositiveVertex()->isOrphan(false) ? "O" : "NO") << "\t"
-            << (seg->getNegativeVertex()->isOrphan(false) ? "O" : "NO") << "\t"
-            << (seg->isDeadEnd() ? "D" : "ND") << "\t"
-            << (seg->hasLowerBoundLimit() ? "LB" : "NLB") << "\t"
-            << ((seg->getPositiveVertex()->getShortestPrevEdge() == NULL) ? "NULL" : seg->getPositiveVertex()->getShortestPrevEdge()->getSource()->getInfo()) << "\t"
-            << ((seg->getNegativeVertex()->getShortestPrevEdge() == NULL) ? "NULL" : seg->getNegativeVertex()->getShortestPrevEdge()->getSource()->getInfo()) << endl;
+             << "SEG" << "\t"
+             << seg->getId() << "\t"
+             << seg->getChrom() << "\t"
+             << seg->getStart() << "\t"
+             << seg->getEnd() << "\t"
+             << seg->getWeight()->getCoverage() << "\t"
+             // << seg->getWeight()->getOriginalCoverage() << "\t"
+             // << seg->getWeight()->getAdjustedCoverage() << "\t"
+             << seg->getWeight()->getCoverage() / mHaploidDepth << "\t"
+             << "\033[1;31m" << seg->getWeight()->getCopyNum() << "\033[0m" << "\t"
+             << seg->getCredibility() << "\t"
+             << (seg->isOrphan() ? "OO" : "ONO") << "\t"
+             << (seg->getPositiveVertex()->isOrphan() ? "OO" : "ONO") << "\t"
+             << (seg->getNegativeVertex()->isOrphan() ? "OO" : "ONO") << "\t"
+             << (seg->isOrphan(false) ? "O" : "NO") << "\t"
+             << (seg->getPositiveVertex()->isOrphan(false) ? "O" : "NO") << "\t"
+             << (seg->getNegativeVertex()->isOrphan(false) ? "O" : "NO") << "\t"
+             << (seg->isDeadEnd() ? "D" : "ND") << "\t"
+             << (seg->hasLowerBoundLimit() ? "LB" : "NLB") << "\t"
+             << ((seg->getPositiveVertex()->getShortestPrevEdge() == NULL) ? "NULL"
+                                                                           : seg->getPositiveVertex()->getShortestPrevEdge()->getSource()->getInfo())
+             << "\t"
+             << ((seg->getNegativeVertex()->getShortestPrevEdge() == NULL) ? "NULL"
+                                                                           : seg->getNegativeVertex()->getShortestPrevEdge()->getSource()->getInfo())
+             << endl;
     }
 
     int c = 0;
-    for (Junction * junc : *mJunctions) {
+    for (Junction *junc : *mJunctions) {
         vector<string> info = junc->getInfo();
         cout << left << fixed << setprecision(4)
-            << "JUNC" << "\t"
-            << c << "\t"
-            << info[0] << "\t" << info[1] << "\t"
-            << junc->getWeight()->getCoverage() << "\t"
-            // << junc->getWeight()->getOriginalCoverage() << "\t"
-            // << junc->getWeight()->getAdjustedCoverage() << "\t"
-            << junc->getWeight()->getCoverage() / mHaploidDepth << "\t" 
-            << "\033[1;31m" << junc->getWeight()->getCopyNum() << "\033[0m" << "\t"
-            << junc->getCredibility() << "\t"
-            << (junc->isInferred() ? "I" : "NI") << "\t"
-            << (junc->hasLowerBoundLimit() ? "LB" : "NLB") << endl;
+             << "JUNC" << "\t"
+             << c << "\t"
+             << info[0] << "\t" << info[1] << "\t"
+             << junc->getWeight()->getCoverage() << "\t"
+             // << junc->getWeight()->getOriginalCoverage() << "\t"
+             // << junc->getWeight()->getAdjustedCoverage() << "\t"
+             << junc->getWeight()->getCoverage() / mHaploidDepth << "\t"
+             << "\033[1;31m" << junc->getWeight()->getCopyNum() << "\033[0m" << "\t"
+             << junc->getCredibility() << "\t"
+             << (junc->isInferred() ? "I" : "NI") << "\t"
+             << (junc->hasLowerBoundLimit() ? "LB" : "NLB") << endl;
         c++;
     }
     cout << "``````````````````````````````````````````````````````````````````````````````````````````" << endl;
+}
+
+vector<Segment *> *Graph::getMSources() const {
+    return mSources;
+}
+
+vector<Segment *> *Graph::getMSinks() const {
+    return mSinks;
+}
+
+char *Graph::getSourcesIds() {
+    char *r;
+    for (auto s : *mSources) {
+        r += s->getId();
+        r += ',';
+    }
+}
+
+char *Graph::getSinksIds() {
+    char *r;
+    for (auto s : *mSinks) {
+        r += s->getId();
+        r += ',';
+    }
 }

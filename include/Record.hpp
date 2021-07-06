@@ -25,43 +25,52 @@ typedef struct Entry {
 // } junc_entry_t;
 
 class Record {
-    protected:
-        string mChrom;
-        int mPos;
-        char mStrand;
-        // vector<int> * mPositivePairId;
-        // vector<entry *> * mBackwardEntries;
-        // vector<int> * mBackwardEntryUUID;
-        vector<entry_t *> * mBackwardEntries;
-        vector<string> * mBackwardEntryUUID;
+protected:
+    string mChrom;
+    int mPos;
+    char mStrand;
+    // vector<int> * mPositivePairId;
+    // vector<entry *> * mBackwardEntries;
+    // vector<int> * mBackwardEntryUUID;
+    vector<entry_t *> *mBackwardEntries;
+    vector<string> *mBackwardEntryUUID;
 
-        // vector<int> * mNegativePairId;
-        // vector<entry *> * mForwardEntries;
-        // vector<int> * mForwardEntryUUID;
-        vector<entry_t *> * mForwardEntries;
-        vector<string> * mForwardEntryUUID;
+    // vector<int> * mNegativePairId;
+    // vector<entry *> * mForwardEntries;
+    // vector<int> * mForwardEntryUUID;
+    vector<entry_t *> *mForwardEntries;
+    vector<string> *mForwardEntryUUID;
 
-        Record * mComplementRecord;
+    Record *mComplementRecord;
 
-    public:
-        Record(string aChrom, int aPos, char aStrand);
-        ~Record();
+public:
+    Record(string aChrom, int aPos, char aStrand);
 
-        string getChrom();
-        int getPos();
-        char getStrand();
-        vector<string> * getBackwardEntryUUID();
-        vector<string> * getForwardEntryUUID();
-        vector<entry_t *> * getBackwardEntries();
-        vector<entry_t *> * getForwardEntries();
+    ~Record();
 
-        void insertBackwardEntry(string aChrom, int aPos, char aStrand, int aSupport, bool aIsComplement);
-        void insertForwardEntry(string aChrom, int aPos, char aStrand, int aSupport, bool aIsComplement);
-        void sortEntry();
+    string getChrom();
 
-        entry_t * findForwardEntry(string aChrom, int aPos, char aStrand);
+    int getPos();
 
-        void print();
+    char getStrand();
+
+    vector<string> *getBackwardEntryUUID();
+
+    vector<string> *getForwardEntryUUID();
+
+    vector<entry_t *> *getBackwardEntries();
+
+    vector<entry_t *> *getForwardEntries();
+
+    void insertBackwardEntry(string aChrom, int aPos, char aStrand, int aSupport, bool aIsComplement);
+
+    void insertForwardEntry(string aChrom, int aPos, char aStrand, int aSupport, bool aIsComplement);
+
+    void sortEntry();
+
+    entry_t *findForwardEntry(string aChrom, int aPos, char aStrand);
+
+    void print();
 };
 
 #endif

@@ -4,40 +4,50 @@
 using namespace std;
 
 class Weight {
-    protected:
-        double mCoverage;           // coverage as adjusted by LP
-        // double mCoverageOriginal;   // coverage from input
-        // double mCoverageAdjusted;   // coverage as adjusted by purity
-        double mCopyNum;             // the copy number, coverage / average coverage of one copy
-        double mCopyNumOriginal;
-        double mCopyNumBackup;
+protected:
+    double mCoverage;           // coverage as adjusted by LP
+    // double mCoverageOriginal;   // coverage from input
+    // double mCoverageAdjusted;   // coverage as adjusted by purity
+    double mCopyNum;             // the copy number, coverage / average coverage of one copy
+    double mCopyNumOriginal;
+    double mCopyNumBackup;
 
-        bool mIsInferred;
-        
-    public:
-        Weight(double aCoverage);
-        ~Weight();
+    bool mIsInferred;
 
-        double getCoverage();
-        // double getOriginalCoverage();
-        // double getAdjustedCoverage();
-        double getCopyNum();
-        double getCopyNumBackup();
-        void setCoverage(double aCoverage);
-        // void setOriginalCoverage(double aCoverage);
-        // void setAdjustedCoverage(double aCoverage);
-        void setCopyNum(double aCopyNum);
-        void backup();
-        void restore();
+public:
+    Weight(double aCoverage);
 
-        void increaseCopyNum(double aIncrement = 1);
-        void decreaseCopyNum(double aDecrement = 1);
+    ~Weight();
 
-        bool isInferred();
-        void setInferred();
-        void resetInferred();
+    double getCoverage();
 
-        void print();
+    // double getOriginalCoverage();
+    // double getAdjustedCoverage();
+    double getCopyNum();
+
+    double getCopyNumBackup();
+
+    void setCoverage(double aCoverage);
+
+    // void setOriginalCoverage(double aCoverage);
+    // void setAdjustedCoverage(double aCoverage);
+    void setCopyNum(double aCopyNum);
+
+    void backup();
+
+    void restore();
+
+    void increaseCopyNum(double aIncrement = 1);
+
+    void decreaseCopyNum(double aDecrement = 1);
+
+    bool isInferred();
+
+    void setInferred();
+
+    void resetInferred();
+
+    void print();
 };
 
 #endif

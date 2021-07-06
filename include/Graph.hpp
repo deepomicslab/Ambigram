@@ -9,94 +9,147 @@
 using namespace std;
 
 class Segment;
+
 class Junction;
 
 class Graph {
-    protected:
-        string mSampleName;
-        
-        int mExpectedPloidy;     // expected ploidy
+protected:
+    string mSampleName;
 
-        double mHaploidDepth;
-        double mHaploidDepthJunc;
-        double mPurity;   // tumor purity
-        double mAvgPloidy;   // the ploidy of whole sequencing region, including tumor if possible
-        double mAvgTumorPloidy;   // the ploidy of tumor
-        double mAvgCoverage;
-        double mAvgCoverageRaw;
-        double mAvgCoverageJunc;
-        double mAvgCoverageRawJunc;
+    int mExpectedPloidy;     // expected ploidy
 
-        string mPloidy;
+    double mHaploidDepth;
+    double mHaploidDepthJunc;
+    double mPurity;   // tumor purity
+    double mAvgPloidy;   // the ploidy of whole sequencing region, including tumor if possible
+    double mAvgTumorPloidy;   // the ploidy of tumor
+    double mAvgCoverage;
+    double mAvgCoverageRaw;
+    double mAvgCoverageJunc;
+    double mAvgCoverageRawJunc;
 
-        Segment * mSource;
-        Segment * mSink;
+    string mPloidy;
 
-        vector<Segment *> * mSegments;
-        vector<Junction *> * mJunctions;
-        vector<Junction *>::iterator mInferredBegin;
+//        Segment * mSource;
+//        Segment * mSink;
+    vector<Segment *> *mSources;
+protected:
+    vector<Segment *> *mSinks;
 
-    public:
-        Graph();
-        Graph(const char * aFilename);
-        ~Graph();
+    vector<Segment *> *mSegments;
+    vector<Junction *> *mJunctions;
+    vector<Junction *>::iterator mInferredBegin;
 
-        string getSampleName();
+public:
+    Graph();
 
-        int getJunctionIndexByEdge(Edge * aEdge);
+    Graph(const char *aFilename);
 
-        int getExpectedPloidy();
-        double getPurity();
-        double getAvgPloidy();
-        double getAvgTumorPloidy();
-        double getAvgCoverage();
-        double getAvgRawCoverage();
-        double getAvgCoverageJunc();
-        double getAvgRawCoverageJunc();
-        double getHaploidDepth();
-        void setPurity(double aPurity);
-        void setAvgPloidy(double aAvgPloidy);
-        void setAvgTumorPloidy(double aAvgTumorPloidy);
-        void setAvgCoverage(double aAvgCoverage);
-        void setAvgRawCoverage(double aAvgCoverageRaw);
+    ~Graph();
 
-        Segment * getSource();
-        Segment * getSink();
-        
-        vector<Segment *> * getSegments();
-        vector<Junction *> * getJunctions();
+    string getSampleName();
 
-        /* functionality */
-        
-        bool isCopyExhaustive();
-        bool doesJunctionExist(Junction * aJunction);
+    int getJunctionIndexByEdge(Edge *aEdge);
 
-        void readGraph(const char * aFilename);
-        void writeGraph(const char * aFilename);
-        void writePartialGraph(vector<Segment*> * segs, const char * aFilename);
-        void checkOrphan();
-        void calculateHapDepth();
-        void calculateCopyNum();
-        void restoreCopy();
-        void backupCopy();
-        void resetVertexVisitFlag();
-        void resetJunctionVisitFlag();
-        void resetShortestPrevEdge();
-        void checkLowerBound();
+    int getExpectedPloidy();
 
-        Segment * getSegmentById(int aSegId);
-        Segment * getSegmentByChromStart(string aChrom, int aStart);
-        Segment * getSegmentByChromEnd(string aChrom, int aEnd);
-        Segment * addSegment(int aId, string aChrom, int aStart, int aEnd, double aCoverage, double aCredibility, double aCopy);
-        Junction * addJunction(Vertex * aSource, Vertex * aTarget, double aCoverage, double aCredibility, double aCopy, bool aInferred, bool aIsBounded, bool aIsSourceSinkJunction);
-        Junction * addJunction(int aSourceId, char aSourceDir, int aTargetId, char aTargetDir, double aCoverage, double aCredibility, double aCopy, bool aInferred, bool aIsBounded, bool aIsSourceSinkJunction);
-        Vertex * getPrevVertexById(Vertex * aTargetVertex);
-        Vertex * getNextVertexById(Vertex * aSourceVertex);
+    double getPurity();
 
-        int BFS(Vertex * aStartVertex, Vertex * aTargetVertex);
-        // int findShortestPath(Vertex * aStartVertex, Vertex * aTargetVertex);
+    double getAvgPloidy();
 
-        void print();
+    double getAvgTumorPloidy();
+
+    double getAvgCoverage();
+
+    double getAvgRawCoverage();
+
+    double getAvgCoverageJunc();
+
+    double getAvgRawCoverageJunc();
+
+    double getHaploidDepth();
+
+    void setPurity(double aPurity);
+
+    void setAvgPloidy(double aAvgPloidy);
+
+    void setAvgTumorPloidy(double aAvgTumorPloidy);
+
+    void setAvgCoverage(double aAvgCoverage);
+
+    void setAvgRawCoverage(double aAvgCoverageRaw);
+
+    Segment *getFirstSource();
+
+    Segment *getFirstSink();
+
+    vector<Segment *> *getMSources() const;
+
+    vector<Segment *> *getMSinks() const;
+
+    vector<Segment *> *getSegments();
+
+    vector<Junction *> *getJunctions();
+
+    char *getSourcesIds();
+
+    char *getSinksIds();
+
+    /* functionality */
+
+    bool isCopyExhaustive();
+
+    bool doesJunctionExist(Junction *aJunction);
+
+    void readGraph(const char *aFilename);
+
+    void writeGraph(const char *aFilename);
+
+    void writePartialGraph(vector<Segment *> *segs, const char *aFilename);
+
+    void checkOrphan();
+
+    void calculateHapDepth();
+
+    void calculateCopyNum();
+
+    void restoreCopy();
+
+    void backupCopy();
+
+    void resetVertexVisitFlag();
+
+    void resetJunctionVisitFlag();
+
+    void resetShortestPrevEdge();
+
+    void checkLowerBound();
+
+    Segment *getSegmentById(int aSegId);
+
+    Segment *getSegmentByChromStart(string aChrom, int aStart);
+
+    Segment *getSegmentByChromEnd(string aChrom, int aEnd);
+
+    Segment *
+    addSegment(int aId, string aChrom, int aStart, int aEnd, double aCoverage, double aCredibility, double aCopy);
+
+    Junction *
+    addJunction(Vertex *aSource, Vertex *aTarget, double aCoverage, double aCredibility, double aCopy, bool aInferred,
+                bool aIsBounded, bool aIsSourceSinkJunction);
+
+    Junction *
+    addJunction(int aSourceId, char aSourceDir, int aTargetId, char aTargetDir, double aCoverage, double aCredibility,
+                double aCopy, bool aInferred, bool aIsBounded, bool aIsSourceSinkJunction);
+
+    Vertex *getPrevVertexById(Vertex *aTargetVertex);
+
+    Vertex *getNextVertexById(Vertex *aSourceVertex);
+
+    int BFS(Vertex *aStartVertex, Vertex *aTargetVertex);
+    // int findShortestPath(Vertex * aStartVertex, Vertex * aTargetVertex);
+
+    void print();
 };
 
 #endif

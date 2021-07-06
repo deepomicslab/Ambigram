@@ -7,59 +7,74 @@
 using namespace std;
 
 class Vertex;
+
 class Weight;
+
 class Junction;
 
 class Edge {
-    protected:
-        // int mId;    // edge id
-        
-        double mCredibility;
-        
-        bool mIsVisited;
-        // bool mIsPreferred;
-        
-        Weight * mWeight;
-        Vertex * mSource;
-        Vertex * mTarget;
-        Junction * mJunction;
+protected:
+    // int mId;    // edge id
 
-    public:
-        // constructor and destructor
-        Edge(Vertex * aSource, Vertex * aTarget, Weight * aWeight, double aCredibility);
-        ~Edge();
+    double mCredibility;
 
-        // getter and setter
-        // int id();
-        string getInfo();
-        
-        double getCredibility();
-        void setCredibility(double aCredibility);
+    bool mIsVisited;
+    // bool mIsPreferred;
 
-        bool isVisited();
-        // bool isPreferred();
-        void setVisited();
-        void resetVisited();
-        // void setPreferred();
-        
-        Weight * getWeight();
-        Vertex * getSource();
-        Vertex * getTarget();
-        Junction * getJunction();
-        void setSource(Vertex * aSource);
-        void setTarget(Vertex * aTarget);
-        void setJunction(Junction * aJunction);
+    Weight *mWeight;
+    Vertex *mSource;
+    Vertex *mTarget;
+    Junction *mJunction;
 
-        // functionality
-        bool hasCopy();
-        bool doesConnectSameDir();
+public:
+    // constructor and destructor
+    Edge(Vertex *aSource, Vertex *aTarget, Weight *aWeight, double aCredibility);
 
-        void recover(double copy = 1);
-        void traverse();
+    ~Edge();
 
-        Edge * getComplementEdge();
+    // getter and setter
+    // int id();
+    string getInfo();
 
-        // print func
-        void print();
+    double getCredibility();
+
+    void setCredibility(double aCredibility);
+
+    bool isVisited();
+
+    // bool isPreferred();
+    void setVisited();
+
+    void resetVisited();
+    // void setPreferred();
+
+    Weight *getWeight();
+
+    Vertex *getSource();
+
+    Vertex *getTarget();
+
+    Junction *getJunction();
+
+    void setSource(Vertex *aSource);
+
+    void setTarget(Vertex *aTarget);
+
+    void setJunction(Junction *aJunction);
+
+    // functionality
+    bool hasCopy();
+
+    bool doesConnectSameDir();
+
+    void recover(double copy = 1);
+
+    void traverse();
+
+    Edge *getComplementEdge();
+
+    // print func
+    void print();
 };
+
 #endif

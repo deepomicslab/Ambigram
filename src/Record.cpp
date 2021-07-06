@@ -25,13 +25,18 @@ Record::~Record() {
 }
 
 string Record::getChrom() { return mChrom; }
+
 int Record::getPos() { return mPos; }
+
 char Record::getStrand() { return mStrand; }
 
-vector<string> * Record::getBackwardEntryUUID() { return mBackwardEntryUUID; }
-vector<string> * Record::getForwardEntryUUID() { return mForwardEntryUUID; }
-vector<entry_t *> * Record::getBackwardEntries() { return mBackwardEntries; }
-vector<entry_t *> * Record::getForwardEntries() { return mForwardEntries; }
+vector<string> *Record::getBackwardEntryUUID() { return mBackwardEntryUUID; }
+
+vector<string> *Record::getForwardEntryUUID() { return mForwardEntryUUID; }
+
+vector<entry_t *> *Record::getBackwardEntries() { return mBackwardEntries; }
+
+vector<entry_t *> *Record::getForwardEntries() { return mForwardEntries; }
 
 void Record::insertBackwardEntry(string aChrom, int aPos, char aStrand, int aSupport, bool aIsComplement) {
     string uuid = (aStrand == '+') ? (aChrom + ':' + to_string(aPos)) : (aChrom + ':' + to_string(-aPos));
@@ -42,7 +47,7 @@ void Record::insertBackwardEntry(string aChrom, int aPos, char aStrand, int aSup
         // not exist
         mBackwardEntryUUID->insert(iterUUID, uuid);
 
-        entry_t * e = new entry_t{aChrom, aPos, aStrand, aSupport, aIsComplement};
+        entry_t *e = new entry_t{aChrom, aPos, aStrand, aSupport, aIsComplement};
         mBackwardEntries->insert(iterEntry, e);
     } else {
         // exist
@@ -59,7 +64,7 @@ void Record::insertForwardEntry(string aChrom, int aPos, char aStrand, int aSupp
         // not exist
         mForwardEntryUUID->insert(iterUUID, uuid);
 
-        entry_t * e = new entry_t{aChrom, aPos, aStrand, aSupport, aIsComplement};
+        entry_t *e = new entry_t{aChrom, aPos, aStrand, aSupport, aIsComplement};
         mForwardEntries->insert(iterEntry, e);
     } else {
         // exist
@@ -68,11 +73,13 @@ void Record::insertForwardEntry(string aChrom, int aPos, char aStrand, int aSupp
 }
 
 void Record::sortEntry() {
-    sort(mBackwardEntries->begin(), mBackwardEntries->end(), [](entry_t * e1, entry_t * e2) { return e1->support < e2->support; });
-    sort(mForwardEntries->begin(), mForwardEntries->end(), [](entry_t * e1, entry_t * e2) { return e1->support < e2->support; });
+    sort(mBackwardEntries->begin(), mBackwardEntries->end(),
+         [](entry_t *e1, entry_t *e2) { return e1->support < e2->support; });
+    sort(mForwardEntries->begin(), mForwardEntries->end(),
+         [](entry_t *e1, entry_t *e2) { return e1->support < e2->support; });
 }
 
-entry_t * Record::findForwardEntry(string aChrom, int aPos, char aStrand) {
+entry_t *Record::findForwardEntry(string aChrom, int aPos, char aStrand) {
     int id = (aStrand == '+') ? aPos : -aPos;
     string uuid = aChrom + ':' + to_string(id);
     vector<string>::iterator iterUUID = lower_bound(mForwardEntryUUID->begin(), mForwardEntryUUID->end(), uuid);

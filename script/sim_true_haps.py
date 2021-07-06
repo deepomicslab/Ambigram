@@ -1,5 +1,6 @@
-import pandas as pd
 import argparse
+
+import pandas as pd
 
 parser = argparse.ArgumentParser()
 parser.add_argument('-d', '--del', dest='de', required=True, help='')
@@ -21,109 +22,117 @@ with open(args.hap) as fin:
     h1, h2 = [line[:-1].split() for line in fin.readlines()]
 
 for i in del_df.index:
-	after = bps_map.loc[lambda df: df.before >= del_df.loc[i, 'Start'] + 28460000 - 1 - 5].loc[lambda df: df.before <= del_df.loc[i, 'Start'] + 28460000 - 1 + 5].after
-	if len(after.unique()) == 1:
-		del_df.at[i, 'Start'] = after.iloc[0]
-	else:
-		print('Fail')
-	after = bps_map.loc[lambda df: df.before >= del_df.loc[i, 'End'] + 28460000 - 1 - 5].loc[lambda df: df.before <= del_df.loc[i, 'End'] + 28460000 - 1 + 5].after
-	if len(after.unique()) == 1:
-		del_df.at[i, 'End'] = after.iloc[0]
-	else:
-		print('Fail')
+    after = bps_map.loc[lambda df: df.before >= del_df.loc[i, 'Start'] + 28460000 - 1 - 5].loc[
+        lambda df: df.before <= del_df.loc[i, 'Start'] + 28460000 - 1 + 5].after
+    if len(after.unique()) == 1:
+        del_df.at[i, 'Start'] = after.iloc[0]
+    else:
+        print('Fail')
+    after = bps_map.loc[lambda df: df.before >= del_df.loc[i, 'End'] + 28460000 - 1 - 5].loc[
+        lambda df: df.before <= del_df.loc[i, 'End'] + 28460000 - 1 + 5].after
+    if len(after.unique()) == 1:
+        del_df.at[i, 'End'] = after.iloc[0]
+    else:
+        print('Fail')
 
 for i in inv_df.index:
-	after = bps_map.loc[lambda df: df.before >= inv_df.loc[i, 'Start'] + 28460000 - 1 - 5].loc[lambda df: df.before <= inv_df.loc[i, 'Start'] + 28460000 - 1 + 5].after
-	if len(after.unique()) == 1:
-		inv_df.at[i, 'Start'] = after.iloc[0]
-	else:
-		print('Fail')
-	after = bps_map.loc[lambda df: df.before >= inv_df.loc[i, 'End'] + 28460000 - 1 - 5].loc[lambda df: df.before <= inv_df.loc[i, 'End'] + 28460000 - 1 + 5].after
-	if len(after.unique()) == 1:
-		inv_df.at[i, 'End'] = after.iloc[0]
-	else:
-		print('Fail')
-
+    after = bps_map.loc[lambda df: df.before >= inv_df.loc[i, 'Start'] + 28460000 - 1 - 5].loc[
+        lambda df: df.before <= inv_df.loc[i, 'Start'] + 28460000 - 1 + 5].after
+    if len(after.unique()) == 1:
+        inv_df.at[i, 'Start'] = after.iloc[0]
+    else:
+        print('Fail')
+    after = bps_map.loc[lambda df: df.before >= inv_df.loc[i, 'End'] + 28460000 - 1 - 5].loc[
+        lambda df: df.before <= inv_df.loc[i, 'End'] + 28460000 - 1 + 5].after
+    if len(after.unique()) == 1:
+        inv_df.at[i, 'End'] = after.iloc[0]
+    else:
+        print('Fail')
 
 for i in dup_df.index:
-	after = bps_map.loc[lambda df: df.before >= dup_df.loc[i, 'Start'] + 28460000 - 1 - 5].loc[lambda df: df.before <= dup_df.loc[i, 'Start'] + 28460000 - 1 + 5].after
-	if len(after.unique()) == 1:
-		dup_df.at[i, 'Start'] = after.iloc[0]
-	else:
-		print('Fail')
-	after = bps_map.loc[lambda df: df.before >= dup_df.loc[i, 'End'] + 28460000 - 1 - 5].loc[lambda df: df.before <= dup_df.loc[i, 'End'] + 28460000 - 1 + 5].after
-	if len(after.unique()) == 1:
-		dup_df.at[i, 'End'] = after.iloc[0]
-	else:
-		print('Fail')
+    after = bps_map.loc[lambda df: df.before >= dup_df.loc[i, 'Start'] + 28460000 - 1 - 5].loc[
+        lambda df: df.before <= dup_df.loc[i, 'Start'] + 28460000 - 1 + 5].after
+    if len(after.unique()) == 1:
+        dup_df.at[i, 'Start'] = after.iloc[0]
+    else:
+        print('Fail')
+    after = bps_map.loc[lambda df: df.before >= dup_df.loc[i, 'End'] + 28460000 - 1 - 5].loc[
+        lambda df: df.before <= dup_df.loc[i, 'End'] + 28460000 - 1 + 5].after
+    if len(after.unique()) == 1:
+        dup_df.at[i, 'End'] = after.iloc[0]
+    else:
+        print('Fail')
 
 for i in trans_df.index:
-	after = bps_map.loc[lambda df: df.before >= trans_df.loc[i, 'StartA'] + 28460000 - 1 - 5].loc[lambda df: df.before <= trans_df.loc[i, 'StartA'] + 28460000 - 1 + 5].after
-	if len(after.unique()) == 1:
-		trans_df.at[i, 'StartA'] = after.iloc[0]
-	else:
-		print('Fail')
-	after = bps_map.loc[lambda df: df.before >= trans_df.loc[i, 'EndA'] + 28460000 - 1 - 5].loc[lambda df: df.before <= trans_df.loc[i, 'EndA'] + 28460000 - 1 + 5].after
-	if len(after.unique()) == 1:
-		trans_df.at[i, 'EndA'] = after.iloc[0]
-	else:
-		print('Fail')
-	after = bps_map.loc[lambda df: df.before >= trans_df.loc[i, 'StartB'] + 28460000 - 1 - 5].loc[lambda df: df.before <= trans_df.loc[i, 'StartB'] + 28460000 - 1 + 5].after
-	if len(after.unique()) == 1:
-		trans_df.at[i, 'StartB'] = after.iloc[0]
-	else:
-		print('Fail')
-	after = bps_map.loc[lambda df: df.before >= trans_df.loc[i, 'EndB'] + 28460000 - 1 - 5].loc[lambda df: df.before <= trans_df.loc[i, 'EndB'] + 28460000 - 1 + 5].after
-	if len(after.unique()) == 1:
-		trans_df.at[i, 'EndB'] = after.iloc[0]
-	else:
-		print('Fail')
-    
+    after = bps_map.loc[lambda df: df.before >= trans_df.loc[i, 'StartA'] + 28460000 - 1 - 5].loc[
+        lambda df: df.before <= trans_df.loc[i, 'StartA'] + 28460000 - 1 + 5].after
+    if len(after.unique()) == 1:
+        trans_df.at[i, 'StartA'] = after.iloc[0]
+    else:
+        print('Fail')
+    after = bps_map.loc[lambda df: df.before >= trans_df.loc[i, 'EndA'] + 28460000 - 1 - 5].loc[
+        lambda df: df.before <= trans_df.loc[i, 'EndA'] + 28460000 - 1 + 5].after
+    if len(after.unique()) == 1:
+        trans_df.at[i, 'EndA'] = after.iloc[0]
+    else:
+        print('Fail')
+    after = bps_map.loc[lambda df: df.before >= trans_df.loc[i, 'StartB'] + 28460000 - 1 - 5].loc[
+        lambda df: df.before <= trans_df.loc[i, 'StartB'] + 28460000 - 1 + 5].after
+    if len(after.unique()) == 1:
+        trans_df.at[i, 'StartB'] = after.iloc[0]
+    else:
+        print('Fail')
+    after = bps_map.loc[lambda df: df.before >= trans_df.loc[i, 'EndB'] + 28460000 - 1 - 5].loc[
+        lambda df: df.before <= trans_df.loc[i, 'EndB'] + 28460000 - 1 + 5].after
+    if len(after.unique()) == 1:
+        trans_df.at[i, 'EndB'] = after.iloc[0]
+    else:
+        print('Fail')
 
 th1 = []
 th2 = []
 for row in segs.itertuples():
-	del_entry = del_df.loc[lambda df: df.Start == row.start].loc[lambda df: df.End == row.end]
-	inv_entry = inv_df.loc[lambda df: df.Start == row.start].loc[lambda df: df.End == row.end]
-	dup_entry = dup_df.loc[lambda df: df.Start == row.start].loc[lambda df: df.End == row.end]
-	trans_entryA = trans_df.loc[lambda df: df.StartA == row.start].loc[lambda df: df.EndA == row.end]
-	trans_entryB = trans_df.loc[lambda df: df.StartB == row.start].loc[lambda df: df.EndB == row.end]
-	if len(del_entry) > 0:
-		if del_entry.Chr.iloc[0] == 'mhc_1':
-			th2.append(str(row.ID) + '+')
-		elif del_entry.Chr.iloc[0] == 'mhc_2':
-			th1.append(str(row.ID) + '+')
-	elif len(inv_entry) > 0:
-		if inv_entry.Chr.iloc[0] == 'mhc_1':
-			th1.append(str(row.ID) + '-')
-			th2.append(str(row.ID) + '+')
-		elif inv_entry.Chr.iloc[0] == 'mhc_2':
-			th1.append(str(row.ID) + '+')
-			th2.append(str(row.ID) + '-')
-	elif len(dup_entry) > 0:
-		if dup_entry.Chr.iloc[0] == 'mhc_1':
-			th1.extend([str(row.ID) + '+'] * dup_entry.Duplications.iloc[0])
-			th2.append(str(row.ID) + '+')
-		elif dup_entry.Chr.iloc[0] == 'mhc_2':
-			th1.append(str(row.ID) + '+')
-			th2.extend([str(row.ID) + '+'] * dup_entry.Duplications.iloc[0])
-	elif len(trans_entryA) > 0:
-		if trans_entryA.ChrB.iloc[0] == 'mhc_1':
-			th1.append(str(segs.loc[lambda df: df.start == trans_entryA.StartB.iloc[0]].ID.iloc[0]) + '+')
-			th2.append(str(row.ID) + '+')
-		elif trans_entryA.ChrB.iloc[0] == 'mhc_2':
-			th1.append(str(row.ID) + '+')
-			th2.append(str(segs.loc[lambda df: df.start == trans_entryA.StartB.iloc[0]].ID.iloc[0]) + '+')
-	elif len(trans_entryB) > 0:
-		if trans_entryB.ChrA.iloc[0] == 'mhc_1':
-			th1.append(str(segs.loc[lambda df: df.start == trans_entryB.StartA.iloc[0]].ID.iloc[0]) + '+')
-			th2.append(str(row.ID) + '+')
-		elif trans_entryB.ChrA.iloc[0] == 'mhc_2':
-			th1.append(str(row.ID) + '+')
-			th2.append(str(segs.loc[lambda df: df.start == trans_entryB.StartA.iloc[0]].ID.iloc[0]) + '+')
-	else:
-		th1.append(str(row.ID) + '+')
-		th2.append(str(row.ID) + '+')
+    del_entry = del_df.loc[lambda df: df.Start == row.start].loc[lambda df: df.End == row.end]
+    inv_entry = inv_df.loc[lambda df: df.Start == row.start].loc[lambda df: df.End == row.end]
+    dup_entry = dup_df.loc[lambda df: df.Start == row.start].loc[lambda df: df.End == row.end]
+    trans_entryA = trans_df.loc[lambda df: df.StartA == row.start].loc[lambda df: df.EndA == row.end]
+    trans_entryB = trans_df.loc[lambda df: df.StartB == row.start].loc[lambda df: df.EndB == row.end]
+    if len(del_entry) > 0:
+        if del_entry.Chr.iloc[0] == 'mhc_1':
+            th2.append(str(row.ID) + '+')
+        elif del_entry.Chr.iloc[0] == 'mhc_2':
+            th1.append(str(row.ID) + '+')
+    elif len(inv_entry) > 0:
+        if inv_entry.Chr.iloc[0] == 'mhc_1':
+            th1.append(str(row.ID) + '-')
+            th2.append(str(row.ID) + '+')
+        elif inv_entry.Chr.iloc[0] == 'mhc_2':
+            th1.append(str(row.ID) + '+')
+            th2.append(str(row.ID) + '-')
+    elif len(dup_entry) > 0:
+        if dup_entry.Chr.iloc[0] == 'mhc_1':
+            th1.extend([str(row.ID) + '+'] * dup_entry.Duplications.iloc[0])
+            th2.append(str(row.ID) + '+')
+        elif dup_entry.Chr.iloc[0] == 'mhc_2':
+            th1.append(str(row.ID) + '+')
+            th2.extend([str(row.ID) + '+'] * dup_entry.Duplications.iloc[0])
+    elif len(trans_entryA) > 0:
+        if trans_entryA.ChrB.iloc[0] == 'mhc_1':
+            th1.append(str(segs.loc[lambda df: df.start == trans_entryA.StartB.iloc[0]].ID.iloc[0]) + '+')
+            th2.append(str(row.ID) + '+')
+        elif trans_entryA.ChrB.iloc[0] == 'mhc_2':
+            th1.append(str(row.ID) + '+')
+            th2.append(str(segs.loc[lambda df: df.start == trans_entryA.StartB.iloc[0]].ID.iloc[0]) + '+')
+    elif len(trans_entryB) > 0:
+        if trans_entryB.ChrA.iloc[0] == 'mhc_1':
+            th1.append(str(segs.loc[lambda df: df.start == trans_entryB.StartA.iloc[0]].ID.iloc[0]) + '+')
+            th2.append(str(row.ID) + '+')
+        elif trans_entryB.ChrA.iloc[0] == 'mhc_2':
+            th1.append(str(row.ID) + '+')
+            th2.append(str(segs.loc[lambda df: df.start == trans_entryB.StartA.iloc[0]].ID.iloc[0]) + '+')
+    else:
+        th1.append(str(row.ID) + '+')
+        th2.append(str(row.ID) + '+')
 
 print(' '.join(th1))
 print(' '.join(th2))

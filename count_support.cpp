@@ -9,15 +9,15 @@
 
 #include <htslib/sam.h>
 #include <htslib/tbx.h>
-
+//deprecated
 using namespace std;
 
 const map<string, int> SV_TYPE = {
-    {"dup", 0},
-    {"del", 1},
-    {"trans", 2},
-    {"inv", 3},
-    {"ins", 4}
+        {"dup",   0},
+        {"del",   1},
+        {"trans", 2},
+        {"inv",   3},
+        {"ins",   4}
 };
 typedef struct Segment {
     int id;
@@ -63,7 +63,7 @@ vector<seq_map_t *> read_data(char const *fn, int sv_type = -1) {
     int ins_id = 1;
     while (getline(inf, line)) {
         ss << line;
-	    seq_map_t *row;
+        seq_map_t *row;
         switch (sv_type) {
             case 0:
             case 1:
@@ -110,7 +110,7 @@ vector<seg_t *> get_seg_seq(vector<seq_map_t *> &seq_maps, vector<seg_t *> &segs
     vector<seg_t *> seg_seq;
     vector<seg_t *>::iterator itr;
     for (seq_map_t *row : seq_maps) {
-        itr = find_if(segs.begin(), segs.end(), [row](seg_t *s){ return s->start == row->r_start; });
+        itr = find_if(segs.begin(), segs.end(), [row](seg_t *s) { return s->start == row->r_start; });
         (*itr)->is_inv = row->inv_indicator == 'I';
         seg_seq.push_back(*itr);
     }
@@ -227,7 +227,7 @@ void count_support(char const *bam_fn, vector<junc_t *> &juncs) {
                             //     cout << "left: " << junc->left->id << " " << left_pos << ", " 
                             //          << "right: " << junc->right->id << " " << right_pos << endl;
                             //     cout << bam_get_qname(aln2) << endl;
-                                // cout << left_overlap << " " << right_overlap << endl;
+                            // cout << left_overlap << " " << right_overlap << endl;
                             // }
                             if (left_overlap >= 10 && right_overlap >= 10) {
                                 junc->support++;
@@ -255,7 +255,7 @@ int get_avg_depth(char const *depth_fn, string chrom, int start, int end) {
     int cid = tbx_name2id(idx, chrom.c_str());
     hts_itr_t *iter = tbx_itr_queryi(idx, cid, start - 1, end);
     kstring_t str = {0, 0, NULL};
-    
+
     char *token;
     int p, d;
     int tot_depth = 0;
@@ -277,7 +277,7 @@ void get_avg_depth(vector<seg_t *> &segs, char const *depth_fn) {
     tbx_t *idx = tbx_index_load(depth_fn);
     int cid;
     hts_itr_t *iter = NULL;
-    for (seg_t * seg: segs) {
+    for (seg_t *seg: segs) {
         cid = tbx_name2id(idx, seg->chrom.c_str());
         iter = tbx_itr_queryi(idx, cid, seg->start - 1, seg->end - 1);
         char *token;
@@ -299,7 +299,7 @@ void get_avg_depth(vector<seg_t *> &segs, char const *depth_fn) {
 
 int cal_avg_seg_depth(vector<seg_t *> &segs) {
     vector<int> depths;
-    for (seg_t * seg: segs) {
+    for (seg_t *seg: segs) {
         depths.push_back(seg->depth);
     }
     sort(depths.begin(), depths.end());
@@ -308,7 +308,7 @@ int cal_avg_seg_depth(vector<seg_t *> &segs) {
 
 int cal_avg_junc_depth(vector<junc_t *> &juncs) {
     vector<int> depths;
-    for (junc_t * junc: juncs) {
+    for (junc_t *junc: juncs) {
         depths.push_back(junc->support);
     }
     sort(depths.begin(), depths.end());
@@ -353,7 +353,7 @@ void write_juncs(char const *fn, vector<junc_t *> &juncs) {
 void write_segs(char const *fn, vector<seg_t *> &segs) {
     ofstream outf(fn);
     outf << "id\tchrom\tstart\tend\tdepth\tis_inv\tis_ins" << endl;
-    for (seg_t * seg : segs) {
+    for (seg_t *seg : segs) {
         outf << seg->id << "\t"
              << seg->chrom << "\t"
              << seg->start << "\t"
@@ -375,24 +375,24 @@ int main(int argc, char *argv[]) {
     char const *seg_out_fn, *junc_out_fn;
 
     static struct option long_options[] = {
-        {"seg_file", required_argument, 0, 's'},
-        {"data_file", required_argument, 0, 'j'},
-        {"bam", required_argument, 0, 'b'},
-        {"depth", required_argument, 0, 'd'},
-        {"svtype", required_argument, 0, 't'},
-        
-        {"seg_out", required_argument, 0, 'S'},
-        {"junc_out", required_argument, 0, 'J'},
-        {0, 0, 0, 0}
+            {"seg_file",  required_argument, 0, 's'},
+            {"data_file", required_argument, 0, 'j'},
+            {"bam",       required_argument, 0, 'b'},
+            {"depth",     required_argument, 0, 'd'},
+            {"svtype",    required_argument, 0, 't'},
+
+            {"seg_out",   required_argument, 0, 'S'},
+            {"junc_out",  required_argument, 0, 'J'},
+            {0, 0,                           0, 0}
     };
 
     int opt_idx = 0;
     int c = getopt_long(argc, argv, "s:j:b:d:t:S:J:", long_options, &opt_idx);
-    while (c > 0){
+    while (c > 0) {
         switch (c) {
-            case 's': 
+            case 's':
                 seg_fn = optarg;
-		cout << "test" << endl;
+                cout << "test" << endl;
                 break;
             case 'j':
                 data_fn = optarg;
@@ -415,7 +415,7 @@ int main(int argc, char *argv[]) {
             default:
                 abort();
         }
-    	c = getopt_long(argc, argv, "s:j:b:d:t:S:J:", long_options, &opt_idx);
+        c = getopt_long(argc, argv, "s:j:b:d:t:S:J:", long_options, &opt_idx);
     }
     cout << SV_TYPE.size() << endl;
     cout << "seg_file: " << seg_fn << endl

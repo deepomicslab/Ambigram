@@ -13,16 +13,16 @@ int main(int argc, char *argv[]) {
     cxxopts::Options options("localhap", "Local Haplotype constructer");
 
     options.add_options()
-            ("op", "operate: check or solve",cxxopts::value<std::string>())
-            ("juncdb", "Junction database",cxxopts::value<std::string>())
-            ("in_lh", "Input lh file",cxxopts::value<std::string>())
-            ("out_lh", "Checked local hap input file, lh format",cxxopts::value<std::string>())
-            ("lp_prefix", "ILP out file prefix, only for check",cxxopts::value<std::string>())
+            ("op", "operate: check or solve", cxxopts::value<std::string>())
+            ("juncdb", "Junction database", cxxopts::value<std::string>())
+            ("in_lh", "Input lh file", cxxopts::value<std::string>())
+            ("out_lh", "Checked local hap input file, lh format", cxxopts::value<std::string>())
+            ("lp_prefix", "ILP out file prefix, only for check", cxxopts::value<std::string>())
             ("verbose", "Verbose output", cxxopts::value<bool>()->default_value("false"))
-            ("hic_matrix", "Segment Hic matrix file, only for solve",cxxopts::value<std::string>())
-            ("tgs_order", "Segment tgs local order file, only for solve",cxxopts::value<std::string>())
-            ("hap", "Haplotype out file, only for solve",cxxopts::value<std::string>())
-            ("circuits", "Circuits out file, only for solve",cxxopts::value<std::string>())
+            ("hic_matrix", "Segment Hic matrix file, only for solve", cxxopts::value<std::string>())
+            ("tgs_order", "Segment tgs local order file, only for solve", cxxopts::value<std::string>())
+            ("hap", "Haplotype out file, only for solve", cxxopts::value<std::string>())
+            ("circuits", "Circuits out file, only for solve", cxxopts::value<std::string>())
             ("help", "Print usage");
     auto result = options.parse(argc, argv);
     if (result.count("help")) {
@@ -30,7 +30,7 @@ int main(int argc, char *argv[]) {
         exit(0);
     }
     result["op"].as<std::string>().c_str();
-    std::cout<<result["op"].as<std::string>().c_str()<<std::endl;
+    std::cout << result["op"].as<std::string>().c_str() << std::endl;
 
     if (strcmp(result["op"].as<std::string>().c_str(), "check") == 0) {
         const char *juncdbFn_sample = result["juncdb"].as<std::string>().c_str();
@@ -126,18 +126,18 @@ int main(int argc, char *argv[]) {
             // g->calculateCopyNum();
             g->print();
             LocalGenomicMap *lgm = new LocalGenomicMap(g);
-            if (result.count("tgs_order")){
-                    longFragFn = result["tgs_order"].as<std::string>().c_str();
-                    lgm->read_long_frags(longFragFn);
-                    lgm->setUsingLong(true);
-                    for (VertexPath *frag : *(lgm->get_long_frags())) {
-                        for (Vertex *v: *frag) {
-                            cout << v->getInfo() << " ";
-                        }
-                        cout << endl;
+            if (result.count("tgs_order")) {
+                longFragFn = result["tgs_order"].as<std::string>().c_str();
+                lgm->read_long_frags(longFragFn);
+                lgm->setUsingLong(true);
+                for (VertexPath *frag : *(lgm->get_long_frags())) {
+                    for (Vertex *v: *frag) {
+                        cout << v->getInfo() << " ";
                     }
+                    cout << endl;
                 }
-            if (result.count("hic_matrix")){
+            }
+            if (result.count("hic_matrix")) {
                 hicMatrix = result["hic_matrix"].as<std::string>().c_str();
 
                 lgm->read_hic_matrix(hicMatrix);

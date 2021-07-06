@@ -561,7 +561,7 @@ int LocalGenomicMap::balancerILP(const char *lpFn) {
 
     // constrains for source and sink
     CoinPackedVector constrainSource;
-    constrainSource.insert(mGraph->getSource()->getId() - 1, 1);
+    constrainSource.insert(mGraph->getFirstSource()->getId() - 1, 1);
     constrainSource.insert(numVariables - 2, -1);
     // cout << mGraph->getExpectedPloidy() << endl;
     constrainLowerBound[numConstrains - 2] = mGraph->getExpectedPloidy();
@@ -569,7 +569,7 @@ int LocalGenomicMap::balancerILP(const char *lpFn) {
     matrix->appendRow(constrainSource);
 
     CoinPackedVector constrainSink;
-    constrainSink.insert(mGraph->getSink()->getId() - 1, 1);
+    constrainSink.insert(mGraph->getFirstSink()->getId() - 1, 1);
     constrainSink.insert(numVariables - 1, -1);
     constrainLowerBound[numConstrains - 1] = mGraph->getExpectedPloidy();
     constrainUpperBound[numConstrains - 1] = mGraph->getExpectedPloidy();
@@ -984,13 +984,13 @@ bool LocalGenomicMap::doesPathExists(Vertex *aStartVertex, Vertex *aEndVertex) {
             Vertex *nextVertex = nextEdge->getTarget();
             // cout << nextEdge->getInfo() << ", forward" << endl;
 
-            // if (nextVertex == mGraph->getSink()->getNegativeVertex()) {
-            //     if (startVertex != mGraph->getSource()->getNegativeVertex()) {
+            // if (nextVertex == mGraph->getFirstSink()->getNegativeVertex()) {
+            //     if (startVertex != mGraph->getFirstSource()->getNegativeVertex()) {
             //         throw ForwardReachSinkNegativeException(aStartVertex);
             //     }
             // }
-            // if (nextVertex == mGraph->getSource()->getPositiveVertex()) {
-            //     if (startVertex != mGraph->getSink()->getPositiveVertex()) {
+            // if (nextVertex == mGraph->getFirstSource()->getPositiveVertex()) {
+            //     if (startVertex != mGraph->getFirstSink()->getPositiveVertex()) {
             //         throw ForwardReachSourcePositiveException(aStartVertex);
             //     }
             // }
@@ -1031,9 +1031,14 @@ double LocalGenomicMap::inferCredibility(Vertex *aSource, Vertex *aTarget) {
 }
 
 void LocalGenomicMap::connectSourceSink() {
-    mGraph->addJunction(mGraph->getSink()->getPositiveVertex(), mGraph->getSource()->getPositiveVertex(),
-                        (mGraph->getSource()->getWeight()->getCoverage() +
-                         mGraph->getSink()->getWeight()->getCoverage()) / 2, 1.0, -1, true, false, true);
+    int i = 0;
+    auto sources = mGraph->getMSources();
+    auto sinks = mGraph->getMSinks();
+    for (; i < sources->size(); i++) {
+        mGraph->addJunction((*sinks)[i]->getPositiveVertex(), (*sources)[i]->getPositiveVertex(),
+                            ((*sources)[i]->getWeight()->getCoverage() +
+                             (*sinks)[i]->getWeight()->getCoverage()) / 2, 1.0, -1, true, false, true);
+    }
 }
 
 void LocalGenomicMap::countReachability(int *nReachability, VertexPath &notReachableVertices, Vertex *targetVertex) {
@@ -1045,8 +1050,8 @@ void LocalGenomicMap::countReachability(int *nReachability, VertexPath &notReach
         int count = 0;
         for (VertexPath::const_iterator j = notReachableVertices.begin(); j != notReachableVertices.end(); j++) {
             if (j == i) continue;
-            if (targetVertex == mGraph->getSource()->getPositiveVertex() ||
-                targetVertex == mGraph->getSink()->getNegativeVertex()) {
+            if (targetVertex == mGraph->getFirstSource()->getPositiveVertex() ||
+                targetVertex == mGraph->getFirstSink()->getNegativeVertex()) {
                 if (mGraph->BFS(*i, *j) >= 0) {
                     // if (this->doesPathExists(*i, *j)) {
                     count++;
@@ -1054,8 +1059,8 @@ void LocalGenomicMap::countReachability(int *nReachability, VertexPath &notReach
                 } else {
                     // cout << (*i)->getInfo() << "=>" << (*j)->getInfo() << " unconnectable" << endl;
                 }
-            } else if (targetVertex == mGraph->getSource()->getNegativeVertex() ||
-                       targetVertex == mGraph->getSink()->getPositiveVertex()) {
+            } else if (targetVertex == mGraph->getFirstSource()->getNegativeVertex() ||
+                       targetVertex == mGraph->getFirstSink()->getPositiveVertex()) {
                 if (mGraph->BFS(*j, *i) >= 0) {
                     // if (this->doesPathExists(*j, *i)) {
                     count++;
@@ -1105,7 +1110,7 @@ void LocalGenomicMap::reconnectNegativeToPositive(JunctionDB *aJuncDB, bool verb
     Junction *inferredJunc;
     VertexPath asSourceVertices, asTargetVertices;
     for (Segment *seg: *(mGraph->getSegments())) {
-        if (seg->getId() > mGraph->getSink()->getId()) {
+        if (seg->getId() > mGraph->getFirstSink()->getId()) {
             cout << "Continue: " << seg->getId() << endl;
             continue;
         }
@@ -1203,11 +1208,11 @@ void LocalGenomicMap::reconnectNegativeToPositive(JunctionDB *aJuncDB, bool verb
                 cout << " As source N2P not added" << endl;
                 prevVertex = v;
                 while (true) {
-                    if (prevVertex->getId() >= mGraph->getSink()->getId() || prevVertex->getId() == 1) {
-                        // prevVertex = mGraph->getSink()->getPositiveVertex();
-                        // prevVertex = mGraph->getSegmentById(mGraph->getSink()->getId() - 1)->getPositiveVertex();
-                        prevVertex = mGraph->getSegmentById(mGraph->getSink()->getId() - 1)->getPositiveVertex();
-                        // prevVertex = mGraph->getSink()->getPositiveVertex();
+                    if (prevVertex->getId() >= mGraph->getFirstSink()->getId() || prevVertex->getId() == 1) {
+                        // prevVertex = mGraph->getFirstSink()->getPositiveVertex();
+                        // prevVertex = mGraph->getSegmentById(mGraph->getFirstSink()->getId() - 1)->getPositiveVertex();
+                        prevVertex = mGraph->getSegmentById(mGraph->getFirstSink()->getId() - 1)->getPositiveVertex();
+                        // prevVertex = mGraph->getFirstSink()->getPositiveVertex();
                     } else {
                         prevVertex = mGraph->getSegmentById(prevVertex->getId() - 1)->getPositiveVertex();
                     }
@@ -1327,19 +1332,19 @@ void LocalGenomicMap::reconnectNegativeToPositive(JunctionDB *aJuncDB, bool verb
                 cout << " As target N2P not added" << endl;
                 nextVertex = v;
                 while (true) {
-                    if (nextVertex->getId() >= mGraph->getSink()->getId() ||
-                        nextVertex->getId() == mGraph->getSink()->getId()) {
-                        // nextVertex = mGraph->getSource()->getPositiveVertex();
-                        nextVertex = mGraph->getSegmentById(mGraph->getSource()->getId() + 1)->getPositiveVertex();
+                    if (nextVertex->getId() >= mGraph->getFirstSink()->getId() ||
+                        nextVertex->getId() == mGraph->getFirstSink()->getId()) {
+                        // nextVertex = mGraph->getFirstSource()->getPositiveVertex();
+                        nextVertex = mGraph->getSegmentById(mGraph->getFirstSource()->getId() + 1)->getPositiveVertex();
                     } else {
-                        // nextVertex = mGraph->getSegmentById(mGraph->getSource()->getId() + 1)->getPositiveVertex();
+                        // nextVertex = mGraph->getSegmentById(mGraph->getFirstSource()->getId() + 1)->getPositiveVertex();
                         nextVertex = mGraph->getSegmentById(nextVertex->getId() + 1)->getPositiveVertex();
                     }
-                    // if (nextVertex->getId() > mGraph->getSink()->getId()) {
+                    // if (nextVertex->getId() > mGraph->getFirstSink()->getId()) {
                     //     continue;
                     // } // TODO
-                    // if (nextVertex->getId() == mGraph->getSink()->getId()) {
-                    //     nextVertex = mGraph->getSource()->getPositiveVertex();
+                    // if (nextVertex->getId() == mGraph->getFirstSink()->getId()) {
+                    //     nextVertex = mGraph->getFirstSource()->getPositiveVertex();
                     // }
                     // nextVertex = mGraph->getSegmentById(nextVertex->getId() + 1)->getPositiveVertex();
                     try {
@@ -1426,7 +1431,7 @@ void LocalGenomicMap::reconnectNegativeToPositive(JunctionDB *aJuncDB, bool verb
 
 Vertex *LocalGenomicMap::getMostReachable(VertexPath &notReachableVertices, Vertex *targetVertex) {
     Vertex *mostReachable = NULL;
-    if (targetVertex == mGraph->getSource()->getPositiveVertex()) {
+    if (targetVertex == mGraph->getFirstSource()->getPositiveVertex()) {
         // use the least id
         int mostReachableId = mGraph->getSegments()->size();
         for (Vertex *v : notReachableVertices) {
@@ -1435,7 +1440,7 @@ Vertex *LocalGenomicMap::getMostReachable(VertexPath &notReachableVertices, Vert
                 mostReachableId = v->getId();
             }
         }
-    } else if (targetVertex == mGraph->getSink()->getNegativeVertex()) {
+    } else if (targetVertex == mGraph->getFirstSink()->getNegativeVertex()) {
         // use the greatest id
         int mostReachableId = -1;
         for (Vertex *v : notReachableVertices) {
@@ -1444,7 +1449,7 @@ Vertex *LocalGenomicMap::getMostReachable(VertexPath &notReachableVertices, Vert
                 mostReachableId = v->getId();
             }
         }
-    } else if (targetVertex == mGraph->getSource()->getNegativeVertex()) {
+    } else if (targetVertex == mGraph->getFirstSource()->getNegativeVertex()) {
         // use the least id
         int mostReachableId = mGraph->getSegments()->size();
         for (Vertex *v : notReachableVertices) {
@@ -1453,7 +1458,7 @@ Vertex *LocalGenomicMap::getMostReachable(VertexPath &notReachableVertices, Vert
                 mostReachableId = v->getId();
             }
         }
-    } else if (targetVertex == mGraph->getSink()->getPositiveVertex()) {
+    } else if (targetVertex == mGraph->getFirstSink()->getPositiveVertex()) {
         // use the greatest id
         int mostReachableId = -1;
         for (Vertex *v : notReachableVertices) {
@@ -1504,8 +1509,8 @@ bool LocalGenomicMap::adjustReachability(VertexPath &notReachableVertices, Verte
         //     continue;
         // }
 
-        if (targetVertex == mGraph->getSource()->getPositiveVertex() ||
-            targetVertex == mGraph->getSink()->getNegativeVertex()) {
+        if (targetVertex == mGraph->getFirstSource()->getPositiveVertex() ||
+            targetVertex == mGraph->getFirstSink()->getNegativeVertex()) {
             cout << "Current vertex: " << mostReachable->getId() << " " << mostReachable->getSegment()->getChrom()
                  << " " << mostReachable->getStart() << mostReachable->getDir() << endl;
 
@@ -1570,20 +1575,20 @@ bool LocalGenomicMap::adjustReachability(VertexPath &notReachableVertices, Verte
                 while (true) {
                     if (mostReachable->getDir() == '+') {
                         // prevVertex = mGraph->getSegmentById(mostReachable->getId() - 1)->getPositiveVertex();
-                        if (prevVertex->getId() == mGraph->getSource()->getId()) {
-                            prevVertex = mGraph->getSink()->getPositiveVertex();
+                        if (prevVertex->getId() == mGraph->getFirstSource()->getId()) {
+                            prevVertex = mGraph->getFirstSink()->getPositiveVertex();
                             // break;
-                        } else if (prevVertex->getId() > mGraph->getSink()->getId()) {
+                        } else if (prevVertex->getId() > mGraph->getFirstSink()->getId()) {
                             break;
                         } else {
                             prevVertex = mGraph->getSegmentById(prevVertex->getId() - 1)->getPositiveVertex();
                         }
                     } else {
                         // prevVertex = mGraph->getSegmentById(mostReachable->getId() + 1)->getNegativeVertex();
-                        if (prevVertex->getId() == mGraph->getSink()->getId()) {
-                            prevVertex = mGraph->getSource()->getNegativeVertex();
+                        if (prevVertex->getId() == mGraph->getFirstSink()->getId()) {
+                            prevVertex = mGraph->getFirstSource()->getNegativeVertex();
                             // break;
-                        } else if (prevVertex->getId() > mGraph->getSink()->getId()) {
+                        } else if (prevVertex->getId() > mGraph->getFirstSink()->getId()) {
                             break;
                         } else {
                             prevVertex = mGraph->getSegmentById(prevVertex->getId() + 1)->getNegativeVertex();
@@ -1668,20 +1673,20 @@ bool LocalGenomicMap::adjustReachability(VertexPath &notReachableVertices, Verte
                 while (true) {
                     if (mostReachable->getDir() == '+') {
                         // nextVertex = mGraph->getSegmentById(mostReachable->getId() + 1)->getPositiveVertex();
-                        if (nextVertex->getId() == mGraph->getSink()->getId()) {
-                            nextVertex = mGraph->getSource()->getPositiveVertex();
+                        if (nextVertex->getId() == mGraph->getFirstSink()->getId()) {
+                            nextVertex = mGraph->getFirstSource()->getPositiveVertex();
                             // break;
-                        } else if (nextVertex->getId() > mGraph->getSink()->getId()) {
+                        } else if (nextVertex->getId() > mGraph->getFirstSink()->getId()) {
                             break;
                         } else {
                             nextVertex = mGraph->getSegmentById(nextVertex->getId() + 1)->getPositiveVertex();
                         }
                     } else {
                         // nextVertex = mGraph->getSegmentById(mostReachable->getId() - 1)->getNegativeVertex();
-                        if (nextVertex->getId() == mGraph->getSource()->getId()) {
-                            nextVertex = mGraph->getSink()->getNegativeVertex();
+                        if (nextVertex->getId() == mGraph->getFirstSource()->getId()) {
+                            nextVertex = mGraph->getFirstSink()->getNegativeVertex();
                             // break;
-                        } else if (nextVertex->getId() > mGraph->getSink()->getId()) {
+                        } else if (nextVertex->getId() > mGraph->getFirstSink()->getId()) {
                             break;
                         } else {
                             nextVertex = mGraph->getSegmentById(nextVertex->getId() - 1)->getNegativeVertex();
@@ -1714,12 +1719,12 @@ bool LocalGenomicMap::adjustReachability(VertexPath &notReachableVertices, Verte
     // if (rec == NULL) {
     //     // no related records in database, add juntion to nearby segment
     // } else {
-    // if (targetVertex == mGraph->getSource()->getPositiveVertex()) {
+    // if (targetVertex == mGraph->getFirstSource()->getPositiveVertex()) {
     //     // backward to source+
     //     Vertex * prevVertex;
     //     while (true) {
     //         try {
-    //             Vertex * selectedVertex = this->selectPrevVertex(mostReachable, mGraph->getSource()->getPositiveVertex(), aJuncDB);
+    //             Vertex * selectedVertex = this->selectPrevVertex(mostReachable, mGraph->getFirstSource()->getPositiveVertex(), aJuncDB);
     //             if (selectedVertex != NULL) {
     //                 prevVertex = selectedVertex;
     //             } else {
@@ -1740,12 +1745,12 @@ bool LocalGenomicMap::adjustReachability(VertexPath &notReachableVertices, Verte
     //             // prevVertex = mGraph->getPrevVertexById(mostReachable);
     //         }
     //     }
-    // } else if (targetVertex == mGraph->getSink()->getNegativeVertex()) {
+    // } else if (targetVertex == mGraph->getFirstSink()->getNegativeVertex()) {
     //     // backward to sink-
     //     Vertex * prevVertex;
     //     while (true) {
     //         try {
-    //             Vertex * selectedVertex = this->selectPrevVertex(mostReachable, mGraph->getSink()->getNegativeVertex(), aJuncDB);
+    //             Vertex * selectedVertex = this->selectPrevVertex(mostReachable, mGraph->getFirstSink()->getNegativeVertex(), aJuncDB);
     //             if (selectedVertex != NULL) {
     //                 prevVertex = selectedVertex;
     //             } else {
@@ -1765,12 +1770,12 @@ bool LocalGenomicMap::adjustReachability(VertexPath &notReachableVertices, Verte
     //             // prevVertex = mGraph->getPrevVertexById(mostReachable);
     //         }
     //     }
-    // } else if (targetVertex == mGraph->getSink()->getPositiveVertex()) {
+    // } else if (targetVertex == mGraph->getFirstSink()->getPositiveVertex()) {
     //     // forward to sink+
     //     Vertex * nextVertex;
     //     while (true) {
     //         try {
-    //             Vertex * selectedVertex = this->selectNextVertex(mostReachable, mGraph->getSink()->getPositiveVertex(), aJuncDB);
+    //             Vertex * selectedVertex = this->selectNextVertex(mostReachable, mGraph->getFirstSink()->getPositiveVertex(), aJuncDB);
     //             if (selectedVertex != NULL) {
     //                 nextVertex = selectedVertex;
     //             } else {
@@ -1790,12 +1795,12 @@ bool LocalGenomicMap::adjustReachability(VertexPath &notReachableVertices, Verte
     //             // prevVertex = mGraph->getPrevVertexById(mostReachable);
     //         }
     //     }
-    // } else if (targetVertex == mGraph->getSource()->getNegativeVertex()) {
+    // } else if (targetVertex == mGraph->getFirstSource()->getNegativeVertex()) {
     //     // forward to source-
     //     Vertex * nextVertex;
     //     while (true) {
     //         try {
-    //             Vertex * selectedVertex = this->selectNextVertex(mostReachable, mGraph->getSource()->getNegativeVertex(), aJuncDB);
+    //             Vertex * selectedVertex = this->selectNextVertex(mostReachable, mGraph->getFirstSource()->getNegativeVertex(), aJuncDB);
     //             if (selectedVertex != NULL) {
     //                 nextVertex = selectedVertex;
     //             } else {
@@ -1836,7 +1841,7 @@ bool LocalGenomicMap::isReachable() {
         isSinkSourceConnectedOriginally = true;
     }
     for (Segment *seg: *(mGraph->getSegments())) {
-        if (seg == mGraph->getSource() || seg == mGraph->getSink()) {
+        if (seg == mGraph->getFirstSource() || seg == mGraph->getFirstSink()) {
             continue;
         }
 
@@ -1853,13 +1858,13 @@ bool LocalGenomicMap::isReachable() {
         segV.push_back(seg->getNegativeVertex());
         for (Vertex *v : segV) {
             // cout << "source+ -> " << v->getInfo() << endl;
-            bool isBackwardSourceReachable = this->doesPathExists(mGraph->getSource()->getPositiveVertex(), v);
+            bool isBackwardSourceReachable = this->doesPathExists(mGraph->getFirstSource()->getPositiveVertex(), v);
             // cout << "sink- -> " << v->getInfo() << endl;
-            bool isBackwardSinkReachable = this->doesPathExists(mGraph->getSink()->getNegativeVertex(), v);
+            bool isBackwardSinkReachable = this->doesPathExists(mGraph->getFirstSink()->getNegativeVertex(), v);
             // cout << v->getInfo() << " -> source-" << endl;
-            bool isForwardSourceReachable = this->doesPathExists(v, mGraph->getSource()->getNegativeVertex());
+            bool isForwardSourceReachable = this->doesPathExists(v, mGraph->getFirstSource()->getNegativeVertex());
             // cout << v->getInfo() << " -> sink+" << endl;
-            bool isForwardSinkReachable = this->doesPathExists(v, mGraph->getSink()->getPositiveVertex());
+            bool isForwardSinkReachable = this->doesPathExists(v, mGraph->getFirstSink()->getPositiveVertex());
             if (!isBackwardSourceReachable && !isForwardSinkReachable
                 && !isBackwardSinkReachable && !isForwardSourceReachable) {
                 if (v->getDir() == '+') {
@@ -1916,7 +1921,7 @@ void LocalGenomicMap::checkReachability(JunctionDB *aJuncDB, bool verbose) {
             isSinkSourceConnectedOriginally = true;
         }
         for (Segment *seg: *(mGraph->getSegments())) {
-            if (seg == mGraph->getSource() || seg == mGraph->getSink()) {
+            if (seg == mGraph->getFirstSource() || seg == mGraph->getFirstSink()) {
                 continue;
             }
 
@@ -1934,13 +1939,13 @@ void LocalGenomicMap::checkReachability(JunctionDB *aJuncDB, bool verbose) {
             segV.push_back(seg->getNegativeVertex());
             for (Vertex *v : segV) {
                 // cout << "source+ -> " << v->getInfo() << endl;
-                bool isBackwardSourceReachable = this->doesPathExists(mGraph->getSource()->getPositiveVertex(), v);
+                bool isBackwardSourceReachable = this->doesPathExists(mGraph->getFirstSource()->getPositiveVertex(), v);
                 // cout << "sink- -> " << v->getInfo() << endl;
-                bool isBackwardSinkReachable = this->doesPathExists(mGraph->getSink()->getNegativeVertex(), v);
+                bool isBackwardSinkReachable = this->doesPathExists(mGraph->getFirstSink()->getNegativeVertex(), v);
                 // cout << v->getInfo() << " -> source-" << endl;
-                bool isForwardSourceReachable = this->doesPathExists(v, mGraph->getSource()->getNegativeVertex());
+                bool isForwardSourceReachable = this->doesPathExists(v, mGraph->getFirstSource()->getNegativeVertex());
                 // cout << v->getInfo() << " -> sink+" << endl;
-                bool isForwardSinkReachable = this->doesPathExists(v, mGraph->getSink()->getPositiveVertex());
+                bool isForwardSinkReachable = this->doesPathExists(v, mGraph->getFirstSink()->getPositiveVertex());
                 if (!isBackwardSourceReachable && !isForwardSinkReachable
                     && !isBackwardSinkReachable && !isForwardSourceReachable) {
                     if (v->getDir() == '+') {
@@ -1987,24 +1992,25 @@ void LocalGenomicMap::checkReachability(JunctionDB *aJuncDB, bool verbose) {
         if (!hasAdded && backwardSourceNotReachableVertices.size() > 0) {
             if (verbose) cout << "for backward source: " << endl;
             hasAdded = this->adjustReachability(backwardSourceNotReachableVertices,
-                                                mGraph->getSource()->getPositiveVertex(), aJuncDB, verbose);
+                                                mGraph->getFirstSource()->getPositiveVertex(), aJuncDB, verbose);
             // continue;
         }
         if (!hasAdded && backwardSinkNotReachableVertices.size() > 0) {
             if (verbose) cout << "for backward sink: " << endl;
             hasAdded = this->adjustReachability(backwardSinkNotReachableVertices,
-                                                mGraph->getSink()->getNegativeVertex(), aJuncDB, verbose);
+                                                mGraph->getFirstSink()->getNegativeVertex(), aJuncDB, verbose);
             // continue;
         }
         if (!hasAdded && forwardSourceNotReachableVertices.size() > 0) {
             if (verbose) cout << "for forward source: " << endl;
             hasAdded = this->adjustReachability(forwardSourceNotReachableVertices,
-                                                mGraph->getSource()->getNegativeVertex(), aJuncDB, verbose);
+                                                mGraph->getFirstSource()->getNegativeVertex(), aJuncDB, verbose);
             // continue;
         }
         if (!hasAdded && forwardSinkNotReachableVertices.size() > 0) {
             if (verbose) cout << "for forward sink: " << endl;
-            hasAdded = this->adjustReachability(forwardSinkNotReachableVertices, mGraph->getSink()->getPositiveVertex(),
+            hasAdded = this->adjustReachability(forwardSinkNotReachableVertices,
+                                                mGraph->getFirstSink()->getPositiveVertex(),
                                                 aJuncDB, verbose);
         }
         // break;
@@ -2037,7 +2043,7 @@ vector<Segment *> *LocalGenomicMap::extractReachableGraph(bool verbose) {
         isSinkSourceConnectedOriginally = true;
     }
     for (Segment *seg: *(mGraph->getSegments())) {
-        if (seg == mGraph->getSource() || seg == mGraph->getSink()) {
+        if (seg == mGraph->getFirstSource() || seg == mGraph->getFirstSink()) {
             continue;
         }
 
@@ -2056,13 +2062,13 @@ vector<Segment *> *LocalGenomicMap::extractReachableGraph(bool verbose) {
         bool flag = true;
         for (Vertex *v : segV) {
             // cout << "source+ -> " << v->getInfo() << endl;
-            bool isBackwardSourceReachable = this->doesPathExists(mGraph->getSource()->getPositiveVertex(), v);
+            bool isBackwardSourceReachable = this->doesPathExists(mGraph->getFirstSource()->getPositiveVertex(), v);
             // cout << "sink- -> " << v->getInfo() << endl;
-            bool isBackwardSinkReachable = this->doesPathExists(mGraph->getSink()->getNegativeVertex(), v);
+            bool isBackwardSinkReachable = this->doesPathExists(mGraph->getFirstSink()->getNegativeVertex(), v);
             // cout << v->getInfo() << " -> source-" << endl;
-            bool isForwardSourceReachable = this->doesPathExists(v, mGraph->getSource()->getNegativeVertex());
+            bool isForwardSourceReachable = this->doesPathExists(v, mGraph->getFirstSource()->getNegativeVertex());
             // cout << v->getInfo() << " -> sink+" << endl;
-            bool isForwardSinkReachable = this->doesPathExists(v, mGraph->getSink()->getPositiveVertex());
+            bool isForwardSinkReachable = this->doesPathExists(v, mGraph->getFirstSink()->getPositiveVertex());
             if (isBackwardSinkReachable && isBackwardSourceReachable && isForwardSinkReachable &&
                 isForwardSourceReachable) {
             } else {
@@ -2152,7 +2158,7 @@ Vertex *LocalGenomicMap::selectPrevVertex(Vertex *currentVertex, Vertex *targetV
     for (vector<entry_t *>::reverse_iterator riter = rec->getBackwardEntries()->rbegin();
          riter != rec->getBackwardEntries()->rend(); riter++) {
         Segment *seg = mGraph->getSegmentByChromEnd((*riter)->chrom, (*riter)->pos);
-        if (targetVertex == mGraph->getSource()->getPositiveVertex()) {
+        if (targetVertex == mGraph->getFirstSource()->getPositiveVertex()) {
             if ((*riter)->strand == '+') {
                 // prefer the positive vertex that directly connects to + strand
                 selectedVertex = seg->getPositiveVertex();
@@ -2166,7 +2172,7 @@ Vertex *LocalGenomicMap::selectPrevVertex(Vertex *currentVertex, Vertex *targetV
                     break;
                 }
             }
-        } else if (targetVertex == mGraph->getSink()->getNegativeVertex()) {
+        } else if (targetVertex == mGraph->getFirstSink()->getNegativeVertex()) {
             if ((*riter)->strand == '-') {
                 selectedVertex = seg->getNegativeVertex();
                 break;
@@ -2190,7 +2196,7 @@ Vertex *LocalGenomicMap::selectNextVertex(Vertex *currentVertex, Vertex *targetV
     for (vector<entry_t *>::reverse_iterator riter = rec->getForwardEntries()->rbegin();
          riter != rec->getForwardEntries()->rend(); riter++) {
         Segment *seg = mGraph->getSegmentByChromStart((*riter)->chrom, (*riter)->pos);
-        if (targetVertex == mGraph->getSink()->getPositiveVertex()) {
+        if (targetVertex == mGraph->getFirstSink()->getPositiveVertex()) {
             if ((*riter)->strand == '+') {
                 // prefer positive vertex
                 selectedVertex = seg->getPositiveVertex();
@@ -2203,7 +2209,7 @@ Vertex *LocalGenomicMap::selectNextVertex(Vertex *currentVertex, Vertex *targetV
                     break;
                 }
             }
-        } else if (targetVertex == mGraph->getSource()->getNegativeVertex()) {
+        } else if (targetVertex == mGraph->getFirstSource()->getNegativeVertex()) {
             if ((*riter)->strand == '-') {
                 selectedVertex = seg->getNegativeVertex();
                 break;
@@ -2433,6 +2439,64 @@ Edge *LocalGenomicMap::traverseNextEdge(Vertex *aStartVertex, VertexPath *vp, Ju
     return selectedEdge;
 }
 
+Edge *LocalGenomicMap::traverseNextEdgeByPartition(Vertex *aStartVertex, VertexPath *vp, JunctionDB *aJuncDB,
+                                                   int *partitionStart, int *partitionEnd) {
+    Edge *selectedEdge = nullptr;
+    int lastPartitionId = this->mGraph->getMSinks()->back()->getId();
+    auto sources = mGraph->getMSources();
+    auto sinks = mGraph->getMSinks();
+    if (this->isUsingHic()) {
+        selectedEdge = traverseWithHic(vp);
+        if (selectedEdge != nullptr) return selectedEdge;
+    }
+    Record *rec = aJuncDB->findRecord(aStartVertex->getSegment()->getChrom(), aStartVertex->getEnd(),
+                                      aStartVertex->getDir());
+    if (rec == NULL) {
+        for (Edge *e: *(aStartVertex->getEdgesAsSource())) {
+            int eTargetId = e->getTarget()->getId();
+            if (e->hasCopy()) {
+                if (eTargetId > lastPartitionId || (eTargetId >= *partitionStart && eTargetId <= *partitionEnd)) {
+                    selectedEdge = e;
+                    break;
+                } else {
+                    auto partitionPair = findPartition(eTargetId);
+                    if (*partitionStart == 0) {
+                        *partitionStart = partitionPair.first;
+                        *partitionEnd = partitionPair.second;
+                        selectedEdge = e;
+                        break;
+                    } else if (*partitionStart == partitionPair.first && *partitionEnd == partitionPair.second) {
+                        selectedEdge = e;
+                        break;
+                    } else continue;
+                }
+            }
+        }
+    } else {
+        int support = 0;
+        entry_t *entry;
+        for (Edge *e: *(aStartVertex->getEdgesAsSource())) {
+            if (!e->hasCopy()) continue;
+            entry = rec->findForwardEntry(e->getTarget()->getSegment()->getChrom(), e->getTarget()->getStart(),
+                                          e->getTarget()->getDir());
+            if (entry != NULL) {
+                if (entry->support > support) {
+                    support = entry->support;
+                    selectedEdge = e;
+                }
+            } else {
+                if (support == 0) {
+                    selectedEdge = e;
+                }
+            }
+        }
+    }
+
+    return selectedEdge;
+
+}
+
+
 Edge *LocalGenomicMap::traverseWithHic(VertexPath *vp) {
     auto currentVertex = vp->back();
     Edge *maxEdge;
@@ -2448,10 +2512,23 @@ Edge *LocalGenomicMap::traverseWithHic(VertexPath *vp) {
     if (maxV == 0) return nullptr;
     this->decreaseHicMatrix(vp, maxEdge);
 //    hic value decrease
-//    int id1 = maxEdge->getSource()->getId();
+//    int id1 = maxEdge->getFirstSource()->getId();
 //    int id2 = maxEdge->getTarget()->getId();
 //    this->hicMatrix[id1][id2] = this->hicMatrix[id1][id2] - this->hicMatrix[id1][id2]/maxEdge->getWeight()->getCopyNum();
     return maxEdge;
+}
+
+pair<int, int> LocalGenomicMap::findPartition(int id) {
+    auto sources = mGraph->getMSources();
+    auto sinks = mGraph->getMSinks();
+    for (int i = 0; i < sources->size(); i++) {
+        auto sId = (*sources)[i]->getId();
+        auto eId = (*sinks)[i]->getId();
+        if (id >= sId && id <= eId) {
+            return make_pair(sId, eId);
+        }
+    }
+    return make_pair(0, 0);
 }
 
 double LocalGenomicMap::calculateHicInteraction(VertexPath *vp, Vertex *currentVertex) {
@@ -2467,6 +2544,9 @@ double LocalGenomicMap::calculateHicInteraction(VertexPath *vp, Vertex *currentV
 }
 
 void LocalGenomicMap::traverse(Vertex *aStartVertex, JunctionDB *aJuncDB) {
+//    current traverse path partition
+    int *partitionStart;
+    int *partitionEnd;
     VertexPath *vp = new VertexPath();
     EdgePath *ep = new EdgePath();
     Vertex *currentVertex;
@@ -2524,8 +2604,20 @@ void LocalGenomicMap::decreaseHicInteraction(Vertex *v1, Vertex *v2) {
     this->hicMatrix[id2][id1] = v;
 }
 
+void LocalGenomicMap::traverseGraphByPartition(JunctionDB *aJuncDB) {
+
+}
+
 void LocalGenomicMap::traverseGraph(JunctionDB *aJuncDB) {
     Vertex *currentVertex;
+//    Traverse sources first
+    for (auto *seg : *(mGraph->getMSources())) {
+        if (seg->hasCopy()) {
+            currentVertex = seg->getPositiveVertex();
+            this->traverse(currentVertex, aJuncDB);
+        }
+    }
+    this->traverse(currentVertex, aJuncDB);
     while (!mGraph->isCopyExhaustive()) {
         for (Segment *seg : *(mGraph->getSegments())) {
             if (seg->hasCopy()) {
@@ -2603,9 +2695,9 @@ int LocalGenomicMap::longPathLenInGraph(VertexPath *longPath) {
 //             // this->traverse(seg->getPositiveVertex());
 //             VertexPath * pathV = new VertexPath();
 //             EdgePath pathE;
-//             if (seg == mGraph->getSource()) {
-//                 this->BFS(mGraph->getSource()->getPositiveVertex());
-//                 int flag = this->findShortestPath(mGraph->getSource()->getPositiveVertex(), mGraph->getSink()->getPositiveVertex(), *pathV, pathE);
+//             if (seg == mGraph->getFirstSource()) {
+//                 this->BFS(mGraph->getFirstSource()->getPositiveVertex());
+//                 int flag = this->findShortestPath(mGraph->getFirstSource()->getPositiveVertex(), mGraph->getFirstSink()->getPositiveVertex(), *pathV, pathE);
 //                 mGraph->resetVertexVisitFlag();
 //                 if (flag < 0) {
 //                     for (Vertex * v : *pathV) v->recover();
@@ -2633,7 +2725,7 @@ int LocalGenomicMap::longPathLenInGraph(VertexPath *longPath) {
 //             if (pathV->size() > 0) {
 //                 mCircuits->push_back(pathV);
 //             }
-//             if (seg == mGraph->getSource()) {
+//             if (seg == mGraph->getFirstSource()) {
 //                 mGraph->print();
 //             }
 //             break;
@@ -2808,7 +2900,7 @@ void LocalGenomicMap::generateHaploids() {
     }
     cout << endl;
 
-    // VertexPath::iterator itr = find(mainPath->begin(), mainPath->end(), mGraph->getSink()->getPositiveVertex());
+    // VertexPath::iterator itr = find(mainPath->begin(), mainPath->end(), mGraph->getFirstSink()->getPositiveVertex());
     // mHaploids->push_back(new VertexPath(mainPath->begin(), itr + 1));
     // mHaploids->push_back(new VertexPath(itr + 1, mainPath->end() - 1));
 }

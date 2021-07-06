@@ -16,37 +16,44 @@ struct support {
 };
 
 class SupportProfile {
-    protected:
-        string mSampleName;
-        vector< pair<locus *, support *> > * mCoveredLociSupports;
+protected:
+    string mSampleName;
+    vector<pair<locus *, support *> > *mCoveredLociSupports;
 
-        LocusDB * mLociRef;
-        int * mGT;
-        int mNumHom;
-        int mNumHet;
-        int mNumUnknown;
+    LocusDB *mLociRef;
+    int *mGT;
+    int mNumHom;
+    int mNumHet;
+    int mNumUnknown;
 
-    public:
-        SupportProfile(string aSampleName);
-        ~SupportProfile();
+public:
+    SupportProfile(string aSampleName);
 
-        string getSampleName();
-        vector< pair<locus *, support *> > * getLociSupports();
-        int * getGT();
-        
-        void setLociRef(LocusDB * db);
-        void readGenotypes(const char * aVCF);
-        void readSupport(const char * aSupportFn);
+    ~SupportProfile();
 
-        void countSupport(const char * aBamFn);
-        void writeSupport(const char * outFn);
+    string getSampleName();
 
-        void getInSameSegSupports(locus * l, vector<locus *> & pLoci, vector<readCount *> & pCounts);
-        
-        int getBaseIdx(bam1_t * aln, int pos);
+    vector<pair<locus *, support *> > *getLociSupports();
 
-        void print();
-        void printStatistics();
+    int *getGT();
+
+    void setLociRef(LocusDB *db);
+
+    void readGenotypes(const char *aVCF);
+
+    void readSupport(const char *aSupportFn);
+
+    void countSupport(const char *aBamFn);
+
+    void writeSupport(const char *outFn);
+
+    void getInSameSegSupports(locus *l, vector<locus *> &pLoci, vector<readCount *> &pCounts);
+
+    int getBaseIdx(bam1_t *aln, int pos);
+
+    void print();
+
+    void printStatistics();
 };
 
 #endif
