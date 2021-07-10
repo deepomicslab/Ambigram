@@ -35,13 +35,13 @@ int main(int argc, char *argv[]) {
     if (strcmp(result["op"].as<std::string>().c_str(), "check") == 0) {
         const char *juncdbFn_sample = result["juncdb"].as<std::string>().c_str();
         const char *lhRawFn = result["in_lh"].as<std::string>().c_str();
-        const char *lhCheckedFn = result["out_checked_lh"].as<std::string>().c_str();
+        const char *lhCheckedFn = result["out_lh"].as<std::string>().c_str();
         const char *lpFn = result["lp_prefix"].as<std::string>().c_str();
-        bool verbose = result["raw_lh"].as<bool>();
+        bool verbose = result["verbose"].as<bool>();
         try {
             auto *db_sample = new JunctionDB(juncdbFn_sample);
             db_sample->sortRecordEntry();
-            db_sample->print();
+//            db_sample->print();
 
             Graph *g = new Graph(lhRawFn);
             g->calculateHapDepth();
@@ -63,7 +63,7 @@ int main(int argc, char *argv[]) {
             } catch (DuplicateJunctionException &e) {
                 cout << e.what() << endl;
             }
-            g->calculateCopyNum();
+//            g->calculateCopyNum();
             g->print();
             cout << "write" << endl;
             g->writeGraph(lhCheckedFn);
@@ -107,10 +107,6 @@ int main(int argc, char *argv[]) {
         bool verbose = result["verbose"].as<bool>();
         const char *longFragFn;
         const char *hicMatrix;
-        if (result.count("tgs_order"))
-            longFragFn = result["tgs_order"].as<std::string>().c_str();
-        if (result.count("hic_matrix"))
-            hicMatrix = result["hic_matrix"].as<std::string>().c_str();
         try {
             JunctionDB *db = new JunctionDB(juncdbFn);
             db->sortRecordEntry();
@@ -182,6 +178,7 @@ int main(int argc, char *argv[]) {
             // cout << "Extracting circuits..." << endl;
             lgm->extractCircuits();
             lgm->sortCircuits();
+            lgm->divideCircuits();
             // g->print();
             if (verbose) {
                 lgm->printCircuits();

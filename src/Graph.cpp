@@ -29,7 +29,8 @@ Graph::Graph(const char *aFilename) {
 
     mSegments = new vector<Segment *>();
     mJunctions = new vector<Junction *>();
-
+    mSources = new vector<Segment *>();
+    mSinks = new vector<Segment *>();
     this->readGraph(aFilename);
 }
 
@@ -94,7 +95,8 @@ void Graph::readGraph(const char *aFilename) {
     cout << "Reading graph..." << endl;
     char line[8192];
     char *token;
-    int sourceId, sinkId;
+    vector<int> sourceIds, sinkIds;
+//    int sourceId, sinkId;
     while (!graphFile.eof()) {
         graphFile.getline(line, 8192);
 
@@ -134,14 +136,16 @@ void Graph::readGraph(const char *aFilename) {
             mExpectedPloidy = atoi(strtok(token, "m"));
         } else if (strcmp(token, "SOURCE") == 0) {
             token = strtok(NULL, " ");
+            token = strtok(token, ",");
             while (token != NULL) {
-                mSources->push_back(this->getSegmentById(atoi(token)));
+                sourceIds.push_back(atoi(token));
                 token = strtok(NULL, ",");
             }
         } else if (strcmp(token, "SINK") == 0) {
             token = strtok(NULL, " ");
+            token = strtok(token, ",");
             while (token != NULL) {
-                mSinks->push_back(this->getSegmentById(atoi(token)));
+                sinkIds.push_back(atoi(token));
                 token = strtok(NULL, ",");
             }
         } else if (strcmp(token, "SEG") == 0) {
@@ -155,11 +159,7 @@ void Graph::readGraph(const char *aFilename) {
             int start = atoi(strtok(NULL, ":"));
             int end = atoi(strtok(NULL, ":"));
             double segCred = 1.0;
-            auto seg = this->addSegment(segId, chrom, start, end, segCoverage, segCred, segCopy);
-            for (auto source :  *mSources) {
-                if (source->getId() > segId) break;
-                seg->setPartition(source->getId());
-            }
+            this->addSegment(segId, chrom, start, end, segCoverage, segCred, segCopy);
         } else if (strcmp(token, "JUNC") == 0) {
             char *sourceNode = strtok(NULL, " ");
             char *targetNode = strtok(NULL, " ");
@@ -188,7 +188,12 @@ void Graph::readGraph(const char *aFilename) {
                               isBounded, false);
         }
     }
-    assert(mSources->size() == mSinks->size());
+    assert(sourceIds.size() == sinkIds.size());
+
+    for (int i = 0 ;i < sourceIds.size(); i++) {
+        mSources->push_back(this->getSegmentById(sourceIds[i]));
+        mSinks->push_back(this->getSegmentById(sinkIds[i]));
+    }
     mInferredBegin = mJunctions->end();
 //
 //    mSource = this->getSegmentById(sourceId);
@@ -332,7 +337,13 @@ void Graph::calculateCopyNum() {
     }
 
     for (Junction *junc : *mJunctions) {
-        double juncCopy = junc->getWeight()->getCoverage() / mHaploidDepthJunc;
+//        double juncCopy = junc->getWeight()->getCoverage() / mHaploidDepthJunc;
+        double juncCopy;
+        if (junc->isInferred()) {
+            cout << mHaploidDepth << endl;
+            junc->getWeight()->setCoverage(mHaploidDepth);
+        }
+        juncCopy = junc->getWeight()->getCoverage() / mHaploidDepth;
         // junc->getWeight()->setAdjustedCoverage(max(juncAdjustedCoverage, 0.0));
         // junc->getWeight()->setCoverage(junc->getWeight()->getAdjustedCoverage());
         junc->getWeight()->setCopyNum(max(juncCopy, 0.0));
@@ -482,6 +493,7 @@ Junction *Graph::addJunction(Vertex *aSource, Vertex *aTarget, double aCoverage,
                                   aCopy, aInferred, aIsBounded, aIsSourceSinkJunction);
     if (this->doesJunctionExist(junc)) {
         throw DuplicateJunctionException(junc);
+        delete junc;
     }
     junc->insertEdgesToVertices();
     mJunctions->push_back(junc);
@@ -700,18 +712,20 @@ vector<Segment *> *Graph::getMSinks() const {
     return mSinks;
 }
 
-char *Graph::getSourcesIds() {
-    char *r;
+string Graph::getSourcesIds() {
+    string r;
     for (auto s : *mSources) {
-        r += s->getId();
+        r += std::to_string(s->getId());
         r += ',';
     }
+    return r;
 }
 
-char *Graph::getSinksIds() {
-    char *r;
+string Graph::getSinksIds() {
+    string r="";
     for (auto s : *mSinks) {
-        r += s->getId();
+        r += std::to_string(s->getId());
         r += ',';
     }
+    return r;
 }

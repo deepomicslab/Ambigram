@@ -17,7 +17,7 @@ typedef struct TrieNode {
     vector<TrieNode *> mChildren;
     vector<int> mIndexes;
 } trie_node_t;
-
+//TODO, There are some functions need to be reconstruct into util
 class LocalGenomicMap {
 protected:
     Graph *mGraph;
@@ -26,6 +26,8 @@ protected:
     vector<EdgePath> *mRawPathEdges;
 
     vector<VertexPath *> *mCircuits;
+    unordered_map<int, vector<VertexPath *> *> *dividedCircuits;
+    unordered_map<int, vector<VertexPath *> *> *dividedHaploids;
     vector<VertexPath *> *mHaploids;
 
     vector<VertexPath *> *mLongFrags;
@@ -143,12 +145,16 @@ public:
 //        find if long path in current graph (return how far the path can be traversed in current graph)
     int longPathLenInGraph(VertexPath *longPath);
 
+    bool checkPartition(int id, int* partitionStart, int* partitionEnd);
+    bool checkCommon(int id, int* partitionStart, int* partitionEnd);
+
     void isCircuitSimple(VertexPath *circuit, pair<int, int> &notSimpleIdx);
 
     void allCircuitsSimple(vector<tuple<int, int, int> > &notSimpleIdx);
 
     void extractCircuits();          // after traversing the whole graph, extract circuits from found paths
     void sortCircuits();
+    void divideCircuits();
 
     void writeCircuits(const char *outFn);
 

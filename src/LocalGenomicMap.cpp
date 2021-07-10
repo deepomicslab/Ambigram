@@ -20,6 +20,8 @@ LocalGenomicMap::LocalGenomicMap(Graph *aGraph) {
 
     mCircuits = new vector<VertexPath *>();
     mHaploids = new vector<VertexPath *>();
+    dividedCircuits = new unordered_map<int, vector<VertexPath *> *>();
+    dividedHaploids = new unordered_map<int, vector<VertexPath *> *>();
     usingLong = false;
     usingHic = false;
 }
@@ -263,9 +265,11 @@ int LocalGenomicMap::balancerILP(const char *lpFn) {
     // {segments (nSeg), junctions (nJunc), segment epsilon, junction epsilon}
     vector<Segment *> *segs = mGraph->getSegments();
     vector<Junction *> *juncs = mGraph->getJunctions();
+    int sourceSinkNum = 2 * (mGraph->getMSources()->size());
+
 
     int numSegsJuncs = segs->size() + juncs->size();
-    int numEpsilons = numSegsJuncs + 2;    // e(t(seg), c(seg)) 
+    int numEpsilons = numSegsJuncs + sourceSinkNum;    // e(t(seg), c(seg))
     // e(t(junc), c(junc))
     // e(source, 2)
     // e(sink, 2)
@@ -280,7 +284,7 @@ int LocalGenomicMap::balancerILP(const char *lpFn) {
     // e(sink, 2)
     int numVariables = numSegsJuncs + juncs->size() + numEpsilons;
     int numConstrains = segs->size() * 4 + 4 * juncs->size() +
-                        2;  // "2" for source & sink      ------  t(seg)+c(seg), t(seg)-c(seg), in=t(seg), out=t(seg, t(junc)+c(junc), t(junc)-c(junc), e, source, sink
+            sourceSinkNum;  // "2" for source & sink      ------  t(seg)+c(seg), t(seg)-c(seg), in=t(seg), out=t(seg, t(junc)+c(junc), t(junc)-c(junc), e, source, sink
     // int numConstrains = segs->size() * 8 + juncs->size() * 6 + numEpsilons + 2;
     // t(seg)+c(seg), t(seg)-c(seg)
     // t(seg)+0.4c(seg), t(seg)-0.4c(seg)
@@ -560,20 +564,39 @@ int LocalGenomicMap::balancerILP(const char *lpFn) {
     // }
 
     // constrains for source and sink
-    CoinPackedVector constrainSource;
-    constrainSource.insert(mGraph->getFirstSource()->getId() - 1, 1);
-    constrainSource.insert(numVariables - 2, -1);
-    // cout << mGraph->getExpectedPloidy() << endl;
-    constrainLowerBound[numConstrains - 2] = mGraph->getExpectedPloidy();
-    constrainUpperBound[numConstrains - 2] = mGraph->getExpectedPloidy();
-    matrix->appendRow(constrainSource);
+    auto sources = mGraph->getMSources();
+    auto sinks = mGraph->getMSinks();
 
-    CoinPackedVector constrainSink;
-    constrainSink.insert(mGraph->getFirstSink()->getId() - 1, 1);
-    constrainSink.insert(numVariables - 1, -1);
-    constrainLowerBound[numConstrains - 1] = mGraph->getExpectedPloidy();
-    constrainUpperBound[numConstrains - 1] = mGraph->getExpectedPloidy();
-    matrix->appendRow(constrainSink);
+    for(int i = 0; i < mGraph->getMSources()->size();i++) {
+        CoinPackedVector constrainSource;
+        CoinPackedVector constrainSink;
+        constrainSource.insert((*sources)[i]->getId() - 1, 1);
+        constrainSource.insert(numVariables - 2*(i+1), -1);
+        // cout << mGraph->getExpectedPloidy() << endl;
+        constrainLowerBound[numConstrains - 2*(i+1)] = mGraph->getExpectedPloidy();
+        constrainUpperBound[numConstrains - 2*(i+1)] = mGraph->getExpectedPloidy();
+        matrix->appendRow(constrainSource);
+
+        constrainSink.insert((*sinks)[i]->getId() - 1, 1);
+        constrainSink.insert(numVariables - i - 1, -1);
+        constrainLowerBound[numConstrains - i - 1] = mGraph->getExpectedPloidy();
+        constrainUpperBound[numConstrains - i - 1] = mGraph->getExpectedPloidy();
+        matrix->appendRow(constrainSink);
+    }
+//    CoinPackedVector constrainSource;
+//    constrainSource.insert(mGraph->getFirstSource()->getId() - 1, 1);
+//    constrainSource.insert(numVariables - 2, -1);
+//    // cout << mGraph->getExpectedPloidy() << endl;
+//    constrainLowerBound[numConstrains - 2] = mGraph->getExpectedPloidy();
+//    constrainUpperBound[numConstrains - 2] = mGraph->getExpectedPloidy();
+//    matrix->appendRow(constrainSource);
+//
+//    CoinPackedVector constrainSink;
+//    constrainSink.insert(mGraph->getFirstSink()->getId() - 1, 1);
+//    constrainSink.insert(numVariables - 1, -1);
+//    constrainLowerBound[numConstrains - 1] = mGraph->getExpectedPloidy();
+//    constrainUpperBound[numConstrains - 1] = mGraph->getExpectedPloidy();
+//    matrix->appendRow(constrainSink);
     cout << "Source sink done" << endl;
 
     // objective function: coefficient is 0 except for epsilon variables
@@ -585,7 +608,7 @@ int LocalGenomicMap::balancerILP(const char *lpFn) {
     max_cov += 1000;
     for (int i = 0; i < numVariables; i++) {
         if (i >= numSegsJuncs) {
-            if (i < numVariables - 2) {
+            if (i < numVariables - sourceSinkNum) {
                 // double cred;
                 if (i < numSegsJuncs + juncs->size()) {
                     if ((*juncs)[i - numSegsJuncs]->isInferred()) {
@@ -699,11 +722,18 @@ int LocalGenomicMap::balancerILP(const char *lpFn) {
         // variableUpperBound[numSegsJuncs + 3 * segs->size() + 3 * i + 2] = si->getInfinity();
     }
     cout << "LU junc done" << endl;
-    variableLowerBound[numVariables - 2] = 0;
-    variableUpperBound[numVariables - 2] = si->getInfinity();
-    //  variableUpperBound[numVariables - 2] = 0;
-    variableLowerBound[numVariables - 1] = 0;
-    variableUpperBound[numVariables - 1] = si->getInfinity();
+    for(int i = 0; i < mGraph->getMSources()->size();i++) {
+        variableLowerBound[numVariables - 2*(i+1)] = 0;
+        variableUpperBound[numVariables - 2*(i+1)] = si->getInfinity();
+        //  variableUpperBound[numVariables - 2] = 0;
+        variableLowerBound[numVariables - i - 1] = 0;
+        variableUpperBound[numVariables - i - 1] = si->getInfinity();
+    }
+//    variableLowerBound[numVariables - 2] = 0;
+//    variableUpperBound[numVariables - 2] = si->getInfinity();
+//    //  variableUpperBound[numVariables - 2] = 0;
+//    variableLowerBound[numVariables - 1] = 0;
+//    variableUpperBound[numVariables - 1] = si->getInfinity();
     // variableUpperBound[numVariables - 1] = 0;
 
     si->loadProblem(*matrix, variableLowerBound, variableUpperBound, objective, constrainLowerBound,
@@ -1916,7 +1946,7 @@ void LocalGenomicMap::checkReachability(JunctionDB *aJuncDB, bool verbose) {
         bool isSinkSourceConnectedOriginally;
         try {
             this->connectSourceSink();
-            isSinkSourceConnectedOriginally = false;
+//            isSinkSourceConnectedOriginally = false;
         } catch (DuplicateJunctionException &e) {
             isSinkSourceConnectedOriginally = true;
         }
@@ -1970,10 +2000,10 @@ void LocalGenomicMap::checkReachability(JunctionDB *aJuncDB, bool verbose) {
                 }
             }
         }
-        if (!isSinkSourceConnectedOriginally) {
-            delete mGraph->getJunctions()->back();
-            mGraph->getJunctions()->pop_back();
-        }
+//        if (!isSinkSourceConnectedOriginally) {
+//            delete mGraph->getJunctions()->back();
+//            mGraph->getJunctions()->pop_back();
+//        }
         // mGraph->print();
 
         if (verbose) {
@@ -2442,61 +2472,68 @@ Edge *LocalGenomicMap::traverseNextEdge(Vertex *aStartVertex, VertexPath *vp, Ju
 Edge *LocalGenomicMap::traverseNextEdgeByPartition(Vertex *aStartVertex, VertexPath *vp, JunctionDB *aJuncDB,
                                                    int *partitionStart, int *partitionEnd) {
     Edge *selectedEdge = nullptr;
-    int lastPartitionId = this->mGraph->getMSinks()->back()->getId();
-    auto sources = mGraph->getMSources();
-    auto sinks = mGraph->getMSinks();
     if (this->isUsingHic()) {
         selectedEdge = traverseWithHic(vp);
         if (selectedEdge != nullptr) return selectedEdge;
     }
-    Record *rec = aJuncDB->findRecord(aStartVertex->getSegment()->getChrom(), aStartVertex->getEnd(),
+//    select jun in juncdb first
+    auto *recs = aJuncDB->findRecords(aStartVertex->getSegment()->getChrom(), aStartVertex->getEnd(),
                                       aStartVertex->getDir());
-    if (rec == NULL) {
-        for (Edge *e: *(aStartVertex->getEdgesAsSource())) {
-            int eTargetId = e->getTarget()->getId();
-            if (e->hasCopy()) {
-                if (eTargetId > lastPartitionId || (eTargetId >= *partitionStart && eTargetId <= *partitionEnd)) {
-                    selectedEdge = e;
-                    break;
-                } else {
-                    auto partitionPair = findPartition(eTargetId);
-                    if (*partitionStart == 0) {
-                        *partitionStart = partitionPair.first;
-                        *partitionEnd = partitionPair.second;
-                        selectedEdge = e;
-                        break;
-                    } else if (*partitionStart == partitionPair.first && *partitionEnd == partitionPair.second) {
-                        selectedEdge = e;
-                        break;
-                    } else continue;
-                }
-            }
-        }
-    } else {
+    if (recs != nullptr) {
         int support = 0;
         entry_t *entry;
-        for (Edge *e: *(aStartVertex->getEdgesAsSource())) {
-            if (!e->hasCopy()) continue;
-            entry = rec->findForwardEntry(e->getTarget()->getSegment()->getChrom(), e->getTarget()->getStart(),
-                                          e->getTarget()->getDir());
-            if (entry != NULL) {
-                if (entry->support > support) {
-                    support = entry->support;
-                    selectedEdge = e;
-                }
-            } else {
-                if (support == 0) {
-                    selectedEdge = e;
+        for (auto rec : *recs) {
+            for (Edge *e: *(aStartVertex->getEdgesAsSource())) {
+                if (e->hasCopy()) {
+                    int eTargetId = e->getTarget()->getId();
+                    auto isInPartition = this->checkPartition(eTargetId, partitionStart, partitionEnd);
+                    if (isInPartition) {
+                        entry = rec->findForwardEntry(e->getTarget()->getSegment()->getChrom(),
+                                                      e->getTarget()->getStart(),
+                                                      e->getTarget()->getDir());
+                        if (entry != nullptr) {
+                            if (entry->support > support) {
+                                support = entry->support;
+                                selectedEdge = e;
+                                return selectedEdge;
+                            }
+                        } else {
+                            if (support == 0) {
+                                selectedEdge = e;
+                                return selectedEdge;
+                            }
+                        }
+                    }
                 }
             }
         }
     }
+// if not return, random select e in partition
+    for (Edge *e: *(aStartVertex->getEdgesAsSource())) {
+        int eTargetId = e->getTarget()->getId();
+        if (e->hasCopy()) {
+            auto isInPartition = this->checkCommon(eTargetId, partitionStart, partitionEnd);
+            if (isInPartition) {
+                selectedEdge = e;
+                return selectedEdge;
+            }
+        }
+    }
 
+    for (Edge *e: *(aStartVertex->getEdgesAsSource())) {
+        int eTargetId = e->getTarget()->getId();
+        if (e->hasCopy()) {
+            auto isInPartition = this->checkPartition(eTargetId, partitionStart, partitionEnd);
+            if (isInPartition) {
+                selectedEdge = e;
+                return selectedEdge;
+            }
+        }
+    }
     return selectedEdge;
-
 }
 
-
+//TODO HIC partition
 Edge *LocalGenomicMap::traverseWithHic(VertexPath *vp) {
     auto currentVertex = vp->back();
     Edge *maxEdge;
@@ -2511,10 +2548,6 @@ Edge *LocalGenomicMap::traverseWithHic(VertexPath *vp) {
     }
     if (maxV == 0) return nullptr;
     this->decreaseHicMatrix(vp, maxEdge);
-//    hic value decrease
-//    int id1 = maxEdge->getFirstSource()->getId();
-//    int id2 = maxEdge->getTarget()->getId();
-//    this->hicMatrix[id1][id2] = this->hicMatrix[id1][id2] - this->hicMatrix[id1][id2]/maxEdge->getWeight()->getCopyNum();
     return maxEdge;
 }
 
@@ -2545,10 +2578,12 @@ double LocalGenomicMap::calculateHicInteraction(VertexPath *vp, Vertex *currentV
 
 void LocalGenomicMap::traverse(Vertex *aStartVertex, JunctionDB *aJuncDB) {
 //    current traverse path partition
-    int *partitionStart;
-    int *partitionEnd;
-    VertexPath *vp = new VertexPath();
-    EdgePath *ep = new EdgePath();
+    int *partitionStart = new int();
+    int *partitionEnd = new int();
+    *partitionStart = 0;
+    *partitionEnd = 0;
+    auto *vp = new VertexPath();
+    auto *ep = new EdgePath();
     Vertex *currentVertex;
 //    if (!usingLong) {
 //        currentVertex = aStartVertex;
@@ -2568,10 +2603,12 @@ void LocalGenomicMap::traverse(Vertex *aStartVertex, JunctionDB *aJuncDB) {
             ep->push_back(nextEdge);
         }
     } else {
+        vp->push_back(currentVertex);
+        checkPartition(currentVertex->getId(), partitionStart, partitionEnd);
         while (true) {
-            auto nextEdge = this->traverseNextEdge(currentVertex, vp, aJuncDB);
-            if (nextEdge == nullptr) break;
+            auto nextEdge = this->traverseNextEdgeByPartition(currentVertex, vp, aJuncDB, partitionStart, partitionEnd);
             currentVertex->traverse();
+            if (nextEdge == nullptr) break;
             nextEdge->traverse();
             ep->push_back(nextEdge);
             vp->push_back(nextEdge->getTarget());
@@ -2611,13 +2648,12 @@ void LocalGenomicMap::traverseGraphByPartition(JunctionDB *aJuncDB) {
 void LocalGenomicMap::traverseGraph(JunctionDB *aJuncDB) {
     Vertex *currentVertex;
 //    Traverse sources first
-    for (auto *seg : *(mGraph->getMSources())) {
-        if (seg->hasCopy()) {
-            currentVertex = seg->getPositiveVertex();
-            this->traverse(currentVertex, aJuncDB);
-        }
-    }
-    this->traverse(currentVertex, aJuncDB);
+//    for (auto *seg : *(mGraph->getMSources())) {
+//        if (seg->hasCopy()) {
+//            currentVertex = seg->getPositiveVertex();
+//            this->traverse(currentVertex, aJuncDB);
+//        }
+//    }
     while (!mGraph->isCopyExhaustive()) {
         for (Segment *seg : *(mGraph->getSegments())) {
             if (seg->hasCopy()) {
@@ -2630,6 +2666,7 @@ void LocalGenomicMap::traverseGraph(JunctionDB *aJuncDB) {
     }
 }
 
+// No partition check;
 Vertex *LocalGenomicMap::traverseLongPath(Vertex *aStartVertex, VertexPath *vPath, bool skip_first) {
     int pathN = -1;
     int maxL = 0;
@@ -2688,6 +2725,38 @@ int LocalGenomicMap::longPathLenInGraph(VertexPath *longPath) {
     return n;
 }
 
+bool LocalGenomicMap::checkPartition(int eTargetId, int *partitionStart, int *partitionEnd) {
+//    return true;
+    int lastPartitionId = mGraph->getMSinks()->back()->getId();
+    if (eTargetId > lastPartitionId || (eTargetId >= *partitionStart && eTargetId <= *partitionEnd)) {
+        return true;
+    } else {
+        auto partitionPair = findPartition(eTargetId);
+        if (*partitionStart == 0) {
+            *partitionStart = partitionPair.first;
+            *partitionEnd = partitionPair.second;
+            return true;
+        } else if (*partitionStart == partitionPair.first && *partitionEnd == partitionPair.second) {
+            return true;
+        } else return false;
+    }
+}
+
+bool LocalGenomicMap::checkCommon(int eTargetId, int *partitionStart, int *partitionEnd) {
+    int lastPartitionId = mGraph->getMSinks()->back()->getId();
+    if (eTargetId >= *partitionStart && eTargetId <= *partitionEnd) {
+        return true;
+    } else {
+        auto partitionPair = findPartition(eTargetId);
+        if (*partitionStart == 0) {
+            *partitionStart = partitionPair.first;
+            *partitionEnd = partitionPair.second;
+            return true;
+        } else if (*partitionStart == partitionPair.first && *partitionEnd == partitionPair.second) {
+            return true;
+        } else return false;
+    }
+}
 // void LocalGenomicMap::traverseGraph() {
 //     while (!mGraph->isCopyExhaustive()) {
 //         for (Segment * seg : *(mGraph->getSegments())) {
@@ -2784,6 +2853,28 @@ void LocalGenomicMap::sortCircuits() {
          [](VertexPath *c1, VertexPath *c2) { return (*c1)[0]->getId() < (*c2)[0]->getId(); });
 }
 
+void LocalGenomicMap::divideCircuits() {
+//    divide circuits to each partition, for common peace, divide averagely
+    auto sources = mGraph->getMSources();
+    int index = 0;
+    int size = sources->size();
+    for (auto seg : *sources) {
+        (*dividedCircuits)[seg->getId()] = new vector<VertexPath *>();
+    }
+    for (int i = 0 ; i < mCircuits->size(); i++) {
+        auto circuit = (*mCircuits)[i];
+        auto startId = (*circuit)[0]->getId();
+        auto pair = this->findPartition(startId);
+        if (pair.first != 0){
+            (*dividedCircuits)[pair.first]->push_back(circuit);
+        } else {
+            int partitionId = (*sources)[index%size]->getId();
+            (*dividedCircuits)[partitionId]->push_back(circuit);
+            index++;
+        }
+    }
+}
+
 void LocalGenomicMap::writeCircuits(const char *outFn) {
     cout << "Write circuits" << endl;
     ofstream fout(outFn);
@@ -2791,11 +2882,14 @@ void LocalGenomicMap::writeCircuits(const char *outFn) {
         cout << "Cannot open file " << outFn << ": no such file or directory" << endl;
         exit(1);
     }
-    for (VertexPath *pathV : *mCircuits) {
-        for (Vertex *v : *pathV) {
-            fout << v->getInfo() << " ";
+    for (auto const& partitions : *dividedCircuits) {
+        fout << "partition: " << partitions.first << "\n";
+        for (auto circuits : *(partitions.second)) {
+            for (Vertex *v : *circuits) {
+                fout << v->getInfo() << " ";
+            }
+            fout << endl;
         }
-        fout << endl;
     }
     fout.close();
 }
@@ -2804,101 +2898,105 @@ void LocalGenomicMap::generateHaploids() {
     cout << "sort circuits" << endl;
     this->sortCircuits();
     srand(time(NULL));
-
-    vector<bool> is_inserted(mCircuits->size(), false);
-    is_inserted[0] = true;
-    VertexPath *mainPath = (*mCircuits)[0];
-    int i = 1;
-    VertexPath *current_circuit = new VertexPath();
-    VertexPath *comp_circuit;
-    bool is_comp = false;
-    bool all_inserted = false;
-    while (!all_inserted) {
-        while (i < mCircuits->size()) {
-            if (is_inserted[i]) {
-                i++;
-                continue;
-            }
-            // for (int i = 1; i < mCircuits->size(); i++) {
-            if (!is_comp) {
-                current_circuit->assign(mCircuits->at(i)->begin(), mCircuits->at(i)->end());
-            } else {
-                comp_circuit = this->get_complement(mCircuits->at(i));
-                current_circuit->assign(comp_circuit->begin(), comp_circuit->end());
-                // comp_circuit->clear();
-            }
-            deque<Vertex *> vq = deque<Vertex *>(current_circuit->begin(), current_circuit->end() - 1);
-            bool isInserted = false;
-            VertexPath::iterator cItr;
-            VertexPath::iterator foundItr;
-            for (int j = 0; j <= vq.size(); j++) {
-                Vertex *startV = vq.front();
-                // while (!isInserted) {
-                cItr = mainPath->begin();
-                // cout << "i=" << i << ": " << startV->getInfo() << " " << (*cItr)->getInfo() << endl;
-                while (cItr != mainPath->end() && cItr - 1 != mainPath->end()) {
-                    foundItr = find(cItr, mainPath->end(), startV);
-                    if (foundItr != mainPath->end()) {
-                        // if (rand() * 1.0 / RAND_MAX < 0.5 && foundItr != mainPath->end()) {
-                        cout << "Insert at " << (*foundItr)->getInfo() << endl;
-                        isInserted = true;
-                        break;
+    for (auto partitions : *dividedCircuits) {
+        int partition = partitions.first;
+        auto circuits = partitions.second;
+        (*dividedHaploids)[partition] = new vector<VertexPath *>();
+        vector<bool> is_inserted(circuits->size(), false);
+        is_inserted[0] = true;
+        VertexPath *mainPath = (*circuits)[0];
+        int i = 1;
+        VertexPath *current_circuit = new VertexPath();
+        VertexPath *comp_circuit;
+        bool is_comp = false;
+        bool all_inserted = false;
+        while (!all_inserted) {
+            while (i < circuits->size()) {
+                if (is_inserted[i]) {
+                    i++;
+                    continue;
+                }
+                // for (int i = 1; i < mCircuits->size(); i++) {
+                if (!is_comp) {
+                    current_circuit->assign(circuits->at(i)->begin(), circuits->at(i)->end());
+                } else {
+                    comp_circuit = this->get_complement(circuits->at(i));
+                    current_circuit->assign(comp_circuit->begin(), comp_circuit->end());
+                    // comp_circuit->clear();
+                }
+                deque<Vertex *> vq = deque<Vertex *>(current_circuit->begin(), current_circuit->end() - 1);
+                bool isInserted = false;
+                VertexPath::iterator cItr;
+                VertexPath::iterator foundItr;
+                for (int j = 0; j <= vq.size(); j++) {
+                    Vertex *startV = vq.front();
+                    // while (!isInserted) {
+                    cItr = mainPath->begin();
+                    // cout << "i=" << i << ": " << startV->getInfo() << " " << (*cItr)->getInfo() << endl;
+                    while (cItr != mainPath->end() && cItr - 1 != mainPath->end()) {
+                        foundItr = find(cItr, mainPath->end(), startV);
+                        if (foundItr != mainPath->end()) {
+                            // if (rand() * 1.0 / RAND_MAX < 0.5 && foundItr != mainPath->end()) {
+                            cout << "Insert at " << (*foundItr)->getInfo() << endl;
+                            isInserted = true;
+                            break;
+                        }
+                        cItr = foundItr + 1;
                     }
-                    cItr = foundItr + 1;
-                }
-                // }
-                if (isInserted) {
-                    // mainPath->insert(foundItr, vq.begin(), vq.end());
-                    // int count = 0;
-                    // for (Vertex * v: *mainPath) {
-                    //     if (v->getId() == 24) {
-                    //         count++;
-                    //     }
                     // }
-                    // this->print(*mainPath);
-                    // cout << count << endl;
-                    break;
-                    // mainPath->insert(foundItr + 1, (*mCircuits)[i]->begin() + 1, (*mCircuits)[i]->end());
-                    // } else {
-                    //     mHaploids->push_back((*mCircuits)[i]);
+                    if (isInserted) {
+                        // mainPath->insert(foundItr, vq.begin(), vq.end());
+                        // int count = 0;
+                        // for (Vertex * v: *mainPath) {
+                        //     if (v->getId() == 24) {
+                        //         count++;
+                        //     }
+                        // }
+                        // this->print(*mainPath);
+                        // cout << count << endl;
+                        break;
+                        // mainPath->insert(foundItr + 1, (*mCircuits)[i]->begin() + 1, (*mCircuits)[i]->end());
+                        // } else {
+                        //     mHaploids->push_back((*mCircuits)[i]);
+                    }
+                    vq.pop_front();
+                    vq.push_back(startV);
                 }
-                vq.pop_front();
-                vq.push_back(startV);
-            }
-            if (isInserted) {
-                mainPath->insert(foundItr, vq.begin(), vq.end());
-                is_inserted[i] = true;
-                i++;
-                is_comp = false;
-            } else {
-                if (is_comp) {
+                if (isInserted) {
+                    mainPath->insert(foundItr, vq.begin(), vq.end());
+                    is_inserted[i] = true;
                     i++;
                     is_comp = false;
                 } else {
-                    is_comp = true;
+                    if (is_comp) {
+                        i++;
+                        is_comp = false;
+                    } else {
+                        is_comp = true;
+                    }
+                    // cout << "NOT INSERTED: " << endl;
+                    // this->print(*(*mCircuits)[i]);
                 }
-                // cout << "NOT INSERTED: " << endl;
-                // this->print(*(*mCircuits)[i]);
+            }
+            all_inserted = true;
+            for (i = 0; i < is_inserted.size(); i++) {
+                if (!is_inserted[i]) {
+                    this->print(*mainPath);
+                    this->print(*circuits->at(i));
+                    all_inserted = false;
+                    break;
+                }
             }
         }
-        all_inserted = true;
-        for (i = 0; i < is_inserted.size(); i++) {
-            if (!is_inserted[i]) {
-                this->print(*mainPath);
-                this->print(*mCircuits->at(i));
-                all_inserted = false;
-                break;
-            }
-        }
-    }
-    mHaploids->push_back(mainPath);
-    cout << "Mainpath done" << endl;
-    cout << mHaploids->size() << endl;
+        (*dividedHaploids)[partition]->push_back(mainPath);
+        cout << "Mainpath done" << endl;
+        cout << (*dividedHaploids)[partition]->size() << endl;
 
-    for (Vertex *v: *mainPath) {
-        cout << v->getInfo() << " ";
+        for (Vertex *v: *mainPath) {
+            cout << v->getInfo() << " ";
+        }
+        cout << endl;
     }
-    cout << endl;
 
     // VertexPath::iterator itr = find(mainPath->begin(), mainPath->end(), mGraph->getFirstSink()->getPositiveVertex());
     // mHaploids->push_back(new VertexPath(mainPath->begin(), itr + 1));
@@ -2943,11 +3041,15 @@ void LocalGenomicMap::writeHaploids(const char *outFn) {
         cout << "Cannot open file " << outFn << " : no such file or directory" << endl;
         exit(1);
     }
-    for (VertexPath *pathV : *mHaploids) {
-        for (Vertex *v : *pathV) {
-            fout << v->getInfo() << " ";
+    for (auto const& partitionHP: *dividedHaploids) {
+        fout << "partition: " << partitionHP.first << "\n";
+        auto hps = partitionHP.second;
+        for (VertexPath *pathV : *hps) {
+            for (Vertex *v : *pathV) {
+                fout << v->getInfo() << " ";
+            }
+            fout << endl;
         }
-        fout << endl;
     }
     fout.close();
 }

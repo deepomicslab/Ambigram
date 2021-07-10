@@ -33,7 +33,6 @@ protected:
 //        Segment * mSource;
 //        Segment * mSink;
     vector<Segment *> *mSources;
-protected:
     vector<Segment *> *mSinks;
 
     vector<Segment *> *mSegments;
@@ -91,9 +90,9 @@ public:
 
     vector<Junction *> *getJunctions();
 
-    char *getSourcesIds();
+    string getSourcesIds();
 
-    char *getSinksIds();
+    string getSinksIds();
 
     /* functionality */
 
