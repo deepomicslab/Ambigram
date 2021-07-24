@@ -255,10 +255,6 @@ class MainArgParser:
                             dest='depth_file',
                             required=True,
                             help='Tabixed depth for counting supports')
-        parser.add_argument('-C', '--chrom-info',
-                            dest='chrom_info',
-                            required=True,
-                            help='Chromosome information')
         parser.add_argument('-s', '--sample-name',
                             dest='sample_name',
                             required=True,
