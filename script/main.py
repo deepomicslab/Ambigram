@@ -86,15 +86,27 @@ class MainArgParser:
                             dest='region',
                             default=None,
                             help='Region')
+        parser.add_argument('-v', '--v_chr',
+                            dest='v_chr',
+                            default=None,
+                            help='Region')
+        parser.add_argument('--h_chrs',
+                            dest='h_chrs',
+                            default=None,
+                            help='Region')
+        parser.add_argument('--v_len',
+                            dest='v_len',
+                            default=None,
+                            help='Region')
         parser.add_argument('-S', '--chrom-sv',
                             dest='chrom_sv',
                             required=False,
                             default=None,
                             help='Chromosome SV')
-        parser.add_argument('-C', '--chrom-info',
-                            dest='chrom_info',
-                            required=True,
-                            help='Chromosome information')
+        # parser.add_argument('-C', '--chrom-info',
+        #                     dest='chrom_info',
+        #                     required=True,
+        #                     help='Chromosome information')
         parser.add_argument('-i', '--keep-imprecise',
                             dest='keep_imprecise',
                             action='store_true',
@@ -109,6 +121,9 @@ class MainArgParser:
                             dest='bps_map_out',
                             required=True,
                             help='Output path for breakpoint map.')
+        parser.add_argument('--out_bed',
+                            default=True,
+                            help='Keep insertions')
         args = parser.parse_args(sys.argv[2:])
 
         if args.chrom_sv is not None:
@@ -121,16 +136,24 @@ class MainArgParser:
                                      )
         else:
             chrom_junc = None
-        seek_sv = False
+        seek_sv = True
         if seek_sv:
             sv_df = pd.read_table(args.sv_list, skiprows=1, header=None,
                                   usecols=[0, 1, 2, 3, 4, 5, 6, 7],
                                   names=['chrom_5p', 'pos_5p', 'strand_5p', 'left_read',
                                          'chrom_3p', 'pos_3p', 'strand_3p', 'right_read'])
+            print(sv_df['pos_3p'])
+            sv_df = sv_df.astype({
+                'chrom_5p':str, 'pos_5p':np.int64, 'strand_5p':str, 'left_read':str,
+                'chrom_3p':str, 'pos_3p':np.int64, 'strand_3p':str, 'right_read':str,
+            })
             # sv_df = pd.read_csv(args.sv_list)
         else:
-            sv_df = bpsmap.concat_sv(args.sv_list)
-        chrom_infos = pd.read_csv(args.chrom_info, dtype={'end': np.int64}, sep='\t')
+            # sv_df = bpsmap.concat_sv(args.sv_list)
+            sv_df = bpsmap.parse_sur(args.sv_list)
+        chroms = args.h_chrs.split(",")
+        chroms.append(args.v_chr)
+        # chrom_infos = pd.read_csv(args.chrom_info, dtype={'end': np.int64}, sep='\t')
         # print(chrom_junc.head())
         # print(sv_df.head())
         # print(chrom_infos.head())
@@ -138,7 +161,7 @@ class MainArgParser:
             ## TODO: if region not None
             pass
         else:
-            chroms = list(sv_df.chrom_5p.unique()) + list(sv_df.chrom_3p.unique()) + chrom_infos.chrom.tolist()
+            chroms = chroms
             if chrom_junc is not None:
                 chroms = sorted(set(
                     list(chrom_junc.chrom_5p.unique()) +
@@ -147,9 +170,10 @@ class MainArgParser:
             else:
                 # print(chroms)
                 print(list(sv_df.columns))
-
+            print(chroms,"xxx")
             chroms = sorted(set(chroms))
             bps_map = []
+            print(sv_df['chrom_5p'])
             for chrom in chroms:
                 sv_5p = bpsmap.get_precise_sv(sv_df, chrom_5p=chrom, drop_imprecise=not args.keep_imprecise,
                                               drop_insertions=not args.keep_insertions)
@@ -159,8 +183,13 @@ class MainArgParser:
                     chrom_junc_5p = chrom_junc.loc[lambda df: df.chrom_5p == chrom]
                     chrom_junc_3p = chrom_junc.loc[lambda df: df.chrom_3p == chrom]
                 print(chrom)
-                chrom_info = chrom_infos.loc[lambda df: df.chrom == chrom].iloc[0]
-                bps = bpsmap.get_breakpoints(sv_5p, sv_3p) + [chrom_info.start, chrom_info.end]
+                print((sv_3p))
+                bps = ""
+                if chrom == args.v_chr:
+                    bps = bpsmap.get_breakpoints(sv_5p, sv_3p, True) + [1, int(args.v_len)]
+                else:
+                    bps = bpsmap.get_breakpoints(sv_5p, sv_3p, False)
+                print(bps)
                 if chrom_junc is not None:
                     bps = np.array(sorted(set(
                         bps +
@@ -169,7 +198,8 @@ class MainArgParser:
                 else:
                     bps = np.array(sorted(set(bps)))
                 bps_map.extend([(chrom, *t) for t in bpsmap.map_bps(bps, 10)])
-            bpsmap.write_bps_map(args.bps_map_out, bps_map)
+            bpsmap.write_bps_map(args.bps_map_out, bps_map,chroms)
+            # bpsmap.generate_bed(bps_map,args.out_bed)
 
         # chrom = args.region.split(':')[0]
         # start, end = [int(i) for i in args.region.split(':')[1].split('-')]
@@ -189,6 +219,19 @@ class MainArgParser:
                             help='Individual SV file')
         parser.add_argument('-b', '--bam-file',
                             dest='bam_file',
+                            required=True,
+                            help='Individual BAM file')
+        parser.add_argument('--v_chr',
+                            dest='v_chr',
+                            required=True,
+                            help='Individual BAM file')
+        parser.add_argument('--h_chrs',
+                            dest='h_chrs',
+                            required=True,
+                            help='Individual BAM file')
+        parser.add_argument('--v_len',
+                            dest='v_len',
+                            type=int,
                             required=True,
                             help='Individual BAM file')
         parser.add_argument('-S', '--seeksv',
@@ -243,6 +286,10 @@ class MainArgParser:
                             dest='seg',
                             required=True,
                             help='Output path of segment')
+        parser.add_argument('--avg_whole_dp',
+                            dest='avg_whole_dp',
+                            required=True,
+                            help='Output path of segment')
         parser.add_argument('-i', '--keep-imprecise',
                             dest='keep_imprecise',
                             action='store_true',
@@ -254,14 +301,16 @@ class MainArgParser:
                             default=True,
                             help='Keep insertions')
         args = parser.parse_args(sys.argv[2:])
+        chroms = args.h_chrs.split(",")
+        chroms.append(args.v_chr)
 
         # chrom = args.region.split(':')[0]
         # start, end = [int(i) for i in args.region.split(':')[1].split('-')]
         bps_map = pd.read_csv(args.bps_map, sep='\t')
-        chrom_infos = pd.read_csv(args.chrom_info, sep='\t')
         print('Reading SV')
         if not args.is_seeksv:
-            sv = bpsmap.read_sv(args.sv_file)
+            # sv = bpsmap.read_sv(args.sv_file)
+            sv = bpsmap.parse_sur(args.sv_file)
             sv = bpsmap.get_precise_sv(sv, drop_imprecise=not args.keep_imprecise,
                                        drop_insertions=not args.keep_insertions)
         # sv = bpsmap.get_precise_sv_svaba(sv, chrom, start, end)
@@ -271,17 +320,19 @@ class MainArgParser:
                                usecols=[0, 1, 2, 3, 4, 5, 6, 7],
                                names=['chrom_5p', 'pos_5p', 'strand_5p', 'left_read',
                                       'chrom_3p', 'pos_3p', 'strand_3p', 'right_read'])
-        # config.map_bps_sv(sv, bps_map)
-        config.map_bps_chrom_infos(chrom_infos, bps_map)
+        config.map_bps_sv(sv, bps_map)
+        # config.map_bps_chrom_infos(chrom_infos, bps_map)
         sv = config.dedup(sv)
 
         segs = pd.DataFrame()
+        beds = []
         id_start = 1
-        for row in chrom_infos.itertuples():
-            seg, id_start = config.segmentation(sv, row.chrom, row.start, row.end, id_start,
+        for chrom in chroms:
+            seg, id_start,i_start,i_end = config.segmentation(sv, chrom,args.v_chr,args.v_len, id_start,
                                                 drop_imprecise=not args.keep_imprecise,
                                                 drop_insertions=not args.keep_insertions)
             segs = segs.append(seg)
+            beds.append([chrom, str(i_start),str(i_end)])
 
         # segs = config.segmentation(sv, chrom, start, end)
         segs.to_csv(args.seg, index=False, sep='\t')
@@ -306,7 +357,7 @@ class MainArgParser:
         junc_db = config.update_junc_db_by_seg_in_chrom(segs, junc_db, bam, args.ext)
         config.write_junc_db(args.junc_db, junc_db)
 
-        config.generate_config(args.out_config, args.sample_name, sv, segs, depth_tabix, bam, ext=args.ext,
+        config.generate_config(args.out_config, args.sample_name, sv, segs, depth_tabix, bam,args.v_chr,args.avg_whole_dp, ext=args.ext,
                                ploidy=args.ploidy)
 
     def mergedb(self):

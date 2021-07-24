@@ -27,6 +27,12 @@ protected:
     double mAvgCoverageRaw;
     double mAvgCoverageJunc;
     double mAvgCoverageRawJunc;
+    double mRatio;
+
+    double mAvgVirusDP;
+    int mVirusSegStart;
+    vector<double> * mAvgCoverages;
+
 
     string mPloidy;
 
@@ -51,6 +57,7 @@ public:
     int getJunctionIndexByEdge(Edge *aEdge);
 
     int getExpectedPloidy();
+    int getExpectedPloidy2(int i);
 
     double getPurity();
 
@@ -62,11 +69,14 @@ public:
 
     double getAvgRawCoverage();
 
+    int getVirusSegStart();
     double getAvgCoverageJunc();
 
     double getAvgRawCoverageJunc();
 
     double getHaploidDepth();
+
+    double getRatio();
 
     void setPurity(double aPurity);
 

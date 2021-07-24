@@ -2,6 +2,7 @@
 
 Weight::Weight(double aCoverage) {
     mCoverage = aCoverage;
+    mCorrectedCoverage = mCoverage;
     // mCoverageOriginal = aCoverage;
     // mCoverageAdjusted = aCoverage;
     mCopyNum = 0;
@@ -14,6 +15,10 @@ Weight::Weight(double aCoverage) {
 Weight::~Weight() { ; }
 
 double Weight::getCoverage() { return mCoverage; }
+
+double Weight::getCorrectedCoverage() { return mCorrectedCoverage; }
+void Weight::setCorrectedCoverage(double v) { mCorrectedCoverage = v; }
+
 
 // double Weight::getOriginalCoverage() { return mCoverageOriginal; }
 // double Weight::getAdjustedCoverage() { return mCoverageAdjusted; }

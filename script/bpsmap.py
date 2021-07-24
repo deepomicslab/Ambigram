@@ -1,4 +1,5 @@
 import numpy as np
+import pandas
 import pandas as pd
 from scipy.spatial.distance import pdist, squareform
 from sklearn.neighbors import KDTree
@@ -133,6 +134,24 @@ def concat_sv(sv_list_filename):
             df = df.append(read_sv(line[:-1]))
     return df
 
+def parse_sur(file_name):
+    f_in = open(file_name)
+    res_list = []
+    for line in f_in.readlines():
+        infos = line.split(" ")
+        p5 = infos[1].split(":")
+        p3 = infos[2].split(":")
+        chrom_5p = p5[0]
+        strand_5p = p5[1][0]
+        pos_5p = int(p5[1][1:])
+
+        chrom_3p = p3[0]
+        strand_3p = p3[1][0]
+        pos_3p = int(p3[1][1:])
+        s_reads = infos[3].split("=")[1]
+        res_list.append([chrom_5p, pos_5p, strand_5p, chrom_3p, pos_3p, strand_3p, int(s_reads)])
+    return pandas.DataFrame(res_list, columns=['chrom_5p', 'pos_5p', 'strand_5p',
+                                               'chrom_3p', 'pos_3p', 'strand_3p','junc_reads'])
 
 def read_sv(file_name):
     return pd.read_csv(file_name, header=None, sep='\t',
@@ -192,8 +211,23 @@ def get_precise_sv(sv_df, chrom_5p=None, start_5p=None, end_5p=None,
 #                   .loc[lambda row: row.right_read >= support_thres]
 #     return res_df
 
-def get_breakpoints(sv_5p, sv_3p):
-    return sorted(set(sv_5p.pos_5p).union(sv_3p.pos_3p))
+def merge_near_pos(poses, threshold):
+    r = []
+    r.append(poses[0])
+    for i in range(1,len(poses)):
+        if poses[i] - poses[i-1] <= threshold:
+            pass
+        else:
+            r.append(poses[i])
+    return r
+
+def get_breakpoints(sv_5p, sv_3p, is_virus):
+    svs = sorted(set(sv_5p.pos_5p).union(sv_3p.pos_3p))
+    if not is_virus:
+        svs.insert(0,svs[0]-300)
+        svs.append(svs[-1]+300)
+# r = merge_near_pos(svs, 6)
+    return svs
 
 
 def get_breakpoints_from_list(sv_list_filename, chrom, start, end, support_thres=5):
@@ -207,6 +241,7 @@ def get_breakpoints_from_list(sv_list_filename, chrom, start, end, support_thres
             sv = get_precise_sv(sv_filename, depth_filename, chrom, start, end, support_thres)
             bps_set = bps_set.union(get_breakpoints(sv))
     return np.array(sorted(bps_set))
+
 
 
 def count_neighbor(arr, r=20):
@@ -238,8 +273,15 @@ def map_bps(bps, r):
     return bps_map
 
 
-def write_bps_map(filename, bps_map):
+def write_bps_map(filename, bps_map,chromos):
     # bps_map = [(chrom, *t) for t in bps_map]
-    pd.DataFrame(bps_map, columns=['chrom', 'before', 'after']) \
-        .sort_values(by=['chrom', 'before']) \
-        .to_csv(filename, sep='\t', index=False)
+    bs = pd.DataFrame(bps_map, columns=['chrom', 'before', 'after']) \
+        .sort_values(by=['chrom', 'before'])
+    print(bs)
+    bs.to_csv(filename+".bps", sep='\t', index=False)
+    bed_out = open(filename+".bed","w")
+    r = []
+    for chr in chromos:
+        t = bs[bs['chrom'] == chr]['after']
+        bed_out.write("{}\t{}\t{}\n".format(chr, min(t), max(t)))
+    bed_out.close()

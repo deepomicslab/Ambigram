@@ -49,20 +49,23 @@ def dedup(sv):
     return sv[~sv.duplicated(sv.columns[:6], keep='last')]
 
 
-def segmentation(sv, chrom, start, end, id_start=1, drop_imprecise=True, drop_insertions=True):
+def segmentation(sv, chrom,v_chr,v_len, id_start=1, drop_imprecise=True, drop_insertions=True):
     sv_5p = bpsmap.get_precise_sv(sv, chrom_5p=chrom, drop_imprecise=drop_imprecise, drop_insertions=drop_insertions)
     sv_3p = bpsmap.get_precise_sv(sv, chrom_3p=chrom, drop_imprecise=drop_imprecise, drop_insertions=drop_insertions)
-    bps = sorted(set(bpsmap.get_breakpoints(sv_5p, sv_3p) + [start, end]))
+    if chrom == v_chr:
+        bps = sorted(set(bpsmap.get_breakpoints(sv_5p, sv_3p, True) + [1, v_len]))
+    else:
+        bps = sorted(set(bpsmap.get_breakpoints(sv_5p, sv_3p, False)))
 
     # bps = bpsmap.get_breakpoints(sv) + [start, end]
     # bps = list(sorted(set(bps)))
     segs = []
-    for p in bps[1:-1]:
+    start = bps[0]
+    for p in bps[1:]:
         segs.append((id_start, chrom, start, p))
         start = p
         id_start += 1
-    segs.append((id_start, chrom, start, end))
-    return pd.DataFrame(segs, columns=['ID', 'chrom', 'start', 'end']), id_start + 1
+    return pd.DataFrame(segs, columns=['ID', 'chrom', 'start', 'end']), id_start,bps[0],bps[-1]
 
 
 def update_junc_db_by_sv(sv, junc_db):
@@ -188,11 +191,16 @@ def get_avg_depth(depth, chrom, start, end):
     return sum(map(lambda x: int(x.split('\t')[-1]), depth.fetch(chrom, start, end))) / (end - start + 1)
 
 
-def generate_config(filename, samplename, sv, segs, depth_tabix, bam, ext, ploidy):
+def generate_config(filename, samplename, sv, segs, depth_tabix, bam,virus_chr, avg_whole_dp, ext, ploidy):
     output = []
-    total_depth = 0
-    total_length = 0
-    # for seg in segs.itertuples():
+
+    total_host_depth = {}
+    total_virus_depth = {}
+    
+    total_host_length = {}
+    total_virus_length = {}
+
+# for seg in segs.itertuples():
     #     total_length += seg.end - seg.start + 1
     #     total_depth += get_avg_depth(depth_tabix, seg.chrom, seg.start, seg.end) * (seg.end - seg.start + 1)
     # avg_depth = total_depth / total_length
@@ -206,14 +214,39 @@ def generate_config(filename, samplename, sv, segs, depth_tabix, bam, ext, ploid
         # fout.write(f'SINK H:{segs.iloc[-1].ID}\n')
 
         output_segs = []
+        sources = []
+        sinks = []
+        v_pos = ""
+        preseg = None
         for seg in segs.itertuples():
             # print(f'Write seg {seg.ID}')
-            total_length += seg.end - seg.start + 1
-            seg_depth = get_avg_depth(depth_tabix, seg.chrom, seg.start, seg.end)
-            total_depth += seg_depth * (seg.end - seg.start + 1)
+            if seg.chrom in total_host_length.keys():
+                total_host_length[seg.chrom] += seg.end - seg.start + 1
+                seg_depth = get_avg_depth(depth_tabix, seg.chrom, seg.start, seg.end)
+                total_host_depth[seg.chrom] += seg_depth * (seg.end - seg.start + 1)
+            else:
+                total_host_length[seg.chrom] = seg.end - seg.start + 1
+                seg_depth = get_avg_depth(depth_tabix, seg.chrom, seg.start, seg.end)
+                total_host_depth[seg.chrom] = seg_depth * (seg.end - seg.start + 1)
+            # if seg.chrom == virus_chr:
+            #     total_virus_length += seg.end - seg.start + 1
+            #     seg_depth = get_avg_depth(depth_tabix, seg.chrom, seg.start, seg.end)
+            #     total_virus_depth += seg_depth * (seg.end - seg.start + 1)
+            # else:
+            #     total_host_length += seg.end - seg.start + 1
+            #     seg_depth = get_avg_depth(depth_tabix, seg.chrom, seg.start, seg.end)
+            #     total_host_depth += seg_depth * (seg.end - seg.start + 1)
+            if preseg == None:
+                sources.append(str(seg.ID))
+                preseg = seg
+            else:
+                if seg.chrom != preseg.chrom:
+                    sources.append(str(seg.ID))
+                    sinks.append(str(preseg.ID))
+                preseg = seg
             output_segs.append(f'SEG H:{seg.ID}:{seg.chrom}:{seg.start}:{seg.end} {seg_depth} -1')
             # fout.write(f'SEG H:{seg.ID}:{seg.chrom}:{seg.start}:{seg.end} {get_avg_depth(depth_tabix, seg.chrom, seg.start, seg.end)} -1\n')
-
+        sinks.append(str(len(segs)+1))
         ins_id = len(segs) + 1
         ins_segs = []
 
@@ -221,8 +254,11 @@ def generate_config(filename, samplename, sv, segs, depth_tabix, bam, ext, ploid
         juncs_depth = []
         left = next(segs.itertuples())
         for right in segs.iloc[1:].itertuples():
+            if left.chrom != right.chrom:
+                left = right
+                continue
             support = get_normal_junc_read_num(bam, left.chrom, left.end, ext=ext)
-            if support > 1:
+            if support > 5:
                 # pass
                 juncs_depth.append(support)
                 output_juncs.append(f'JUNC H:{left.ID}:+ H:{right.ID}:+ {support} -1 U B')
@@ -256,11 +292,20 @@ def generate_config(filename, samplename, sv, segs, depth_tabix, bam, ext, ploid
                     right = segs.loc[lambda r: r.chrom == row.chrom_3p] \
                         .loc[lambda r: r.start == row.pos_3p]
             # print(f'JUNC H:{left.ID.values[0]}:{row.strand_5p} H:{right.ID.values[0]}:{row.strand_3p} {row.junc_reads} -1 U B')
-            # juncs_depth.append(row.junc_reads)
-            juncs_depth.append((row.left_read + row.right_read) / 2)
+            if False:
+                pass
+                # print(row.junc_reads)
+                # juncs_depth.append(row.junc_reads)
+            else:
+                juncs_depth.append((row.left_read + row.right_read) / 2)
 
             # print(row.inner_ins)
             if True or row.inner_ins == '.':
+                print(left,"left")
+                print(right, "right")
+                print(row)
+                # output_juncs.append(
+                #     f'JUNC H:{left.ID.values[0]}:{row.strand_5p} H:{right.ID.values[0]}:{row.strand_3p} {row.junc_reads} -1 U B')
                 output_juncs.append(
                     f'JUNC H:{left.ID.values[0]}:{row.strand_5p} H:{right.ID.values[0]}:{row.strand_3p} {(row.left_read + row.right_read) / 2} -1 U B')
             else:
@@ -282,13 +327,22 @@ def generate_config(filename, samplename, sv, segs, depth_tabix, bam, ext, ploid
         #         print('\n'.join(output_segs + output_juncs))
 
         fout.write(f'SAMPLE {samplename}\n')
-        fout.write(f'AVG_SEG_DP {total_depth * 1.0 / total_length}\n')
+        avg_chr_seg_dp = ""
+        for k in total_host_length.keys():
+            avg_chr_seg_dp += str(total_host_depth[k]/total_host_length[k])+" "
+            break
+        fout.write(f'AVG_CHR_SEG_DP {avg_chr_seg_dp}\n')
+        # fout.write(f'AVG_VIRUS_SEG_DP {total_virus_depth * 1.0 / total_virus_length}\n')
+        fout.write(f'AVG_WHOLE_HOST_DP {avg_whole_dp}\n')
         fout.write(f'AVG_JUNC_DP {np.mean(juncs_depth)}\n')
         fout.write(f'PURITY 1\n')
-        fout.write(f'AVG_PLOIDY {ploidy}\n')
+        fout.write(f'AVG_TUMOR_PLOIDY {ploidy}\n')
         fout.write(f'PLOIDY {ploidy}m1\n')
-        fout.write(f'SOURCE H:1\n')
-        fout.write(f'SINK H:{segs.iloc[-1].ID}\n')
+        fout.write(f'VIRUS_START {sources[-1]}\n')
+        sources = ",".join(sources)
+        sinks = ",".join(sinks)
+        fout.write(f'SOURCE {sources}\n')
+        fout.write(f'SINK {sinks}\n')
         fout.write('\n'.join(output_segs + output_juncs) + '\n')
 
     if len(ins_segs) > 0:

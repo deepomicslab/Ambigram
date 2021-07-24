@@ -11,6 +11,7 @@ protected:
     double mCopyNum;             // the copy number, coverage / average coverage of one copy
     double mCopyNumOriginal;
     double mCopyNumBackup;
+    double mCorrectedCoverage;
 
     bool mIsInferred;
 
@@ -20,6 +21,8 @@ public:
     ~Weight();
 
     double getCoverage();
+    double getCorrectedCoverage();
+    void setCorrectedCoverage(double v);
 
     // double getOriginalCoverage();
     // double getAdjustedCoverage();

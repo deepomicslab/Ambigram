@@ -147,6 +147,7 @@ public:
 
     bool checkPartition(int id, int* partitionStart, int* partitionEnd);
     bool checkCommon(int id, int* partitionStart, int* partitionEnd);
+    bool vReachable(bool isBackwardSourceReachable, bool isForwardSinkReachable, bool isBackwardSinkReachable, bool isForwardSourceReachable);
 
     void isCircuitSimple(VertexPath *circuit, pair<int, int> &notSimpleIdx);
 
@@ -169,6 +170,8 @@ public:
     Edge *selectPrevEdge(Vertex *aTargetVertex, bool isTraversing = false);
 
     Edge *selectNextEdge(Vertex *aSourceVertex, bool isTraversing = false);
+    Edge *selectNextEdgeByPartition(int partitionStart, int partitionEnd,Vertex *aSourceVertex, bool isTraversing = false);
+
 
     /* print functions */
     void print(EdgePath &path);

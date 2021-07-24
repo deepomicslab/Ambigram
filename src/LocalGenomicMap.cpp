@@ -260,41 +260,23 @@ vector<double> LocalGenomicMap::scaleILPCoef(vector<double> aCovs) {
 
 int LocalGenomicMap::balancerILP(const char *lpFn) {
     OsiClpSolverInterface *si = new OsiClpSolverInterface();
+    int sourceSize = this->getGraph()->getMSinks()->size() - 1;
+//    int sourceSize = 2;
 
     // variable structure:
     // {segments (nSeg), junctions (nJunc), segment epsilon, junction epsilon}
     vector<Segment *> *segs = mGraph->getSegments();
     vector<Junction *> *juncs = mGraph->getJunctions();
-    int sourceSinkNum = 2 * (mGraph->getMSources()->size());
+    int sourceSinkNum = 2 * (sourceSize);
 
 
     int numSegsJuncs = segs->size() + juncs->size();
     int numEpsilons = numSegsJuncs + sourceSinkNum;    // e(t(seg), c(seg))
-    // e(t(junc), c(junc))
-    // e(source, 2)
-    // e(sink, 2)
-    // int numEpsilons = segs->size() * 3 + juncs->size() * 3 + 2;    
-    // e(t(seg), c(seg)) 
-    // e(t(seg), 0.4c(seg)) 
-    // e(t(seg), 0.4c(seg)) 
-    // e(t(junc), c(junc)) 
-    // e(t(junc), 0.4c(junc)) 
-    // e(t(junc), 0.8c(junc)) 
-    // e(source, 2) 
-    // e(sink, 2)
+
     int numVariables = numSegsJuncs + juncs->size() + numEpsilons;
     int numConstrains = segs->size() * 4 + 4 * juncs->size() +
-            sourceSinkNum;  // "2" for source & sink      ------  t(seg)+c(seg), t(seg)-c(seg), in=t(seg), out=t(seg, t(junc)+c(junc), t(junc)-c(junc), e, source, sink
+                        sourceSinkNum;  // "2" for source & sink      ------  t(seg)+c(seg), t(seg)-c(seg), in=t(seg), out=t(seg, t(junc)+c(junc), t(junc)-c(junc), e, source, sink
     // int numConstrains = segs->size() * 8 + juncs->size() * 6 + numEpsilons + 2;
-    // t(seg)+c(seg), t(seg)-c(seg)
-    // t(seg)+0.4c(seg), t(seg)-0.4c(seg)
-    // t(seg)+0.8c(seg), t(seg)-0.8c(seg)
-    // in=t(seg), out=t(seg)
-    // t(junc)+c(junc), t(junc)-c(junc)
-    // t(junc)+0.4c(junc), t(junc)-0.4c(junc)
-    // t(junc)+0.8c(junc), t(junc)-0.8c(junc)
-    // e
-    // source, sink
 
     double *objective = new double[numVariables];
     double *variableLowerBound = new double[numVariables];
@@ -306,25 +288,27 @@ int LocalGenomicMap::balancerILP(const char *lpFn) {
     CoinPackedMatrix *matrix = new CoinPackedMatrix(false, 0, 0);
 
     double hap_cov = mGraph->getHaploidDepth();
+    double v_hap_cov = mGraph->getAvgRawCoverage()/2;
+    int v_seg_start = mGraph->getVirusSegStart();
     int maxCopy = 999999;
     double max_cov = -1;
     double max_cp = -1;
     double min_cov = 999999;
     vector<double> covs;
-    // constrains for segments
+    // constrains for segments, virus and host difference
     for (int i = 0; i < segs->size(); i++) {
-        covs.push_back((*segs)[i]->getWeight()->getCoverage());
-        if ((*segs)[i]->getWeight()->getCoverage() > max_cov) {
+        covs.push_back((*segs)[i]->getWeight()->getCorrectedCoverage());
+        if ((*segs)[i]->getWeight()->getCorrectedCoverage() > max_cov) {
             // max_cov = (*segs)[i]->getWeight()->getCopyNum();
-            max_cov = (*segs)[i]->getWeight()->getCoverage();
+            max_cov = (*segs)[i]->getWeight()->getCorrectedCoverage();
         }
         if ((*segs)[i]->getWeight()->getCopyNum() > max_cp) {
             // max_cov = (*segs)[i]->getWeight()->getCopyNum();
             max_cp = (*segs)[i]->getWeight()->getCopyNum();
         }
-        if ((*segs)[i]->getWeight()->getCoverage() < min_cov) {
+        if ((*segs)[i]->getWeight()->getCorrectedCoverage() < min_cov) {
             // max_cov = (*segs)[i]->getWeight()->getCopyNum();
-            min_cov = (*segs)[i]->getWeight()->getCoverage();
+            min_cov = (*segs)[i]->getWeight()->getCorrectedCoverage();
         }
         // t_i + e_i_1 >= c_i
         CoinPackedVector constrain1;
@@ -332,9 +316,12 @@ int LocalGenomicMap::balancerILP(const char *lpFn) {
         // constrain1.insert(numSegsJuncs + juncs->size() + i, 1);  // e_i_1
         // constrainLowerBound[4 * i] = (*segs)[i]->getWeight()->getCopyNum();
         // constrainUpperBound[4 * i] = si->getInfinity();
-        constrain1.insert(i, hap_cov);  // t_i
+        if (i < v_seg_start)
+            constrain1.insert(i, hap_cov);  // t_i
+        else
+            constrain1.insert(i, v_hap_cov);
         constrain1.insert(numSegsJuncs + juncs->size() + i, 1);  // e_i_1
-        constrainLowerBound[4 * i] = (*segs)[i]->getWeight()->getCoverage();
+        constrainLowerBound[4 * i] = (*segs)[i]->getWeight()->getCorrectedCoverage();
         constrainUpperBound[4 * i] = si->getInfinity();
         matrix->appendRow(constrain1);
 
@@ -344,43 +331,14 @@ int LocalGenomicMap::balancerILP(const char *lpFn) {
         // constrain2.insert(numSegsJuncs + juncs->size() + i, -1);
         // constrainLowerBound[4 * i + 1] = -1 * si->getInfinity();
         // constrainUpperBound[4 * i + 1] = (*segs)[i]->getWeight()->getCopyNum();
-        constrain2.insert(i, hap_cov);
+        if (i < v_seg_start)
+            constrain2.insert(i, hap_cov);  // t_i
+        else
+            constrain2.insert(i, v_hap_cov);
         constrain2.insert(numSegsJuncs + juncs->size() + i, -1);
         constrainLowerBound[4 * i + 1] = -1 * si->getInfinity();
-        constrainUpperBound[4 * i + 1] = (*segs)[i]->getWeight()->getCoverage();
+        constrainUpperBound[4 * i + 1] = (*segs)[i]->getWeight()->getCorrectedCoverage();
         matrix->appendRow(constrain2);
-
-        // // t_i + 0.4*c_i*e_i_2 >= c_i
-        // CoinPackedVector constrain3;
-        // constrain3.insert(i, 1);  // t_i
-        // constrain3.insert(numSegsJuncs + 3 * i + 1, 0.4 * (*segs)[i]->getWeight()->getCopyNum());  // e_i_2
-        // constrainLowerBound[8 * i + 2] = (*segs)[i]->getWeight()->getCopyNum();
-        // constrainUpperBound[8 * i + 2] = si->getInfinity();
-        // matrix->appendRow(constrain3);
-
-        // // t_i - 0.4*c_i*e_i_2 <= c_i
-        // CoinPackedVector constrain4;
-        // constrain4.insert(i, 1);
-        // constrain4.insert(numSegsJuncs + 3 * i + 1, -0.4 * (*segs)[i]->getWeight()->getCopyNum());
-        // constrainLowerBound[8 * i + 3] = -1 * si->getInfinity();
-        // constrainUpperBound[8 * i + 3] = (*segs)[i]->getWeight()->getCopyNum();
-        // matrix->appendRow(constrain4);
-
-        // // t_i + 0.8*c_i*e_i_3 >= c_i
-        // CoinPackedVector constrain5;
-        // constrain5.insert(i, 1);  // t_i
-        // constrain5.insert(numSegsJuncs + 3 * i + 2, 0.8 * (*segs)[i]->getWeight()->getCopyNum());  // e_i_3
-        // constrainLowerBound[8 * i + 4] = (*segs)[i]->getWeight()->getCopyNum();
-        // constrainUpperBound[8 * i + 4] = si->getInfinity();
-        // matrix->appendRow(constrain5);
-
-        // // t_i - 0.8*c_i*e_i_2 <= c_i
-        // CoinPackedVector constrain6;
-        // constrain6.insert(i, 1);
-        // constrain6.insert(numSegsJuncs + 3 * i + 2, -0.8 * (*segs)[i]->getWeight()->getCopyNum());
-        // constrainLowerBound[8 * i + 5] = -1 * si->getInfinity();
-        // constrainUpperBound[8 * i + 5] = (*segs)[i]->getWeight()->getCopyNum();
-        // matrix->appendRow(constrain6);
 
         // constrains for in=out=copynum
         vector<int> visitedIdx;
@@ -461,22 +419,22 @@ int LocalGenomicMap::balancerILP(const char *lpFn) {
 
     // constrains for junctions
     for (int i = 0; i < juncs->size(); i++) {
-        covs.push_back((*juncs)[i]->getWeight()->getCoverage());
-        if ((*juncs)[i]->getWeight()->getCoverage() > max_cov) {
+        covs.push_back((*juncs)[i]->getWeight()->getCorrectedCoverage());
+        if ((*juncs)[i]->getWeight()->getCorrectedCoverage() > max_cov) {
             // max_cov = (*juncs)[i]->getWeight()->getCopyNum();
-            max_cov = (*juncs)[i]->getWeight()->getCoverage();
+            max_cov = (*juncs)[i]->getWeight()->getCorrectedCoverage();
         }
         if ((*juncs)[i]->getWeight()->getCopyNum() > max_cp) {
             // max_cov = (*juncs)[i]->getWeight()->getCopyNum();
             max_cp = (*juncs)[i]->getWeight()->getCopyNum();
         }
-        if ((*juncs)[i]->getWeight()->getCoverage() < min_cov) {
+        if ((*juncs)[i]->getWeight()->getCorrectedCoverage() < min_cov) {
             // max_cov = (*juncs)[i]->getWeight()->getCopyNum();
-            min_cov = (*juncs)[i]->getWeight()->getCoverage();
+            min_cov = (*juncs)[i]->getWeight()->getCorrectedCoverage();
         }
         // t_i - c_ix_i + e_i_1 >= 0
         // double copy = (*juncs)[i]->getWeight()->getCopyNum() + 0.01;
-        double cov = (*juncs)[i]->getWeight()->getCoverage() + 0.05;
+        double cov = (*juncs)[i]->getWeight()->getCorrectedCoverage() + 0.05;
         CoinPackedVector constrain1;
         // constrain1.insert(segs->size() + i, 1);
         // constrain1.insert(numSegsJuncs + i, -copy);
@@ -567,20 +525,20 @@ int LocalGenomicMap::balancerILP(const char *lpFn) {
     auto sources = mGraph->getMSources();
     auto sinks = mGraph->getMSinks();
 
-    for(int i = 0; i < mGraph->getMSources()->size();i++) {
+    for (int i = 0; i < sourceSize; i++) {
         CoinPackedVector constrainSource;
         CoinPackedVector constrainSink;
         constrainSource.insert((*sources)[i]->getId() - 1, 1);
-        constrainSource.insert(numVariables - 2*(i+1), -1);
+        constrainSource.insert(numVariables - 2 * (i + 1), -1);
         // cout << mGraph->getExpectedPloidy() << endl;
-        constrainLowerBound[numConstrains - 2*(i+1)] = mGraph->getExpectedPloidy();
-        constrainUpperBound[numConstrains - 2*(i+1)] = mGraph->getExpectedPloidy();
+        constrainLowerBound[numConstrains - 2 * (i + 1)] = mGraph->getExpectedPloidy();
+        constrainUpperBound[numConstrains - 2 * (i + 1)] = mGraph->getExpectedPloidy();
         matrix->appendRow(constrainSource);
 
         constrainSink.insert((*sinks)[i]->getId() - 1, 1);
-        constrainSink.insert(numVariables - i - 1, -1);
-        constrainLowerBound[numConstrains - i - 1] = mGraph->getExpectedPloidy();
-        constrainUpperBound[numConstrains - i - 1] = mGraph->getExpectedPloidy();
+        constrainSink.insert(numVariables - 2*i - 1, -1);
+        constrainLowerBound[numConstrains - 2*i - 1] = mGraph->getExpectedPloidy();
+        constrainUpperBound[numConstrains - 2*i - 1] = mGraph->getExpectedPloidy();
         matrix->appendRow(constrainSink);
     }
 //    CoinPackedVector constrainSource;
@@ -722,12 +680,12 @@ int LocalGenomicMap::balancerILP(const char *lpFn) {
         // variableUpperBound[numSegsJuncs + 3 * segs->size() + 3 * i + 2] = si->getInfinity();
     }
     cout << "LU junc done" << endl;
-    for(int i = 0; i < mGraph->getMSources()->size();i++) {
-        variableLowerBound[numVariables - 2*(i+1)] = 0;
-        variableUpperBound[numVariables - 2*(i+1)] = si->getInfinity();
+    for (int i = 0; i < sourceSize; i++) {
+        variableLowerBound[numVariables - 2 * (i + 1)] = 0;
+        variableUpperBound[numVariables - 2 * (i + 1)] = si->getInfinity();
         //  variableUpperBound[numVariables - 2] = 0;
-        variableLowerBound[numVariables - i - 1] = 0;
-        variableUpperBound[numVariables - i - 1] = si->getInfinity();
+        variableLowerBound[numVariables - 2*i - 1] = 0;
+        variableUpperBound[numVariables - 2*i - 1] = si->getInfinity();
     }
 //    variableLowerBound[numVariables - 2] = 0;
 //    variableUpperBound[numVariables - 2] = si->getInfinity();
@@ -1000,7 +958,8 @@ bool LocalGenomicMap::doesPathExists(Vertex *aStartVertex, Vertex *aEndVertex) {
     Vertex *startVertex = aStartVertex;
     VertexPath vertexStack;
     vertexStack.push_back(startVertex);
-    Edge *nextEdge = this->selectNextEdge(startVertex);
+    auto partitionPair = findPartition(aStartVertex->getId());
+    Edge *nextEdge = this->selectNextEdgeByPartition(partitionPair.first, partitionPair.second, startVertex);
     while (true) {
         if (nextEdge == NULL) {
             vertexStack.pop_back();
@@ -1008,7 +967,7 @@ bool LocalGenomicMap::doesPathExists(Vertex *aStartVertex, Vertex *aEndVertex) {
                 break;
             } else {
                 startVertex = vertexStack.back();
-                nextEdge = this->selectNextEdge(startVertex);
+                nextEdge = this->selectNextEdgeByPartition(partitionPair.first, partitionPair.second, startVertex);
             }
         } else {
             Vertex *nextVertex = nextEdge->getTarget();
@@ -1032,7 +991,7 @@ bool LocalGenomicMap::doesPathExists(Vertex *aStartVertex, Vertex *aEndVertex) {
             // nextEdge->getComplementEdge()->setVisited();
             vertexStack.push_back(nextVertex);
             startVertex = nextVertex;
-            nextEdge = this->selectNextEdge(startVertex);
+            nextEdge = this->selectNextEdgeByPartition(partitionPair.first, partitionPair.second, startVertex);
         }
     }
     mGraph->resetJunctionVisitFlag();
@@ -1934,6 +1893,7 @@ void LocalGenomicMap::checkReachability(JunctionDB *aJuncDB, bool verbose) {
     VertexPath backwardSinkNotReachableVertices;
     VertexPath forwardSourceNotReachableVertices;
     VertexPath forwardSinkNotReachableVertices;
+    int i = 0;
     do {
         backwardSourceNotReachableVertices.clear();
         backwardSinkNotReachableVertices.clear();
@@ -1951,7 +1911,8 @@ void LocalGenomicMap::checkReachability(JunctionDB *aJuncDB, bool verbose) {
             isSinkSourceConnectedOriginally = true;
         }
         for (Segment *seg: *(mGraph->getSegments())) {
-            if (seg == mGraph->getFirstSource() || seg == mGraph->getFirstSink()) {
+            if (std::count(mGraph->getMSources()->begin(), mGraph->getMSources()->end(), seg)
+                || std::count(mGraph->getMSinks()->begin(), mGraph->getMSinks()->end(), seg)) {
                 continue;
             }
 
@@ -1967,43 +1928,74 @@ void LocalGenomicMap::checkReachability(JunctionDB *aJuncDB, bool verbose) {
             VertexPath segV;
             segV.push_back(seg->getPositiveVertex());
             segV.push_back(seg->getNegativeVertex());
-            for (Vertex *v : segV) {
-                // cout << "source+ -> " << v->getInfo() << endl;
-                bool isBackwardSourceReachable = this->doesPathExists(mGraph->getFirstSource()->getPositiveVertex(), v);
-                // cout << "sink- -> " << v->getInfo() << endl;
-                bool isBackwardSinkReachable = this->doesPathExists(mGraph->getFirstSink()->getNegativeVertex(), v);
-                // cout << v->getInfo() << " -> source-" << endl;
-                bool isForwardSourceReachable = this->doesPathExists(v, mGraph->getFirstSource()->getNegativeVertex());
-                // cout << v->getInfo() << " -> sink+" << endl;
-                bool isForwardSinkReachable = this->doesPathExists(v, mGraph->getFirstSink()->getPositiveVertex());
-                if (!isBackwardSourceReachable && !isForwardSinkReachable
-                    && !isBackwardSinkReachable && !isForwardSourceReachable) {
-                    if (v->getDir() == '+') {
-                        backwardSourceNotReachableVertices.push_back(v);
-                    } else {
-                        backwardSinkNotReachableVertices.push_back(v);
+            auto segPartitionPair = findPartition(seg->getId());
+//            如果seg是病毒seg那么对任意第一个定点reachable就可以, 否则需要在自己的partition内reachable
+            if (segPartitionPair.first == 0) {
+                auto sources = this->mGraph->getMSources();
+                auto sinks = this->mGraph->getMSinks();
+                for (Vertex *v : segV) {
+                    bool finalReachable = false;
+                    for (int i = 0; i < sources->size(); i++) {
+                        auto tSource = (*sources)[i];
+                        auto tSinks = (*sinks)[i];
+                        // cout << "source+ -> " << v->getInfo() << endl;
+                        bool isBackwardSourceReachable = this->doesPathExists(tSource->getPositiveVertex(), v);
+                        // cout << "sink- -> " << v->getInfo() << endl;
+                        bool isBackwardSinkReachable = this->doesPathExists(tSinks->getNegativeVertex(), v);
+                        // cout << v->getInfo() << " -> source-" << endl;
+                        bool isForwardSourceReachable = this->doesPathExists(v, tSource->getNegativeVertex());
+                        // cout << v->getInfo() << " -> sink+" << endl;
+                        bool isForwardSinkReachable = this->doesPathExists(v, tSinks->getPositiveVertex());
+                        if (vReachable(isBackwardSourceReachable, isForwardSinkReachable, isBackwardSinkReachable,
+                                       isForwardSourceReachable)) {
+                            finalReachable = true;
+                            break;
+                        }
+                    }
+                    if(!finalReachable) {
+                        cout << v->getInfo()<<"-----\n";
                     }
                 }
-                if ((isBackwardSourceReachable ^ isForwardSinkReachable) != 0) {
-                    if (!isBackwardSourceReachable) {
-                        backwardSourceNotReachableVertices.push_back(v);
-                    } else {
-                        forwardSinkNotReachableVertices.push_back(v);
+            } else {
+                auto segPartitionSource = this->mGraph->getSegmentById(segPartitionPair.first);
+                auto segPartitionSink = this->mGraph->getSegmentById(segPartitionPair.second);
+//                auto segPartitionSource = this->mGraph->getFirstSource();
+//                auto segPartitionSink = this->mGraph->getFirstSink();
+                for (Vertex *v : segV) {
+                    // cout << "source+ -> " << v->getInfo() << endl;
+                    bool isBackwardSourceReachable = this->doesPathExists(segPartitionSource->getPositiveVertex(), v);
+                    // cout << "sink- -> " << v->getInfo() << endl;
+                    bool isBackwardSinkReachable = this->doesPathExists(segPartitionSink->getNegativeVertex(), v);
+                    // cout << v->getInfo() << " -> source-" << endl;
+                    bool isForwardSourceReachable = this->doesPathExists(v, segPartitionSource->getNegativeVertex());
+                    // cout << v->getInfo() << " -> sink+" << endl;
+                    bool isForwardSinkReachable = this->doesPathExists(v, segPartitionSink->getPositiveVertex());
+                    if (!isBackwardSourceReachable && !isForwardSinkReachable
+                        && !isBackwardSinkReachable && !isForwardSourceReachable) {
+                        if (v->getDir() == '+') {
+                            backwardSourceNotReachableVertices.push_back(v);
+                        } else {
+                            backwardSinkNotReachableVertices.push_back(v);
+                        }
                     }
-                }
-                if ((isBackwardSinkReachable ^ isForwardSourceReachable) != 0) {
-                    if (!isBackwardSinkReachable) {
-                        backwardSinkNotReachableVertices.push_back(v);
-                    } else {
-                        forwardSourceNotReachableVertices.push_back(v);
+                    if ((isBackwardSourceReachable ^ isForwardSinkReachable) != 0) {
+                        if (!isBackwardSourceReachable) {
+                            backwardSourceNotReachableVertices.push_back(v);
+                        } else {
+                            forwardSinkNotReachableVertices.push_back(v);
+                        }
+                    }
+                    if ((isBackwardSinkReachable ^ isForwardSourceReachable) != 0) {
+                        if (!isBackwardSinkReachable) {
+                            backwardSinkNotReachableVertices.push_back(v);
+                        } else {
+                            forwardSourceNotReachableVertices.push_back(v);
+                        }
                     }
                 }
             }
         }
-//        if (!isSinkSourceConnectedOriginally) {
-//            delete mGraph->getJunctions()->back();
-//            mGraph->getJunctions()->pop_back();
-//        }
+
         // mGraph->print();
 
         if (verbose) {
@@ -2281,6 +2273,30 @@ Edge *LocalGenomicMap::selectPrevEdge(Vertex *aTargetVertex, bool isTraversing) 
     return NULL;
 }
 
+Edge *LocalGenomicMap::selectNextEdgeByPartition(int partitionStart, int partitionEnd, Vertex *aSourceVertex,
+                                                 bool isTraversing) {
+    for (Edge *e : *(aSourceVertex->getEdgesAsSource())) {
+        int eTargetId = e->getTarget()->getId();
+        auto eTargetPartitionPair = findPartition(eTargetId);
+        int lastPartitionId = this->getGraph()->getMSinks()->back()->getId();
+        if (eTargetPartitionPair.first != 0 &&
+            (eTargetPartitionPair.first != partitionStart && eTargetPartitionPair.second != partitionEnd))
+            continue;
+        if (!e->isVisited()) {
+            if (isTraversing) {
+                if (e->hasCopy()) {
+                    return e;
+                } else {
+                    continue;
+                }
+            } else {
+                return e;
+            }
+        }
+    }
+    return NULL;
+}
+
 Edge *LocalGenomicMap::selectNextEdge(Vertex *aSourceVertex, bool isTraversing) {
     for (Edge *e : *(aSourceVertex->getEdgesAsSource())) {
         if (!e->isVisited()) {
@@ -2486,7 +2502,8 @@ Edge *LocalGenomicMap::traverseNextEdgeByPartition(Vertex *aStartVertex, VertexP
             for (Edge *e: *(aStartVertex->getEdgesAsSource())) {
                 if (e->hasCopy()) {
                     int eTargetId = e->getTarget()->getId();
-                    auto isInPartition = this->checkPartition(eTargetId, partitionStart, partitionEnd);
+//                    TODO 两个check需要更改
+                    auto isInPartition = this->checkCommon(eTargetId, partitionStart, partitionEnd) || this->checkPartition(eTargetId, partitionStart, partitionEnd);
                     if (isInPartition) {
                         entry = rec->findForwardEntry(e->getTarget()->getSegment()->getChrom(),
                                                       e->getTarget()->getStart(),
@@ -2552,13 +2569,19 @@ Edge *LocalGenomicMap::traverseWithHic(VertexPath *vp) {
 }
 
 pair<int, int> LocalGenomicMap::findPartition(int id) {
+    if(id == 7) {
+        int m = 0;
+    }
     auto sources = mGraph->getMSources();
     auto sinks = mGraph->getMSinks();
     for (int i = 0; i < sources->size(); i++) {
         auto sId = (*sources)[i]->getId();
         auto eId = (*sinks)[i]->getId();
         if (id >= sId && id <= eId) {
-            return make_pair(sId, eId);
+            if (sId == sources->back()->getId()) {
+                return make_pair(0,0);
+            } else
+                return make_pair(sId, eId);
         }
     }
     return make_pair(0, 0);
@@ -2727,8 +2750,8 @@ int LocalGenomicMap::longPathLenInGraph(VertexPath *longPath) {
 
 bool LocalGenomicMap::checkPartition(int eTargetId, int *partitionStart, int *partitionEnd) {
 //    return true;
-    int lastPartitionId = mGraph->getMSinks()->back()->getId();
-    if (eTargetId > lastPartitionId || (eTargetId >= *partitionStart && eTargetId <= *partitionEnd)) {
+    int lastPartitionId = mGraph->getMSources()->back()->getId();
+    if (eTargetId >= lastPartitionId || (eTargetId >= *partitionStart && eTargetId <= *partitionEnd)) {
         return true;
     } else {
         auto partitionPair = findPartition(eTargetId);
@@ -2756,6 +2779,22 @@ bool LocalGenomicMap::checkCommon(int eTargetId, int *partitionStart, int *parti
             return true;
         } else return false;
     }
+}
+
+bool
+LocalGenomicMap::vReachable(bool isBackwardSourceReachable, bool isForwardSinkReachable, bool isBackwardSinkReachable,
+                            bool isForwardSourceReachable) {
+    if (!isBackwardSourceReachable && !isForwardSinkReachable
+        && !isBackwardSinkReachable && !isForwardSourceReachable) {
+        return false;
+    }
+    if ((isBackwardSourceReachable ^ isForwardSinkReachable) != 0) {
+        return false;
+    }
+    if ((isBackwardSinkReachable ^ isForwardSourceReachable) != 0) {
+        return false;
+    }
+    return true;
 }
 // void LocalGenomicMap::traverseGraph() {
 //     while (!mGraph->isCopyExhaustive()) {
@@ -2857,18 +2896,19 @@ void LocalGenomicMap::divideCircuits() {
 //    divide circuits to each partition, for common peace, divide averagely
     auto sources = mGraph->getMSources();
     int index = 0;
-    int size = sources->size();
-    for (auto seg : *sources) {
+    int size = sources->size() - 1;
+    for (int i = 0; i < size ; i ++) {
+        auto seg = (*sources)[i];
         (*dividedCircuits)[seg->getId()] = new vector<VertexPath *>();
     }
-    for (int i = 0 ; i < mCircuits->size(); i++) {
+    for (int i = 0; i < mCircuits->size(); i++) {
         auto circuit = (*mCircuits)[i];
         auto startId = (*circuit)[0]->getId();
         auto pair = this->findPartition(startId);
-        if (pair.first != 0){
+        if (pair.first != 0) {
             (*dividedCircuits)[pair.first]->push_back(circuit);
         } else {
-            int partitionId = (*sources)[index%size]->getId();
+            int partitionId = (*sources)[index % size]->getId();
             (*dividedCircuits)[partitionId]->push_back(circuit);
             index++;
         }
@@ -2882,7 +2922,7 @@ void LocalGenomicMap::writeCircuits(const char *outFn) {
         cout << "Cannot open file " << outFn << ": no such file or directory" << endl;
         exit(1);
     }
-    for (auto const& partitions : *dividedCircuits) {
+    for (auto const &partitions : *dividedCircuits) {
         fout << "partition: " << partitions.first << "\n";
         for (auto circuits : *(partitions.second)) {
             for (Vertex *v : *circuits) {
@@ -3041,7 +3081,7 @@ void LocalGenomicMap::writeHaploids(const char *outFn) {
         cout << "Cannot open file " << outFn << " : no such file or directory" << endl;
         exit(1);
     }
-    for (auto const& partitionHP: *dividedHaploids) {
+    for (auto const &partitionHP: *dividedHaploids) {
         fout << "partition: " << partitionHP.first << "\n";
         auto hps = partitionHP.second;
         for (VertexPath *pathV : *hps) {

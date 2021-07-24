@@ -24,13 +24,16 @@ Graph::Graph() {
 
 Graph::Graph(const char *aFilename) {
     mPurity = -1;
-    mAvgPloidy = -1;
+    mAvgPloidy = 0;
     mAvgTumorPloidy = -1;
+    mAvgCoverageRaw = -1;
+    mAvgVirusDP = -1;
 
     mSegments = new vector<Segment *>();
     mJunctions = new vector<Junction *>();
     mSources = new vector<Segment *>();
     mSinks = new vector<Segment *>();
+    mAvgCoverages = new vector<double>();
     this->readGraph(aFilename);
 }
 
@@ -49,6 +52,10 @@ int Graph::getJunctionIndexByEdge(Edge *aEdge) {
 }
 
 int Graph::getExpectedPloidy() { return mExpectedPloidy; }
+int Graph::getExpectedPloidy2(int i) {
+    int * r = new int [8,2,2,2];
+    return r[i];
+}
 
 double Graph::getPurity() { return mPurity; }
 
@@ -58,6 +65,8 @@ double Graph::getAvgTumorPloidy() { return mAvgTumorPloidy; }
 
 double Graph::getAvgCoverage() { return mAvgCoverage; }
 
+int Graph::getVirusSegStart() { return mVirusSegStart;}
+
 double Graph::getAvgRawCoverage() { return mAvgCoverageRaw; }
 
 double Graph::getAvgCoverageJunc() { return mAvgCoverageJunc; }
@@ -65,6 +74,7 @@ double Graph::getAvgCoverageJunc() { return mAvgCoverageJunc; }
 double Graph::getAvgRawCoverageJunc() { return mAvgCoverageRawJunc; }
 
 double Graph::getHaploidDepth() { return mHaploidDepth; }
+double Graph::getRatio() {return mRatio;}
 
 void Graph::setPurity(double aPurity) { mPurity = aPurity; }
 
@@ -78,7 +88,7 @@ void Graph::setAvgRawCoverage(double aAvgRawCoverage) { mAvgCoverageRaw = aAvgRa
 
 Segment *Graph::getFirstSource() { return (*mSources)[0]; }
 
-Segment *Graph::getFirstSink() { return (*mSources)[0]; }
+Segment *Graph::getFirstSink() { return (*mSinks)[0]; }
 
 vector<Segment *> *Graph::getSegments() { return mSegments; }
 
@@ -118,9 +128,19 @@ void Graph::readGraph(const char *aFilename) {
         }
         if (strcmp(token, "SAMPLE_NAME") == 0) {
             mSampleName = string(strtok(NULL, " "));
-        } else if (strcmp(token, "AVG_SEG_DP") == 0) {
-            mAvgCoverage = atof(strtok(NULL, " "));
-            mAvgCoverageRaw = mAvgCoverage;
+        } else if (strcmp(token, "AVG_CHR_SEG_DP") == 0) {
+            token = strtok(NULL, " ");
+            token = strtok(token, ",");
+            while (token != NULL) {
+                mAvgCoverages->push_back(atof(token));
+                token = strtok(NULL, ",");
+            }
+        } else if (strcmp(token, "AVG_WHOLE_HOST_DP") == 0) {
+            mAvgCoverageRaw = atof(strtok(NULL, " "));
+        } else if (strcmp(token, "AVG_VIRUS_SEG_DP") == 0) {
+            mAvgVirusDP = atof(strtok(NULL, " "));
+        } else if (strcmp(token, "VIRUS_START") == 0) {
+            mVirusSegStart = atoi(strtok(NULL, " "));
         } else if (strcmp(token, "AVG_JUNC_DP") == 0) {
             mAvgCoverageJunc = atof(strtok(NULL, " "));
             mAvgCoverageRawJunc = mAvgCoverageJunc;
@@ -300,7 +320,9 @@ void Graph::calculateHapDepth() {
             if (mPurity < 0) {
                 cout << "WARN: no purity information provided, use the given AVG_PLOIDY" << endl;
             } else {
+                double ratio = 1 - (mPurity * mAvgTumorPloidy)/((mPurity * mAvgTumorPloidy) + (1 - mPurity) * 2 );
                 double avgPloidy = mPurity * mAvgTumorPloidy + (1 - mPurity) * 2;
+                mRatio = ratio;
                 if (abs(mAvgPloidy - avgPloidy) <= 0.1) {
                     cout
                             << "calculated AVG_PLOIDY using AVG_TUMOR_PLOIDY is close enough to the given AVG_PLOIDY, use the given AVG_PLOIDY"
@@ -329,8 +351,18 @@ void Graph::calculateHapDepth() {
 }
 
 void Graph::calculateCopyNum() {
+    double ratio = getRatio();
+    double hDP = getHaploidDepth();
     for (Segment *seg : *mSegments) {
-        double segCopy = (seg->getWeight()->getCoverage() - (1 - mPurity) * mAvgCoverage) / (mPurity * mHaploidDepth);
+//        TODO 判断virus seg
+        double segCopy;
+        if(seg->getId() >= mVirusSegStart) {
+            segCopy = seg->getWeight()->getCoverage() / mAvgCoverageRaw * 2;
+        } else {
+            double depthT = seg->getWeight()->getCoverage() - mAvgCoverageRaw * ratio;
+            seg->getWeight()->setCorrectedCoverage(depthT);
+            segCopy = depthT/hDP;
+        }
         // seg->getWeight()->setAdjustedCoverage(max(segAdjustedCoverage, 0.0));
         // seg->getWeight()->setCoverage(seg->getWeight()->getAdjustedCoverage());
         seg->getWeight()->setCopyNum(max(segCopy, 0.0));
@@ -341,9 +373,12 @@ void Graph::calculateCopyNum() {
         double juncCopy;
         if (junc->isInferred()) {
             cout << mHaploidDepth << endl;
-            junc->getWeight()->setCoverage(mHaploidDepth);
+//            junc->getWeight()->setCoverage(hDP);
         }
-        juncCopy = junc->getWeight()->getCoverage() / mHaploidDepth;
+//        juncCopy = junc->getWeight()->getCoverage() / mHaploidDepth;
+        double depthT = junc->getWeight()->getCoverage() - mAvgCoverageRaw * ratio;
+        juncCopy = depthT/hDP;
+        junc->getWeight()->setCorrectedCoverage(depthT);
         // junc->getWeight()->setAdjustedCoverage(max(juncAdjustedCoverage, 0.0));
         // junc->getWeight()->setCoverage(junc->getWeight()->getAdjustedCoverage());
         junc->getWeight()->setCopyNum(max(juncCopy, 0.0));

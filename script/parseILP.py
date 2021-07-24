@@ -1,11 +1,15 @@
 def parse_ilp_result(filename):
     d = {}
     with open(filename) as fin:
-        for line in fin.readlines()[1:]:
-            line = line[:-1].split()
+        for l in fin.readlines()[1:]:
+            line = l[:-1].split()
             #             print(line)
-            dd = {int(line[1][1:]): float(line[2])}
-            #             print(dd)
+            if "*" in l:
+                print(line[2][1:])
+                dd = {int(line[2][1:]): float(line[3])}
+            else:
+                dd = {int(line[1][1:]): float(line[2])}
+            print(dd)
             d.update(dd)
     return d
 
