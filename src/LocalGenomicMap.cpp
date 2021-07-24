@@ -10,8 +10,8 @@
 
 #include "LocalGenomicMap.hpp"
 #include "Exceptions.hpp"
-#include "coin/CbcModel.hpp"
-#include "coin/OsiClpSolverInterface.hpp"
+#include <coin/CbcModel.hpp>
+#include <coin/OsiClpSolverInterface.hpp>
 
 using namespace std;
 
