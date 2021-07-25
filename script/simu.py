@@ -30,21 +30,24 @@ def main():
     parser.add_argument('--simple_par',
                         required=True,
                         help='simple_par')
+    parser.add_argument('--depth',
+                        required=True,
+                        help='simple_par')
     args = parser.parse_args()
     if not os.path.exists(args.out):
         os.mkdir(args.out)
     # choose host chr
     # mk_fa(args.host_ref, host_chrs, args.v_ref, args.v_chr, args.out)
     # generate_var(host_chrs, args.v_chr, v_len,args.out,args.v_ref)
-    simulate(args.mutforge, args.host_ref, args.v_ref,args.simple_par, args.out, args.script_root)
+    simulate(args.mutforge, args.host_ref, args.v_ref,args.simple_par, args.out, args.script_root, args.depth)
 
-def run_local(out_dir,script_root,vc,v_len,selected_chrs):
+def run_local(out_dir,script_root,vc,v_len,selected_chrs,depth):
     cmd_seek="bash {}/seek.sh {} {}.lib1.bam {}/mix.fa".format(script_root,out_dir,out_dir,out_dir)
     cmd_bps = "{} {}/main.py bpsmap -l {}.seek.sv.txt -o {} -v {} --v_len {} --h_chrs {} --out_bed {}.bed".format(PYTHON, script_root,out_dir,out_dir,vc,v_len, ','.join(selected_chrs),out_dir)
     bed_file = out_dir+".bed"
     cmd_depth= "{} depth -aa -b {}.bed {}.lib1.bam | bgzip -c > {}.depth.gz && tabix -s 1 -b 2 -e 2 {}.depth.gz".format(SAMTOOLS,out_dir,out_dir,out_dir,out_dir)
     cmd_config = "{} {}/main.py config -f {}.seek.sv.txt -b {}.lib1.bam -m {}.bps -j {}.junc -d {}.txt.gz  -s {} -e 5 -c {}.lh -g {}.seg -p 2 -S --v_chr {} --avg_whole_dp {}\
-         --v_len {} --h_chrs {}".format(PYTHON,script_root, out_dir,out_dir,out_dir,out_dir,out_dir,out_dir,out_dir,out_dir,vc,40,v_len,','.join(selected_chrs))
+         --v_len {} --h_chrs {}".format(PYTHON,script_root, out_dir,out_dir,out_dir,out_dir,out_dir,out_dir,out_dir,out_dir,vc,depth,v_len,','.join(selected_chrs))
     cmd_check = "{} --op check --juncdb {}.junc --in_lh {}.lh --out_lh {}.checked.lh --lp_prefix {} --verbose".format(LOCALHAP, out_dir, out_dir, out_dir, out_dir)
     cmd_cbc = "{} {}.lp solve solu {}.sol".format(CBC,out_dir,out_dir)
     cmd_parse = "{} {}/main.py parseILP -i {}.checked.lh -s {}.sol -o {}.balanced.lh".format(PYTHON, script_root,out_dir,out_dir,out_dir)
@@ -59,7 +62,7 @@ def run_local(out_dir,script_root,vc,v_len,selected_chrs):
     execmd(cmd_solve)
 
 
-def simulate(mutforge, host_ref, v_ref,simple_par, out, script_root):
+def simulate(mutforge, host_ref, v_ref,simple_par, out, script_root,depth):
     ref_host = Fasta(host_ref)
     ref_v = Fasta(v_ref)
     host_chrs = list(ref_host.keys())[0:-3]
@@ -92,7 +95,7 @@ def simulate(mutforge, host_ref, v_ref,simple_par, out, script_root):
             # cmd_parse = "{} {}/main.py parseILP -i {}.checked.lh -s {}.sol -o {}.balanced.lh".format(python, script_root,out_dir,out_dir,out_dir)
             # cmd_solve = "{} --op solve --juncdb {}.junc --in_lh {}.balanced.lh --circuits {}.circuits --hap {}.haps --verbose".format(localhap,out_dir,out_dir,out_dir,out_dir)
             execmd(cmd_mu)
-            run_local(out_dir,script_root,vc,v_len,selected_chrs)
+            run_local(out_dir,script_root,vc,v_len,selected_chrs,depth)
             # execmd(cmd_seek)
 def mk_fa(host_ref,host_chrs,v_ref,v_chr,out):
     # extract
