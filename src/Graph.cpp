@@ -222,7 +222,7 @@ void Graph::readGraph(const char *aFilename) {
 
 void Graph::writeGraph(const char *aFilename) {
     ofstream fout(aFilename);
-    fout << "SAMPLE_NAME " << mSampleName << endl
+    fout << "SAMPLE_NAME " << "TEST" << endl
          << "AVG_SEG_DP " << mAvgCoverage << endl
          << "AVG_JUNC_DP " << mAvgCoverageJunc << endl
          << "PURITY " << mPurity << endl
