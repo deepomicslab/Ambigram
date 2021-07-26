@@ -2504,7 +2504,31 @@ Edge *LocalGenomicMap::traverseNextEdgeByPartition(Vertex *aStartVertex, VertexP
                 if (e->hasCopy()) {
                     int eTargetId = e->getTarget()->getId();
 //                    TODO 两个check需要更改
-                    auto isInPartition = this->checkCommon(eTargetId, partitionStart, partitionEnd) || this->checkPartition(eTargetId, partitionStart, partitionEnd);
+                    auto isInPartition = this->checkCommon(eTargetId, partitionStart, partitionEnd);
+                    if (isInPartition) {
+                        entry = rec->findForwardEntry(e->getTarget()->getSegment()->getChrom(),
+                                                      e->getTarget()->getStart(),
+                                                      e->getTarget()->getDir());
+                        if (entry != nullptr) {
+                            if (entry->support > support) {
+                                support = entry->support;
+                                selectedEdge = e;
+                                return selectedEdge;
+                            }
+                        } else {
+                            if (support == 0) {
+                                selectedEdge = e;
+                                return selectedEdge;
+                            }
+                        }
+                    }
+                }
+            }
+            for (Edge *e: *(aStartVertex->getEdgesAsSource())) {
+                if (e->hasCopy()) {
+                    int eTargetId = e->getTarget()->getId();
+//                    TODO 两个check需要更改
+                    auto isInPartition = this->checkPartition(eTargetId, partitionStart, partitionEnd);
                     if (isInPartition) {
                         entry = rec->findForwardEntry(e->getTarget()->getSegment()->getChrom(),
                                                       e->getTarget()->getStart(),
