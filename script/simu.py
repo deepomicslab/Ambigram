@@ -3,12 +3,15 @@ import sys
 import os
 import random
 import argparse
+import logging
+
 PYTHON = "~/miniconda3/envs/py3/bin/python"
 LOCALHAP = "/home/gzpan2/app/localhaptgs/debug/localHap"
 SAMTOOLS = "~/app/samtools/bin/samtools"
 CBC = "~/miniconda3/envs/py2/bin/cbc"
 def execmd(cmd):
-    print("Exec: {}".format(cmd))
+    # print("Exec: {}".format(cmd))
+    logging.info(cmd)
     os.system(cmd)
 def main():
     parser = argparse.ArgumentParser()
