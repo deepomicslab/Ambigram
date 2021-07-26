@@ -4,12 +4,12 @@ import os
 import random
 import argparse
 PYTHON = "~/miniconda3/envs/py3/bin/python"
-LOCALHAP = "/home/gzpan2/app/localhaptgs/debug"
+LOCALHAP = "/home/gzpan2/app/localhaptgs/debug/localHap"
 SAMTOOLS = "~/app/samtools/bin/samtools"
 CBC = "~/miniconda3/envs/py2/bin/cbc"
 def execmd(cmd):
     print("Exec: {}".format(cmd))
-    # os.system(cmd)
+    os.system(cmd)
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--host_ref',
@@ -46,7 +46,7 @@ def run_local(out_dir,script_root,vc,v_len,selected_chrs,depth):
     cmd_bps = "{} {}/main.py bpsmap -l {}.seek.sv.txt -o {} -v {} --v_len {} --h_chrs {} --out_bed {}.bed".format(PYTHON, script_root,out_dir,out_dir,vc,v_len, ','.join(selected_chrs),out_dir)
     bed_file = out_dir+".bed"
     cmd_depth= "{} depth -aa -b {}.bed {}.lib1.bam | bgzip -c > {}.depth.gz && tabix -s 1 -b 2 -e 2 {}.depth.gz".format(SAMTOOLS,out_dir,out_dir,out_dir,out_dir)
-    cmd_config = "{} {}/main.py config -f {}.seek.sv.txt -b {}.lib1.bam -m {}.bps -j {}.junc -d {}.txt.gz  -s {} -e 5 -c {}.lh -g {}.seg -p 2 -S --v_chr {} --avg_whole_dp {}\
+    cmd_config = "{} {}/main.py config -f {}.seek.sv.txt -b {}.lib1.bam -m {}.bps -j {}.junc -d {}.depth.gz  -s {} -e 5 -c {}.lh -g {}.seg -p 2 -S --v_chr {} --avg_whole_dp {}\
          --v_len {} --h_chrs {}".format(PYTHON,script_root, out_dir,out_dir,out_dir,out_dir,out_dir,out_dir,out_dir,out_dir,vc,depth,v_len,','.join(selected_chrs))
     cmd_check = "{} --op check --juncdb {}.junc --in_lh {}.lh --out_lh {}.checked.lh --lp_prefix {} --verbose".format(LOCALHAP, out_dir, out_dir, out_dir, out_dir)
     cmd_cbc = "{} {}.lp solve solu {}.sol".format(CBC,out_dir,out_dir)
@@ -71,11 +71,11 @@ def simulate(mutforge, host_ref, v_ref,simple_par, out, script_root,depth):
         v_chrs[k] = ref_v[k][0:].end
     for vc,v_len in v_chrs.items():
         for i in range(0,6):
-            selected_chrs = random.choices(host_chrs, k=1)
+            selected_chrs = random.choices(host_chrs, k=3)
             if i > 2:
-                selected_chrs = random.choices(host_chrs, k=2)
+                selected_chrs = random.choices(host_chrs, k=3)
                 while len(set(selected_chrs)) != 2:
-                    selected_chrs = random.choices(host_chrs, k=2)
+                    selected_chrs = random.choices(host_chrs, k=3)
             if i >= 5:
                 selected_chrs = random.choices(host_chrs, k=3)
                 while len(set(selected_chrs)) != 3:
@@ -143,8 +143,8 @@ def generate_var(host_chrs,v_chr,v_len,out,fa_file):
             else:
                 # ins
                 rev = "f"
-                i_start = random.randint(500,v_len - 1500)
-                i_end = random.randint(i_start + 500,v_len)
+                i_start = random.randint(700,v_len - 1500)
+                i_end = random.randint(i_start + 500,v_len - 700)
                 while in_region(i_start, del_regions) or in_region(i_end,del_regions):
                     i_start = random.randint(100,v_len - 1500)
                     i_end = random.randint(i_start + 500,v_len)

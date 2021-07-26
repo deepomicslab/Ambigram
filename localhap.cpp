@@ -181,17 +181,17 @@ int main(int argc, char *argv[]) {
             lgm->divideCircuits();
             // g->print();
             if (verbose) {
-                lgm->printCircuits();
+               lgm->printCircuits();
             }
 
-            lgm->writeCircuits(circuitsFn);
+           lgm->writeCircuits(circuitsFn);
 
             cout << "Generating haploids..." << endl;
             g->print();
-            lgm->generateHaploids();
+           // lgm->generateHaploids();
             // // cout << "Estimated haploids: " << endl;
             // // lgm->printHaploids();
-            lgm->writeHaploids(hapFn);
+            //lgm->writeHaploids(hapFn);
             // cout << "Done" << endl;
         } catch (DuplicateJunctionException &e) {
             cout << e.what() << endl;

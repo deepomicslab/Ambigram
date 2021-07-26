@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.17)
+cmake_minimum_required(VERSION 3.10)
 project(localHapHpv)
 
 set(CMAKE_FIND_DEBUG_MODE TRUE)
@@ -12,8 +12,6 @@ set(seqGraph_DIR /home/caronkey/.apps/localLibs/share/seqGraph/cmake)
 aux_source_directory(./src LOCAL_HAP_SRC)
 include_directories(${PROJECT_SOURCE_DIR}/include)
 add_executable(localHap localhap.cpp ${LOCAL_HAP_SRC})
-add_executable(findPath findPath.cpp ${LOCAL_HAP_SRC})
 
 target_link_libraries(localHap -lCbcSolver -lCbc -lOsi -lOsiCbc -lCgl -lOsiClp -lClp -lCoinUtils -llapack -lbz2 -lz -lhts)
-target_link_libraries(findPath -lCbcSolver -lCbc -lOsi -lOsiCbc -lCgl -lOsiClp -lClp -lCoinUtils -llapack -lbz2 -lz -lhts)
 install(TARGETS localHap DESTINATION bin)

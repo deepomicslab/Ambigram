@@ -246,7 +246,7 @@ def generate_config(filename, samplename, sv, segs, depth_tabix, bam,virus_chr, 
                 preseg = seg
             output_segs.append(f'SEG H:{seg.ID}:{seg.chrom}:{seg.start}:{seg.end} {seg_depth} -1')
             # fout.write(f'SEG H:{seg.ID}:{seg.chrom}:{seg.start}:{seg.end} {get_avg_depth(depth_tabix, seg.chrom, seg.start, seg.end)} -1\n')
-        sinks.append(str(len(segs)+1))
+        sinks.append(str(len(segs)))
         ins_id = len(segs) + 1
         ins_segs = []
 
