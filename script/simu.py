@@ -143,8 +143,8 @@ def generate_var(host_chrs,v_chr,v_len,out,fa_file):
             else:
                 # ins
                 rev = "f"
-                i_start = random.randint(700,v_len - 1500)
-                i_end = random.randint(i_start + 500,v_len - 700)
+                i_start = random.randint(700,v_len - 500)
+                i_end = random.randint(i_start + 300,i_start + 700)
                 while in_region(i_start, del_regions) or in_region(i_end,del_regions):
                     i_start = random.randint(100,v_len - 1500)
                     i_end = random.randint(i_start + 500,v_len)
