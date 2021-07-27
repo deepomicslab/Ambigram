@@ -9,10 +9,13 @@ PYTHON = "~/miniconda3/envs/py3/bin/python"
 LOCALHAP = "/home/gzpan2/app/localhaptgs/debug/localHap"
 SAMTOOLS = "~/app/samtools/bin/samtools"
 CBC = "~/miniconda3/envs/py2/bin/cbc"
+pbsim = "~/app/pbsim2/src/pbsim"
+pbmodel = "~/app/pbsim2/data/P6C4.model"
+# ~/app/pbsim2/src/pbsim --depth 20 --prefix tgs --hmm_model ~/app/pbsim2/data/P6C4.model test.out.fa
 def execmd(cmd):
-    # print("Exec: {}".format(cmd))
+    print("Exec: {}".format(cmd))
     logging.info(cmd)
-    os.system(cmd)
+    # os.system(cmd)
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--host_ref',
@@ -36,13 +39,53 @@ def main():
     parser.add_argument('--depth',
                         required=True,
                         help='simple_par')
+    parser.add_argument('--host_count',
+                        required=True,
+                        type=int,
+                        help='simple_par')
+    parser.add_argument('--s_times',
+                        required=True,
+                        type=int,
+                        help='simple_par')
     args = parser.parse_args()
     if not os.path.exists(args.out):
         os.mkdir(args.out)
     # choose host chr
     # mk_fa(args.host_ref, host_chrs, args.v_ref, args.v_chr, args.out)
     # generate_var(host_chrs, args.v_chr, v_len,args.out,args.v_ref)
-    simulate(args.mutforge, args.host_ref, args.v_ref,args.simple_par, args.out, args.script_root, args.depth)
+    simulate(args.mutforge, args.host_ref, args.v_ref,args.simple_par, args.out, args.script_root, args.depth, args.host_count, args.s_times)
+# def sim_tgs(out_dir,depth = 20):
+#     cmd1 = "{} --depth {} --prefix tgs --hmm_model {} test.out.fa"
+
+def g_tgs_ref(out_dir,all_chrs, depth = 20):
+    out_fa = open(out_dir+".out.fa","w")
+    res = {}
+    for i in all_chrs:
+        res[i] = []
+    ref_host = Fasta(out_dir+".hap1.fa")
+    for k in list(ref_host.keys()):
+        if "original" in k:
+            continue
+        tmp_chr = k.split(":")[5].split("=")[1]
+        res[tmp_chr].append(k)
+    for key,v in res.items():
+        combined_fa = ""
+        for k in v:
+            combined_fa = combined_fa+str(ref_host[k][0:])
+        out_fa.write(">{}\n".format(key))
+        out_fa.write(combined_fa+"\n")
+    out_fa.close()
+#     simulate tgs
+    cmd1 = "{} --depth {} --prefix tgs --hmm_model {} {}".format(pbsim,depth, pbmodel, out_fa)
+    cmd2 = "cat tgs_*.fastq > {}.tgs.fastq".format(out_dir)
+    cmd3 = "sed -n '1~4s/^@/>/p;2~4p' {}.tgs.fastq > {}.tgs.fasta".format(out_dir, out_dir)
+    execmd(cmd1)
+    execmd(cmd2)
+    execmd(cmd3)
+
+
+
+
 
 def run_local(out_dir,script_root,vc,v_len,selected_chrs,depth):
     cmd_seek="bash {}/seek.sh {} {}.lib1.bam {}/mix.fa".format(script_root,out_dir,out_dir,out_dir)
@@ -62,10 +105,12 @@ def run_local(out_dir,script_root,vc,v_len,selected_chrs,depth):
     execmd(cmd_check)
     execmd(cmd_cbc)
     execmd(cmd_parse)
+    selected_chrs.append(vc)
+    g_tgs_ref(out_dir,selected_chrs)
     execmd(cmd_solve)
 
 
-def simulate(mutforge, host_ref, v_ref,simple_par, out, script_root,depth):
+def simulate(mutforge, host_ref, v_ref,simple_par, out, script_root,depth, host_count, s_times):
     ref_host = Fasta(host_ref)
     ref_v = Fasta(v_ref)
     host_chrs = list(ref_host.keys())[0:-3]
@@ -73,16 +118,16 @@ def simulate(mutforge, host_ref, v_ref,simple_par, out, script_root,depth):
     for k in list(ref_v.keys()):
         v_chrs[k] = ref_v[k][0:].end
     for vc,v_len in v_chrs.items():
-        for i in range(0,6):
-            selected_chrs = random.choices(host_chrs, k=3)
-            if i > 2:
-                selected_chrs = random.choices(host_chrs, k=3)
-                while len(set(selected_chrs)) != 2:
-                    selected_chrs = random.choices(host_chrs, k=3)
-            if i >= 5:
-                selected_chrs = random.choices(host_chrs, k=3)
-                while len(set(selected_chrs)) != 3:
-                    selected_chrs = random.choices(host_chrs, k=3)
+        for i in range(0,s_times):
+            # selected_chrs = random.choices(host_chrs, k=3)
+            # if i > 2:
+            selected_chrs = random.choices(host_chrs, k=host_count)
+            while len(set(selected_chrs)) != host_count:
+                selected_chrs = random.choices(host_chrs, k=host_count)
+            # if i >= 5:
+            #     selected_chrs = random.choices(host_chrs, k=3)
+            #     while len(set(selected_chrs)) != 3:
+            #         selected_chrs = random.choices(host_chrs, k=3)
             out_dir = os.path.join(out, "{}_{}".format(vc,"_".join(selected_chrs)),"test")
             if not os.path.exists(out_dir):
                 os.makedirs(out_dir)

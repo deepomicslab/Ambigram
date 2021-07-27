@@ -2721,7 +2721,7 @@ Vertex *LocalGenomicMap::traverseLongPath(Vertex *aStartVertex, VertexPath *vPat
     int i = 0;
 //    find longest path that current graph can cover, choose this graph to traverse.
     for (auto path: *this->mLongFrags) {
-        if (path[0][0] == aStartVertex) {
+        if ((*path)[0] == aStartVertex) {
             int l = longPathLenInGraph(path);
             if (l > maxL) {
                 maxL = l;
@@ -2732,16 +2732,16 @@ Vertex *LocalGenomicMap::traverseLongPath(Vertex *aStartVertex, VertexPath *vPat
     }
     i = 0;
     if (maxL <= 0) {
-        if (!skip_first) {
+//        if (!skip_first) {
             vPath->push_back(aStartVertex);
             aStartVertex->traverse();
-        }
+//        }
         return aStartVertex;
     }
 //    auto m = this->mLongFrags[pathN][0];
     i = 0;
-    if (skip_first)
-        i = 0;
+//    if (skip_first)
+//        i = 0;
     for (; i < maxL; i++) {
         auto v = (*((*this->mLongFrags)[pathN]))[i];
         vPath->push_back(v);
@@ -2754,7 +2754,7 @@ Vertex *LocalGenomicMap::traverseLongPath(Vertex *aStartVertex, VertexPath *vPat
             }
         }
     }
-    return (*(this->mLongFrags)[0][pathN])[maxL - 1];
+    return (*((*this->mLongFrags)[pathN]))[maxL - 1];
 }
 
 int LocalGenomicMap::longPathLenInGraph(VertexPath *longPath) {
@@ -2769,6 +2769,10 @@ int LocalGenomicMap::longPathLenInGraph(VertexPath *longPath) {
             }
         }
         if (flag) n++;
+        else {
+            n = 1;
+            break;
+        }
     }
     return n;
 }
