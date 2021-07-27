@@ -31,6 +31,7 @@ protected:
     vector<VertexPath *> *mHaploids;
 
     unordered_map<int, vector<VertexPath *> *> *mLongFrags;
+//    vector<VertexPath *>* mTraversedPath;
 
     bool usingLong;
     bool usingHic;
@@ -159,6 +160,7 @@ public:
     void divideCircuits();
 
     void writeCircuits(const char *outFn);
+    void writeTraversedPath(const char *outFn);
 
     void generateHaploids();
 

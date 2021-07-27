@@ -22,6 +22,7 @@ int main(int argc, char *argv[]) {
             ("hic_matrix", "Segment Hic matrix file, only for solve", cxxopts::value<std::string>())
             ("tgs_order", "Segment tgs local order file, only for solve", cxxopts::value<std::string>())
             ("hap", "Haplotype out file, only for solve", cxxopts::value<std::string>())
+            ("traversed", "traversed path out file, only for solve", cxxopts::value<std::string>())
             ("circuits", "Circuits out file, only for solve", cxxopts::value<std::string>())
             ("help", "Print usage");
     auto result = options.parse(argc, argv);
@@ -103,6 +104,7 @@ int main(int argc, char *argv[]) {
         const char *lhFn = result["in_lh"].as<std::string>().c_str();
         // const char * lpOutFn = argv[4];
         const char *circuitsFn = result["circuits"].as<std::string>().c_str();
+        const char *traversedFn = result["traversed"].as<std::string>().c_str();
         const char *hapFn = result["hap"].as<std::string>().c_str();
         bool verbose = result["verbose"].as<bool>();
         const char *longFragFn;
@@ -178,6 +180,7 @@ int main(int argc, char *argv[]) {
             // g->print();
             // lgm->printCircuits();
             // cout << "Extracting circuits..." << endl;
+            lgm->writeTraversedPath(traversedFn);
             lgm->extractCircuits();
             lgm->sortCircuits();
             lgm->divideCircuits();

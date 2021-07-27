@@ -3018,6 +3018,20 @@ void LocalGenomicMap::writeCircuits(const char *outFn) {
     }
     fout.close();
 }
+void LocalGenomicMap::writeTraversedPath(const char *outFn) {
+    cout << "Write Traversed Path" << endl;
+    ofstream fout(outFn);
+    if (!fout) {
+        cout << "Cannot open file " << outFn << ": no such file or directory" << endl;
+        exit(1);
+    }
+    for (auto circuits : *(mCircuits)) {
+        for (Vertex *v : *circuits) {
+            fout << v->getInfo() << " ";
+        }
+        fout << endl;
+    }
+}
 
 void LocalGenomicMap::generateHaploids() {
     cout << "sort circuits" << endl;
