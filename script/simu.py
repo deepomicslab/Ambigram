@@ -58,7 +58,8 @@ def main():
 #     cmd1 = "{} --depth {} --prefix tgs --hmm_model {} test.out.fa"
 
 def g_tgs_ref(out_dir,all_chrs, depth = 20):
-    out_fa = open(out_dir+".out.fa","w")
+    out_fa_file = out_dir+".out.fa"
+    out_fa = open(out_fa_file,"w")
     res = {}
     for i in all_chrs:
         res[i] = []
@@ -76,7 +77,7 @@ def g_tgs_ref(out_dir,all_chrs, depth = 20):
         out_fa.write(combined_fa+"\n")
     out_fa.close()
 #     simulate tgs
-    cmd1 = "{} --depth {} --prefix tgs --hmm_model {} {}".format(pbsim,depth, pbmodel, out_fa)
+    cmd1 = "{} --depth {} --prefix tgs --hmm_model {} {}".format(pbsim,depth, pbmodel, out_fa_file)
     cmd2 = "cat tgs_*.fastq > {}.tgs.fastq".format(out_dir)
     cmd3 = "sed -n '1~4s/^@/>/p;2~4p' {}.tgs.fastq > {}.tgs.fasta".format(out_dir, out_dir)
     execmd(cmd1)
