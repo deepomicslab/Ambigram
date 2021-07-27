@@ -40,12 +40,17 @@ void LocalGenomicMap::setUsingLong(bool v) { usingLong = v; }
 
 void LocalGenomicMap::setUsingHic(bool v) { usingHic = v; }
 
-vector<VertexPath *> *LocalGenomicMap::get_long_frags() {
+unordered_map<int, vector<VertexPath *> *> *LocalGenomicMap::get_long_frags() {
     return mLongFrags;
 }
 
 void LocalGenomicMap::read_long_frags(const char *fn) {
-    mLongFrags = new vector<VertexPath *>();
+//    init long path
+    mLongFrags = new unordered_map<int, vector<VertexPath *> *>();
+    for(auto i: *mGraph->getMSources()) {
+        (*mLongFrags)[i->getId()] = new vector<VertexPath *>();
+    }
+    (*mLongFrags)[0] = new vector<VertexPath *>();
     ifstream in(fn);
     string line, value;
     stringstream ss;
@@ -61,41 +66,32 @@ void LocalGenomicMap::read_long_frags(const char *fn) {
                 p->push_back(mGraph->getSegmentById(id)->getNegativeVertex());
             }
         }
+//        check parition
+        auto partitionPair = findLongPathPartition(p);
+        if(partitionPair.first == -1) {
+//            cout<<  <<"\n";
+            continue;
+        }
+//        (*mLongFrags)
         if (p->front()->getDir() == '-') {
             if (p->back()->getDir() == '-') {
-                mLongFrags->push_back(this->get_complement(p));
+                (*mLongFrags)[partitionPair.first]->push_back(this->get_complement(p));
             } else {
                 if (p->back()->getId() < p->front()->getId()) {
-                    mLongFrags->push_back(this->get_complement(p));
+                    (*mLongFrags)[partitionPair.first]->push_back(this->get_complement(p));
                 }
             }
             p->clear();
         } else {
-            mLongFrags->push_back(p);
+            (*mLongFrags)[partitionPair.first]->push_back(p);
         }
     }
-    sort(mLongFrags->begin(), mLongFrags->end(), [](VertexPath *p1, VertexPath *p2) {
-        int size = min(p1->size(), p2->size());
-        for (int i = 0; i < size; i++) {
-            if (p1->at(i)->getId() != p2->at(i)->getId()) {
-                return p1->at(i)->getId() < p2->at(i)->getId();
-            }
-        }
-    });
 
     in.close();
 
-    vector<VertexPath *> *long_frags_new = new vector<VertexPath *>();
-    vector<VertexPath *> *temp;
-    while (!this->equal_frags(mLongFrags, long_frags_new)) {
-        temp = mLongFrags;
-        mLongFrags = long_frags_new;
-        long_frags_new = temp;
-        mLongFrags->clear();
-        for (VertexPath *frag : *long_frags_new) {
-            this->merge_long_frags(frag);
-        }
-        sort(mLongFrags->begin(), mLongFrags->end(), [](VertexPath *p1, VertexPath *p2) {
+
+    for(auto &it : *mLongFrags) {
+        sort(it.second->begin(), it.second->end(), [](VertexPath *p1, VertexPath *p2) {
             int size = min(p1->size(), p2->size());
             for (int i = 0; i < size; i++) {
                 if (p1->at(i)->getId() != p2->at(i)->getId()) {
@@ -103,10 +99,49 @@ void LocalGenomicMap::read_long_frags(const char *fn) {
                 }
             }
         });
+        vector<VertexPath *> *long_frags_new = new vector<VertexPath *>();
+        vector<VertexPath *> *temp;
+        while (!this->equal_frags(it.second, long_frags_new)) {
+            temp = it.second;
+            it.second = long_frags_new;
+            long_frags_new = temp;
+            it.second->clear();
+            for (VertexPath *frag : *long_frags_new) {
+                this->merge_long_frags(it.second,frag);
+            }
+            sort(it.second->begin(), it.second->end(), [](VertexPath *p1, VertexPath *p2) {
+                int size = min(p1->size(), p2->size());
+                for (int i = 0; i < size; i++) {
+                    if (p1->at(i)->getId() != p2->at(i)->getId()) {
+                        return p1->at(i)->getId() < p2->at(i)->getId();
+                    }
+                }
+            });
+        }
+        sort(it.second->begin(), it.second->end(), [](VertexPath *p1, VertexPath *p2) {
+            return p1->size() > p2->size();
+        });
     }
-    sort(mLongFrags->begin(), mLongFrags->end(), [](VertexPath *p1, VertexPath *p2) {
-        return p1->size() > p2->size();
-    });
+//    while (!this->equal_frags(mLongFrags, long_frags_new)) {
+//        temp = mLongFrags;
+//        mLongFrags = long_frags_new;
+//        long_frags_new = temp;
+//        mLongFrags->clear();
+//        for (VertexPath *frag : *long_frags_new) {
+//            this->merge_long_frags(frag);
+//        }
+//        sort(mLongFrags->begin(), mLongFrags->end(), [](VertexPath *p1, VertexPath *p2) {
+//            int size = min(p1->size(), p2->size());
+//            for (int i = 0; i < size; i++) {
+//                if (p1->at(i)->getId() != p2->at(i)->getId()) {
+//                    return p1->at(i)->getId() < p2->at(i)->getId();
+//                }
+//            }
+//        });
+//    }
+//    sort(mLongFrags->begin(), mLongFrags->end(), [](VertexPath *p1, VertexPath *p2) {
+//        return p1->size() > p2->size();
+//    });
 }
 
 void LocalGenomicMap::read_hic_matrix(const char *fn) {
@@ -148,32 +183,32 @@ void LocalGenomicMap::read_hic_matrix(const char *fn) {
     }
 }
 
-void LocalGenomicMap::merge_long_frags(VertexPath *aFrag) {
+void LocalGenomicMap::merge_long_frags(vector<VertexPath *>* partitionLong,VertexPath *aFrag) {
     VertexPath::iterator found_iter, iter;
     bool found = false;
     for (iter = aFrag->end(); iter != aFrag->begin(); iter--) {
-        for (int i = 0; i < mLongFrags->size(); i++) {
-            found_iter = find_end(mLongFrags->at(i)->begin(), mLongFrags->at(i)->end(), aFrag->begin(), iter);
-            if (found_iter != mLongFrags->at(i)->end()) {
+        for (int i = 0; i < partitionLong->size(); i++) {
+            found_iter = find_end(partitionLong->at(i)->begin(), partitionLong->at(i)->end(), aFrag->begin(), iter);
+            if (found_iter != partitionLong->at(i)->end()) {
                 found = true;
-                VertexPath *new_f = new VertexPath(mLongFrags->at(i)->begin(), found_iter);
+                VertexPath *new_f = new VertexPath(partitionLong->at(i)->begin(), found_iter);
                 new_f->insert(new_f->end(), aFrag->begin(), aFrag->end());
-                found_iter = find_end(mLongFrags->at(i)->begin(), mLongFrags->at(i)->end(), new_f->begin(),
+                found_iter = find_end(partitionLong->at(i)->begin(), partitionLong->at(i)->end(), new_f->begin(),
                                       new_f->end());
-                if (found_iter == mLongFrags->at(i)->end()) {
+                if (found_iter == partitionLong->at(i)->end()) {
                     // new_f in
                     //     break;
                     // } else {
                     // new_f not in
-                    found_iter = find_end(new_f->begin(), new_f->end(), mLongFrags->at(i)->begin(),
-                                          mLongFrags->at(i)->end());
+                    found_iter = find_end(new_f->begin(), new_f->end(), partitionLong->at(i)->begin(),
+                                          partitionLong->at(i)->end());
                     if (found_iter != new_f->end()) {
                         // new_f include
-                        mLongFrags->at(i)->clear();
-                        mLongFrags->at(i)->insert(mLongFrags->at(i)->end(), new_f->begin(), new_f->end());
+                        partitionLong->at(i)->clear();
+                        partitionLong->at(i)->insert(partitionLong->at(i)->end(), new_f->begin(), new_f->end());
                     } else {
                         // new_f not include
-                        mLongFrags->push_back(new_f);
+                        partitionLong->push_back(new_f);
                     }
                 }
                 break;
@@ -186,28 +221,28 @@ void LocalGenomicMap::merge_long_frags(VertexPath *aFrag) {
     if (!found) {
         VertexPath *comp = this->get_complement(aFrag);
         for (iter = comp->end(); iter != comp->begin(); iter--) {
-            for (int i = 0; i < mLongFrags->size(); i++) {
-                found_iter = find_end(mLongFrags->at(i)->begin(), mLongFrags->at(i)->end(), comp->begin(), iter);
-                if (found_iter != mLongFrags->at(i)->end()) {
+            for (int i = 0; i < partitionLong->size(); i++) {
+                found_iter = find_end(partitionLong->at(i)->begin(), partitionLong->at(i)->end(), comp->begin(), iter);
+                if (found_iter != partitionLong->at(i)->end()) {
                     found = true;
-                    VertexPath *new_f = new VertexPath(mLongFrags->at(i)->begin(), found_iter);
+                    VertexPath *new_f = new VertexPath(partitionLong->at(i)->begin(), found_iter);
                     new_f->insert(new_f->end(), comp->begin(), comp->end());
-                    found_iter = find_end(mLongFrags->at(i)->begin(), mLongFrags->at(i)->end(), new_f->begin(),
+                    found_iter = find_end(partitionLong->at(i)->begin(), partitionLong->at(i)->end(), new_f->begin(),
                                           new_f->end());
-                    if (found_iter == mLongFrags->at(i)->end()) {
+                    if (found_iter == partitionLong->at(i)->end()) {
                         // new_f in
                         //     break;
                         // } else {
                         // new_f not in
-                        found_iter = find_end(new_f->begin(), new_f->end(), mLongFrags->at(i)->begin(),
-                                              mLongFrags->at(i)->end());
+                        found_iter = find_end(new_f->begin(), new_f->end(), partitionLong->at(i)->begin(),
+                                              partitionLong->at(i)->end());
                         if (found_iter != new_f->end()) {
                             // new_f include
-                            mLongFrags->at(i)->clear();
-                            mLongFrags->at(i)->insert(mLongFrags->at(i)->end(), new_f->begin(), new_f->end());
+                            partitionLong->at(i)->clear();
+                            partitionLong->at(i)->insert(partitionLong->at(i)->end(), new_f->begin(), new_f->end());
                         } else {
                             // new_f not include
-                            mLongFrags->push_back(new_f);
+                            partitionLong->push_back(new_f);
                         }
                     }
                     break;
@@ -219,7 +254,7 @@ void LocalGenomicMap::merge_long_frags(VertexPath *aFrag) {
         }
     }
     if (!found) {
-        mLongFrags->push_back(aFrag);
+        partitionLong->push_back(aFrag);
     }
 }
 
@@ -2594,9 +2629,9 @@ Edge *LocalGenomicMap::traverseWithHic(VertexPath *vp) {
 }
 
 pair<int, int> LocalGenomicMap::findPartition(int id) {
-    if(id == 7) {
-        int m = 0;
-    }
+//    if(id == 7) {
+//        int m = 0;
+//    }
     auto sources = mGraph->getMSources();
     auto sinks = mGraph->getMSinks();
     for (int i = 0; i < sources->size(); i++) {
@@ -2610,6 +2645,29 @@ pair<int, int> LocalGenomicMap::findPartition(int id) {
         }
     }
     return make_pair(0, 0);
+}
+
+pair<int, int> LocalGenomicMap::findLongPathPartition(VertexPath* vp) {
+//    pair<int, int> parPair = findPartition(vp->front()->getId());
+//    for(auto v : *vp) {
+//        auto tParPair = findPartition(v->getId());
+//        if(tParPair.first == 0 || tParPair.first = parPair.first)
+//    }
+    int startId = 0;
+    int endId = 0;
+    auto v = vp->begin();
+    while(v != vp->end()){
+        auto tParPair = findPartition((*v)->getId());
+        v++;
+        if(tParPair.first == 0) continue;
+        else if(startId == 0){
+            startId = tParPair.first;
+            endId = tParPair.second;
+        } else if (tParPair.first != startId) {
+            return make_pair(-1,-1);
+        }
+    }
+    return make_pair(startId, endId);
 }
 
 double LocalGenomicMap::calculateHicInteraction(VertexPath *vp, Vertex *currentVertex) {
@@ -2642,9 +2700,10 @@ void LocalGenomicMap::traverse(Vertex *aStartVertex, JunctionDB *aJuncDB) {
     bool start = true;
     currentVertex = aStartVertex;
     if (isUsingLong()) {
+        checkPartition(currentVertex->getId(), partitionStart, partitionEnd);
         while (true) {
-            currentVertex = traverseLongPath(currentVertex, vp, false);
-            Edge *nextEdge = this->traverseNextEdge(currentVertex, vp, aJuncDB);
+            currentVertex = traverseLongPath(currentVertex, vp, partitionStart, partitionEnd);
+            Edge *nextEdge = this->traverseNextEdgeByPartition(currentVertex, vp, aJuncDB, partitionStart, partitionEnd);
             if (nextEdge == nullptr) break;
             nextEdge->traverse();
             currentVertex = nextEdge->getTarget();
@@ -2715,12 +2774,13 @@ void LocalGenomicMap::traverseGraph(JunctionDB *aJuncDB) {
 }
 
 // No partition check;
-Vertex *LocalGenomicMap::traverseLongPath(Vertex *aStartVertex, VertexPath *vPath, bool skip_first) {
+Vertex *LocalGenomicMap::traverseLongPath(Vertex *aStartVertex, VertexPath *vPath, int *partitionStart, int *partitionEnd) {
     int pathN = -1;
     int maxL = 0;
     int i = 0;
+    auto selectedLongPartition = (*this->mLongFrags)[*partitionStart];
 //    find longest path that current graph can cover, choose this graph to traverse.
-    for (auto path: *this->mLongFrags) {
+    for (auto path: *selectedLongPartition) {
         if ((*path)[0] == aStartVertex) {
             int l = longPathLenInGraph(path);
             if (l > maxL) {
@@ -2731,22 +2791,18 @@ Vertex *LocalGenomicMap::traverseLongPath(Vertex *aStartVertex, VertexPath *vPat
         i++;
     }
     i = 0;
-    if (maxL <= 0) {
-//        if (!skip_first) {
+    if (maxL <= 1) {
             vPath->push_back(aStartVertex);
             aStartVertex->traverse();
-//        }
         return aStartVertex;
     }
 //    auto m = this->mLongFrags[pathN][0];
     i = 0;
-//    if (skip_first)
-//        i = 0;
     for (; i < maxL; i++) {
-        auto v = (*((*this->mLongFrags)[pathN]))[i];
+        auto v = (*((*selectedLongPartition)[pathN]))[i];
         vPath->push_back(v);
         v->traverse();
-        auto vNext = (*((*this->mLongFrags)[pathN]))[i + 1];
+        auto vNext = (*((*selectedLongPartition)[pathN]))[i + 1];
         for (Edge *e: *(v->getEdgesAsSource())) {
             if (e->getTarget() == vNext) {
                 e->traverse();
@@ -2754,7 +2810,7 @@ Vertex *LocalGenomicMap::traverseLongPath(Vertex *aStartVertex, VertexPath *vPat
             }
         }
     }
-    return (*((*this->mLongFrags)[pathN]))[maxL - 1];
+    return (*((*selectedLongPartition)[pathN]))[maxL - 1];
 }
 
 int LocalGenomicMap::longPathLenInGraph(VertexPath *longPath) {

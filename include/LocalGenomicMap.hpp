@@ -30,7 +30,7 @@ protected:
     unordered_map<int, vector<VertexPath *> *> *dividedHaploids;
     vector<VertexPath *> *mHaploids;
 
-    vector<VertexPath *> *mLongFrags;
+    unordered_map<int, vector<VertexPath *> *> *mLongFrags;
 
     bool usingLong;
     bool usingHic;
@@ -56,11 +56,11 @@ public:
     void setUsingHic(bool);
 
     /* Long fragments for TGS */
-    vector<VertexPath *> *get_long_frags();
+    unordered_map<int, vector<VertexPath *> *> *get_long_frags();
 
     void read_long_frags(const char *fn);
 
-    void merge_long_frags(VertexPath *aFrag);
+    void merge_long_frags(vector<VertexPath *> * partitionLong, VertexPath *aFrag);
 
     bool equal_frags(vector<VertexPath *> *f1, vector<VertexPath *> *f2);
 
@@ -126,6 +126,7 @@ public:
     Edge *traverseWithHic(VertexPath *vp);
 
     pair<int, int> findPartition(int id);
+    pair<int, int> findLongPathPartition(VertexPath* vp);
 
     double calculateHicInteraction(VertexPath *vp, Vertex *currentVertex);
 
@@ -140,7 +141,7 @@ public:
 //        Traverse long path first
     void traverseWithLong(Vertex *aStartVertex, JunctionDB *aJuncDB);
 
-    Vertex *traverseLongPath(Vertex *aStartVertex, VertexPath *vPath, bool skip_first);
+    Vertex *traverseLongPath(Vertex *aStartVertex, VertexPath *vPath, int *partitionStart, int *partitionEnd);
 
 //        find if long path in current graph (return how far the path can be traversed in current graph)
     int longPathLenInGraph(VertexPath *longPath);

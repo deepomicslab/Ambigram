@@ -126,9 +126,11 @@ int main(int argc, char *argv[]) {
                 longFragFn = result["tgs_order"].as<std::string>().c_str();
                 lgm->read_long_frags(longFragFn);
                 lgm->setUsingLong(true);
-                for (VertexPath *frag : *(lgm->get_long_frags())) {
-                    for (Vertex *v: *frag) {
-                        cout << v->getInfo() << " ";
+                for (auto frag : *lgm->get_long_frags()) {
+                    for(VertexPath* suvp : *frag.second) {
+                        for (Vertex *v: *suvp) {
+                            cout << v->getInfo() << " ";
+                        }
                     }
                     cout << endl;
                 }
