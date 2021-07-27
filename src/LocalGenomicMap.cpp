@@ -2011,30 +2011,30 @@ void LocalGenomicMap::checkReachability(JunctionDB *aJuncDB, bool verbose) {
         }
 
         bool hasAdded = false;
-        if (!hasAdded && backwardSourceNotReachableVertices.size() > 0) {
-            if (verbose) cout << "for backward source: " << endl;
-            hasAdded = this->adjustReachability(backwardSourceNotReachableVertices,
-                                                mGraph->getFirstSource()->getPositiveVertex(), aJuncDB, verbose);
-            // continue;
-        }
-        if (!hasAdded && backwardSinkNotReachableVertices.size() > 0) {
-            if (verbose) cout << "for backward sink: " << endl;
-            hasAdded = this->adjustReachability(backwardSinkNotReachableVertices,
-                                                mGraph->getFirstSink()->getNegativeVertex(), aJuncDB, verbose);
-            // continue;
-        }
-        if (!hasAdded && forwardSourceNotReachableVertices.size() > 0) {
-            if (verbose) cout << "for forward source: " << endl;
-            hasAdded = this->adjustReachability(forwardSourceNotReachableVertices,
-                                                mGraph->getFirstSource()->getNegativeVertex(), aJuncDB, verbose);
-            // continue;
-        }
-        if (!hasAdded && forwardSinkNotReachableVertices.size() > 0) {
-            if (verbose) cout << "for forward sink: " << endl;
-            hasAdded = this->adjustReachability(forwardSinkNotReachableVertices,
-                                                mGraph->getFirstSink()->getPositiveVertex(),
-                                                aJuncDB, verbose);
-        }
+//        if (!hasAdded && backwardSourceNotReachableVertices.size() > 0) {
+//            if (verbose) cout << "for backward source: " << endl;
+//            hasAdded = this->adjustReachability(backwardSourceNotReachableVertices,
+//                                                mGraph->getFirstSource()->getPositiveVertex(), aJuncDB, verbose);
+//            // continue;
+//        }
+//        if (!hasAdded && backwardSinkNotReachableVertices.size() > 0) {
+//            if (verbose) cout << "for backward sink: " << endl;
+//            hasAdded = this->adjustReachability(backwardSinkNotReachableVertices,
+//                                                mGraph->getFirstSink()->getNegativeVertex(), aJuncDB, verbose);
+//            // continue;
+//        }
+//        if (!hasAdded && forwardSourceNotReachableVertices.size() > 0) {
+//            if (verbose) cout << "for forward source: " << endl;
+//            hasAdded = this->adjustReachability(forwardSourceNotReachableVertices,
+//                                                mGraph->getFirstSource()->getNegativeVertex(), aJuncDB, verbose);
+//            // continue;
+//        }
+//        if (!hasAdded && forwardSinkNotReachableVertices.size() > 0) {
+//            if (verbose) cout << "for forward sink: " << endl;
+//            hasAdded = this->adjustReachability(forwardSinkNotReachableVertices,
+//                                                mGraph->getFirstSink()->getPositiveVertex(),
+//                                                aJuncDB, verbose);
+//        }
 	i = i+1;
         // break;
     } while (backwardSourceNotReachableVertices.size() + backwardSinkNotReachableVertices.size() +
