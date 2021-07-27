@@ -2073,7 +2073,7 @@ void LocalGenomicMap::checkReachability(JunctionDB *aJuncDB, bool verbose) {
 	i = i+1;
         // break;
     } while (backwardSourceNotReachableVertices.size() + backwardSinkNotReachableVertices.size() +
-             forwardSourceNotReachableVertices.size() + forwardSinkNotReachableVertices.size() > 0 || i <=20);
+             forwardSourceNotReachableVertices.size() + forwardSinkNotReachableVertices.size() > 0 && i <=10);
 
     cout << "Graph reachable." << endl;
 }
