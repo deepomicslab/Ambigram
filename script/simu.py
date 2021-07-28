@@ -15,7 +15,7 @@ pbmodel = "~/app/pbsim2/data/P6C4.model"
 def execmd(cmd):
     print("Exec: {}".format(cmd))
     logging.info(cmd)
-    # os.system(cmd)
+    os.system(cmd)
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--host_ref',
@@ -97,7 +97,7 @@ def run_local(out_dir,script_root,vc,v_len,selected_chrs,depth):
     cmd_check = "{} --op check --juncdb {}.junc --in_lh {}.lh --out_lh {}.checked.lh --lp_prefix {} --verbose".format(LOCALHAP, out_dir, out_dir, out_dir, out_dir)
     cmd_cbc = "{} {}.lp solve solu {}.sol".format(CBC,out_dir,out_dir)
     cmd_parse = "{} {}/main.py parseILP -i {}.checked.lh -s {}.sol -o {}.balanced.lh".format(PYTHON, script_root,out_dir,out_dir,out_dir)
-    cmd_solve = "{} --op solve --juncdb {}.junc --in_lh {}.balanced.lh --circuits {}.circuits --hap {}.haps --verbose".format(LOCALHAP,out_dir,out_dir,out_dir,out_dir)
+    cmd_solve = "{} --op solve --juncdb {}.junc --in_lh {}.balanced.lh --circuits {}.circuits --hap {}.haps --traversed {}.traversed --verbose".format(LOCALHAP,out_dir,out_dir,out_dir,out_dir,out_dir)
     execmd(cmd_seek)
     execmd(cmd_bps)
     execmd(cmd_depth)
