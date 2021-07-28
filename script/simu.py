@@ -87,7 +87,6 @@ def g_tgs_ref(out_dir,all_chrs, depth = 20):
 
 
 
-
 def run_local(out_dir,script_root,vc,v_len,selected_chrs,depth):
     cmd_seek="bash {}/seek.sh {} {}.lib1.bam {}/mix.fa".format(script_root,out_dir,out_dir,out_dir)
     cmd_bps = "{} {}/main.py bpsmap -l {}.seek.sv.txt -o {} -v {} --v_len {} --h_chrs {} --out_bed {}.bed".format(PYTHON, script_root,out_dir,out_dir,vc,v_len, ','.join(selected_chrs),out_dir)
