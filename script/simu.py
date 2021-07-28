@@ -5,6 +5,7 @@ import random
 import argparse
 import logging
 import e_size
+import re
 
 PYTHON = "~/miniconda3/envs/py3/bin/python"
 LOCALHAP = "/home/gzpan2/app/localhaptgs/debug/localHap"
@@ -92,6 +93,17 @@ def g_tgs_ref(out_dir,all_chrs, depth = 20):
     execmd(cmd3)
     execmd(cmd4)
 
+def parse_mean_depth(bam,out_dir,n_size):
+    cmd = "{} coverage {} > {}.scov".format(samtools, bam,out_dir)
+    execmd(cmd)
+    for l in open(out_dir+".scov") :
+        if "#" not in l:
+            a = re.split("\s+",l)
+            o_size = int(a[2])
+            o_depth = int(a[6])
+            n_depth = o_depth*(o_size/n_size)
+            break
+    return n_depth
 def check_dir(dir):
     if not os.path.exists(dir):
         os.makedirs(dir,exist_ok=True)
@@ -173,7 +185,8 @@ def simulate(mutforge, host_ref, v_ref,simple_par, out, script_root,depth, host_
             execmd(cmd_mu)
             total_size = total_size + v_len + sum([e_size.sizes[c] for c in selected_chrs])
             gc_bam = gc_correction(out_dir+".lib1.bam",out_dir,total_size)
-            run_local(out_dir,script_root,vc,v_len,selected_chrs,depth,gc_bam)
+            n_depth = parse_mean_depth(gc_bam,out_dir,total_size)
+            run_local(out_dir,script_root,vc,v_len,selected_chrs,n_depth,gc_bam)
             # execmd(cmd_seek)
 def mk_fa(host_ref,host_chrs,v_ref,v_chr,out):
     # extract
