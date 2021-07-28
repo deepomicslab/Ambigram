@@ -4,6 +4,7 @@ import os
 import random
 import argparse
 import logging
+import e_size
 
 PYTHON = "~/miniconda3/envs/py3/bin/python"
 LOCALHAP = "/home/gzpan2/app/localhaptgs/debug/localHap"
@@ -12,15 +13,15 @@ CBC = "~/miniconda3/envs/py2/bin/cbc"
 pbsim = "~/app/pbsim2/src/pbsim"
 pbmodel = "~/app/pbsim2/data/P6C4.model"
 hpvpip_root = "~/app/hpvpip"
-faToTwoBit = ""
-computeGCBias = ""
-correctGCBias = ""
-samtools = ""
+faToTwoBit = "~/app/faToTwoBit"
+computeGCBias = "/home/xuedowang2/app/conda/envs/py37/bin/computeGCBias"
+correctGCBias = "/home/xuedowang2/app/conda/envs/py37/bin/correctGCBias"
+samtools = "~/app/samtools/bin/samtools"
 # ~/app/pbsim2/src/pbsim --depth 20 --prefix tgs --hmm_model ~/app/pbsim2/data/P6C4.model test.out.fa
 def execmd(cmd):
     print("Exec: {}".format(cmd))
     logging.info(cmd)
-    os.system(cmd)
+    # os.system(cmd)
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--host_ref',
@@ -97,7 +98,7 @@ def check_dir(dir):
 
 def gc_correction(input_bam, out_dir, effectiveGenomeSize):
     ref = out_dir + "/mix.fa"
-    corrected_bam = input_bam.replace(".bam", ".gccorrected.bam")
+    corrected_bam = out_dir+".gc.bam"
     # faToTwoBit hg38_hpv.fa hg38_hpv.bit
     cmd1 = "echo 'skip ref faToTwoBit'"
     cmd2 = "echo 'skip generate freq.txt'"
@@ -116,7 +117,7 @@ def run_local(out_dir,script_root,vc,v_len,selected_chrs,depth, gc_bam):
     cmd_seek="bash {}/seek.sh {} {}.lib1.bam {}/mix.fa".format(script_root,out_dir,out_dir,out_dir)
     cmd_bps = "{} {}/main.py bpsmap -l {}.seek.sv.txt -o {} -v {} --v_len {} --h_chrs {} --out_bed {}.bed".format(PYTHON, script_root,out_dir,out_dir,vc,v_len, ','.join(selected_chrs),out_dir)
     bed_file = out_dir+".bed"
-    cmd_depth= "{} depth -aa -b {}.bed {}.lib1.bam | bgzip -c > {}.depth.gz && tabix -s 1 -b 2 -e 2 {}.depth.gz".format(SAMTOOLS,out_dir,out_dir,out_dir,out_dir)
+    cmd_depth= "{} depth -aa -b {}.bed {}.gc.bam | bgzip -c > {}.depth.gz && tabix -s 1 -b 2 -e 2 {}.depth.gz".format(SAMTOOLS,out_dir,out_dir,out_dir,out_dir)
     cmd_config = "{} {}/main.py config -f {}.seek.sv.txt -b {} -m {}.bps -j {}.junc -d {}.depth.gz  -s {} -e 5 -c {}.lh -g {}.seg -p 2 -S --v_chr {} --avg_whole_dp {}\
          --v_len {} --h_chrs {}".format(PYTHON,script_root, out_dir,gc_bam,out_dir,out_dir,out_dir,out_dir,out_dir,out_dir,vc,depth,v_len,','.join(selected_chrs))
     cmd_check = "{} --op check --juncdb {}.junc --in_lh {}.lh --out_lh {}.checked.lh --lp_prefix {} --verbose".format(LOCALHAP, out_dir, out_dir, out_dir, out_dir)
@@ -140,11 +141,12 @@ def simulate(mutforge, host_ref, v_ref,simple_par, out, script_root,depth, host_
     ref_v = Fasta(v_ref)
     host_chrs = list(ref_host.keys())[0:-3]
     v_chrs = {}
-
+    total_size = 0
     for k in list(ref_v.keys()):
         v_chrs[k] = ref_v[k][0:].end
     for vc,v_len in v_chrs.items():
         for i in range(0,s_times):
+            total_size = 0
             # selected_chrs = random.choices(host_chrs, k=3)
             # if i > 2:
             selected_chrs = random.choices(host_chrs, k=host_count)
@@ -169,7 +171,8 @@ def simulate(mutforge, host_ref, v_ref,simple_par, out, script_root,depth, host_
             # cmd_parse = "{} {}/main.py parseILP -i {}.checked.lh -s {}.sol -o {}.balanced.lh".format(python, script_root,out_dir,out_dir,out_dir)
             # cmd_solve = "{} --op solve --juncdb {}.junc --in_lh {}.balanced.lh --circuits {}.circuits --hap {}.haps --verbose".format(localhap,out_dir,out_dir,out_dir,out_dir)
             execmd(cmd_mu)
-            gc_bam = gc_correction(out_dir+".lib1.bam",out_dir)
+            total_size = total_size + v_len + sum([e_size.sizes[c] for c in selected_chrs])
+            gc_bam = gc_correction(out_dir+".lib1.bam",out_dir,total_size)
             run_local(out_dir,script_root,vc,v_len,selected_chrs,depth,gc_bam)
             # execmd(cmd_seek)
 def mk_fa(host_ref,host_chrs,v_ref,v_chr,out):
