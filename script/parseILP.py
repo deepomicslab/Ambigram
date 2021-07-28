@@ -40,7 +40,7 @@ def generate_balanced_lh(outfilename, infilename, d):
                         seg_cp = 0
                     #                     print(f"{seg_id} : {seg_cp}")
                     junc_id += 1
-                    fout.write(' '.join(line[:-2]) + f' {seg_cp} {line[-1]}\n')
+                    fout.write(' '.join(line[:-2]) + f' {seg_cp} {line[-1]} {line[-2]}\n')
                 #                     print(' '.join(line[:-1]) + f' {seg_cp} {line[-1]}\n')
                 elif line[0] == 'JUNC':
                     try:
@@ -50,7 +50,7 @@ def generate_balanced_lh(outfilename, infilename, d):
                         junc_cp = 0
                     #                     print(f"{junc_id} : {junc_cp}")
                     junc_id += 1
-                    fout.write(' '.join(line[:-3]) + f' {junc_cp} ' + ' '.join(line[-2:]) + '\n')
+                    fout.write(' '.join(line[:-3]) + f' {junc_cp} ' + ' '.join(line[-2:])+f' {line[-3]}' + '\n')
                 #                     print(' '.join(line[:-2]) + f' {junc_cp} ' + ' '.join(line[-2:]) + '\n')
                 else:
                     fout.write(' '.join(line) + '\n')
