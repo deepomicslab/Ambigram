@@ -151,7 +151,7 @@ def update_junc_db_by_seg_in_chrom(segs, junc_db, bam, ext):
             #                           'strand_3p': '+',
             #                           'count': get_normal_junc_read_num(bam, row.chrom, row.end, ext=ext) / avg_depth}, ignore_index=True)
 
-            if get_normal_junc_read_num(bam, row.chrom, row.end, ext=ext) > 3:
+            if get_normal_junc_read_num(bam, row.chrom, row.end, ext=ext) > 5:
                 junc_db = junc_db.append({'chrom_5p': row.chrom,
                                           'pos_5p': row.end,
                                           'strand_5p': '+',

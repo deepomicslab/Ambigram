@@ -12,6 +12,10 @@ CBC = "~/miniconda3/envs/py2/bin/cbc"
 pbsim = "~/app/pbsim2/src/pbsim"
 pbmodel = "~/app/pbsim2/data/P6C4.model"
 hpvpip_root = "~/app/hpvpip"
+faToTwoBit = ""
+computeGCBias = ""
+correctGCBias = ""
+samtools = ""
 # ~/app/pbsim2/src/pbsim --depth 20 --prefix tgs --hmm_model ~/app/pbsim2/data/P6C4.model test.out.fa
 def execmd(cmd):
     print("Exec: {}".format(cmd))
@@ -87,16 +91,34 @@ def g_tgs_ref(out_dir,all_chrs, depth = 20):
     execmd(cmd3)
     execmd(cmd4)
 
+def check_dir(dir):
+    if not os.path.exists(dir):
+        os.makedirs(dir,exist_ok=True)
 
+def gc_correction(input_bam, out_dir, effectiveGenomeSize):
+    ref = out_dir + "/mix.fa"
+    corrected_bam = input_bam.replace(".bam", ".gccorrected.bam")
+    # faToTwoBit hg38_hpv.fa hg38_hpv.bit
+    cmd1 = "echo 'skip ref faToTwoBit'"
+    cmd2 = "echo 'skip generate freq.txt'"
+    if not check_dir(ref+".freq.txt"):
+        cmd1 = "{} {} {}.2bit".format(faToTwoBit, ref, ref)
+        cmd2 = "{} -b {} --effectiveGenomeSize {} -g {}.2bit --GCbiasFrequenciesFile {}.freq.txt".format(computeGCBias, input_bam, effectiveGenomeSize, ref, ref)
+    cmd3 = "{} -b {} --effectiveGenomeSize {} -g {}.2bit --GCbiasFrequenciesFile {}.freq.txt -o {}".format(correctGCBias, input_bam, effectiveGenomeSize, ref, ref, corrected_bam)
+    cmd4 = "{} index {} -@ {}".format(samtools, corrected_bam, 48)
+    execmd(cmd1)
+    execmd(cmd2)
+    execmd(cmd3)
+    execmd(cmd4)
+    return corrected_bam
 
-
-def run_local(out_dir,script_root,vc,v_len,selected_chrs,depth):
+def run_local(out_dir,script_root,vc,v_len,selected_chrs,depth, gc_bam):
     cmd_seek="bash {}/seek.sh {} {}.lib1.bam {}/mix.fa".format(script_root,out_dir,out_dir,out_dir)
     cmd_bps = "{} {}/main.py bpsmap -l {}.seek.sv.txt -o {} -v {} --v_len {} --h_chrs {} --out_bed {}.bed".format(PYTHON, script_root,out_dir,out_dir,vc,v_len, ','.join(selected_chrs),out_dir)
     bed_file = out_dir+".bed"
     cmd_depth= "{} depth -aa -b {}.bed {}.lib1.bam | bgzip -c > {}.depth.gz && tabix -s 1 -b 2 -e 2 {}.depth.gz".format(SAMTOOLS,out_dir,out_dir,out_dir,out_dir)
-    cmd_config = "{} {}/main.py config -f {}.seek.sv.txt -b {}.lib1.bam -m {}.bps -j {}.junc -d {}.depth.gz  -s {} -e 5 -c {}.lh -g {}.seg -p 2 -S --v_chr {} --avg_whole_dp {}\
-         --v_len {} --h_chrs {}".format(PYTHON,script_root, out_dir,out_dir,out_dir,out_dir,out_dir,out_dir,out_dir,out_dir,vc,depth,v_len,','.join(selected_chrs))
+    cmd_config = "{} {}/main.py config -f {}.seek.sv.txt -b {} -m {}.bps -j {}.junc -d {}.depth.gz  -s {} -e 5 -c {}.lh -g {}.seg -p 2 -S --v_chr {} --avg_whole_dp {}\
+         --v_len {} --h_chrs {}".format(PYTHON,script_root, out_dir,gc_bam,out_dir,out_dir,out_dir,out_dir,out_dir,out_dir,vc,depth,v_len,','.join(selected_chrs))
     cmd_check = "{} --op check --juncdb {}.junc --in_lh {}.lh --out_lh {}.checked.lh --lp_prefix {} --verbose".format(LOCALHAP, out_dir, out_dir, out_dir, out_dir)
     cmd_cbc = "{} {}.lp solve solu {}.sol".format(CBC,out_dir,out_dir)
     cmd_parse = "{} {}/main.py parseILP -i {}.checked.lh -s {}.sol -o {}.balanced.lh".format(PYTHON, script_root,out_dir,out_dir,out_dir)
@@ -118,6 +140,7 @@ def simulate(mutforge, host_ref, v_ref,simple_par, out, script_root,depth, host_
     ref_v = Fasta(v_ref)
     host_chrs = list(ref_host.keys())[0:-3]
     v_chrs = {}
+
     for k in list(ref_v.keys()):
         v_chrs[k] = ref_v[k][0:].end
     for vc,v_len in v_chrs.items():
@@ -146,7 +169,8 @@ def simulate(mutforge, host_ref, v_ref,simple_par, out, script_root,depth, host_
             # cmd_parse = "{} {}/main.py parseILP -i {}.checked.lh -s {}.sol -o {}.balanced.lh".format(python, script_root,out_dir,out_dir,out_dir)
             # cmd_solve = "{} --op solve --juncdb {}.junc --in_lh {}.balanced.lh --circuits {}.circuits --hap {}.haps --verbose".format(localhap,out_dir,out_dir,out_dir,out_dir)
             execmd(cmd_mu)
-            run_local(out_dir,script_root,vc,v_len,selected_chrs,depth)
+            gc_bam = gc_correction(out_dir+".lib1.bam",out_dir)
+            run_local(out_dir,script_root,vc,v_len,selected_chrs,depth,gc_bam)
             # execmd(cmd_seek)
 def mk_fa(host_ref,host_chrs,v_ref,v_chr,out):
     # extract
