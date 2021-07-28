@@ -11,11 +11,12 @@ SAMTOOLS = "~/app/samtools/bin/samtools"
 CBC = "~/miniconda3/envs/py2/bin/cbc"
 pbsim = "~/app/pbsim2/src/pbsim"
 pbmodel = "~/app/pbsim2/data/P6C4.model"
+hpvpip_root = "~/app/hpvpip"
 # ~/app/pbsim2/src/pbsim --depth 20 --prefix tgs --hmm_model ~/app/pbsim2/data/P6C4.model test.out.fa
 def execmd(cmd):
     print("Exec: {}".format(cmd))
     logging.info(cmd)
-    os.system(cmd)
+    # os.system(cmd)
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--host_ref',
@@ -59,30 +60,32 @@ def main():
 
 def g_tgs_ref(out_dir,all_chrs, depth = 20):
     out_fa_file = out_dir+".out.fa"
-    out_fa = open(out_fa_file,"w")
-    res = {}
-    for i in all_chrs:
-        res[i] = []
-    ref_host = Fasta(out_dir+".hap1.fa")
-    for k in list(ref_host.keys()):
-        if "original" in k:
-            continue
-        tmp_chr = k.split(":")[5].split("=")[1]
-        res[tmp_chr].append(k)
-    for key,v in res.items():
-        combined_fa = ""
-        for k in v:
-            combined_fa = combined_fa+str(ref_host[k][0:])
-        out_fa.write(">{}\n".format(key))
-        out_fa.write(combined_fa+"\n")
-    out_fa.close()
+    # out_fa = open(out_fa_file,"w")
+    # res = {}
+    # for i in all_chrs:
+    #     res[i] = []
+    # ref_host = Fasta(out_dir+".hap1.fa")
+    # for k in list(ref_host.keys()):
+    #     if "original" in k:
+    #         continue
+    #     tmp_chr = k.split(":")[5].split("=")[1]
+    #     res[tmp_chr].append(k)
+    # for key,v in res.items():
+    #     combined_fa = ""
+    #     for k in v:
+    #         combined_fa = combined_fa+str(ref_host[k][0:])
+    #     out_fa.write(">{}\n".format(key))
+    #     out_fa.write(combined_fa+"\n")
+    # out_fa.close()
 #     simulate tgs
-    cmd1 = "{} --depth {} --prefix tgs --hmm_model {} {}".format(pbsim,depth, pbmodel, out_fa_file)
-    cmd2 = "cat tgs_*.fastq > {}.tgs.fastq".format(out_dir)
+    cmd1 = "{} --depth {} --prefix {} --hmm_model {} {}".format(pbsim,depth, out_dir,pbmodel, out_fa_file)
+    cmd2 = "cat {}_*.fastq > {}.tgs.fastq".format(out_dir,out_dir)
     cmd3 = "sed -n '1~4s/^@/>/p;2~4p' {}.tgs.fastq > {}.tgs.fasta".format(out_dir, out_dir)
+    cmd4 = "{} {}/main.py process_tgs --ref {}/mix.fa -l {}.lh -t {}.tgs.fasta -o {}/tgsout --max_bias 0.2".format(PYTHON, hpvpip_root, out_dir,out_dir,out_dir,out_dir)
     execmd(cmd1)
     execmd(cmd2)
     execmd(cmd3)
+    execmd(cmd4)
 
 
 
@@ -97,7 +100,7 @@ def run_local(out_dir,script_root,vc,v_len,selected_chrs,depth):
     cmd_check = "{} --op check --juncdb {}.junc --in_lh {}.lh --out_lh {}.checked.lh --lp_prefix {} --verbose".format(LOCALHAP, out_dir, out_dir, out_dir, out_dir)
     cmd_cbc = "{} {}.lp solve solu {}.sol".format(CBC,out_dir,out_dir)
     cmd_parse = "{} {}/main.py parseILP -i {}.checked.lh -s {}.sol -o {}.balanced.lh".format(PYTHON, script_root,out_dir,out_dir,out_dir)
-    cmd_solve = "{} --op solve --juncdb {}.junc --in_lh {}.balanced.lh --circuits {}.circuits --hap {}.haps --traversed {}.traversed --verbose".format(LOCALHAP,out_dir,out_dir,out_dir,out_dir,out_dir)
+    cmd_solve = "{} --op solve --juncdb {}.junc --in_lh {}.balanced.lh --circuits {}.circuits --hap {}.haps --traversed {}.traversed --tgs_order {}/tgsout/tgs.juncs --verbose".format(LOCALHAP,out_dir,out_dir,out_dir,out_dir,out_dir,out_dir)
     execmd(cmd_seek)
     execmd(cmd_bps)
     execmd(cmd_depth)
