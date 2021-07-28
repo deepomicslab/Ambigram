@@ -60,23 +60,23 @@ def main():
 
 def g_tgs_ref(out_dir,all_chrs, depth = 20):
     out_fa_file = out_dir+".out.fa"
-    # out_fa = open(out_fa_file,"w")
-    # res = {}
-    # for i in all_chrs:
-    #     res[i] = []
-    # ref_host = Fasta(out_dir+".hap1.fa")
-    # for k in list(ref_host.keys()):
-    #     if "original" in k:
-    #         continue
-    #     tmp_chr = k.split(":")[5].split("=")[1]
-    #     res[tmp_chr].append(k)
-    # for key,v in res.items():
-    #     combined_fa = ""
-    #     for k in v:
-    #         combined_fa = combined_fa+str(ref_host[k][0:])
-    #     out_fa.write(">{}\n".format(key))
-    #     out_fa.write(combined_fa+"\n")
-    # out_fa.close()
+    out_fa = open(out_fa_file,"w")
+    res = {}
+    for i in all_chrs:
+        res[i] = []
+    ref_host = Fasta(out_dir+".hap1.fa")
+    for k in list(ref_host.keys()):
+        if "original" in k:
+            continue
+        tmp_chr = k.split(":")[5].split("=")[1]
+        res[tmp_chr].append(k)
+    for key,v in res.items():
+        combined_fa = ""
+        for k in v:
+            combined_fa = combined_fa+str(ref_host[k][0:])
+        out_fa.write(">{}\n".format(key))
+        out_fa.write(combined_fa+"\n")
+    out_fa.close()
 #     simulate tgs
     cmd1 = "{} --depth {} --prefix {} --hmm_model {} {}".format(pbsim,depth, out_dir,pbmodel, out_fa_file)
     cmd2 = "cat {}_*.fastq > {}.tgs.fastq".format(out_dir,out_dir)
