@@ -22,7 +22,7 @@ samtools = "~/app/samtools/bin/samtools"
 def execmd(cmd):
     print("Exec: {}".format(cmd))
     logging.info(cmd)
-    # os.system(cmd)
+    os.system(cmd)
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--host_ref',
