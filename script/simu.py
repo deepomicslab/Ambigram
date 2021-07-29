@@ -21,7 +21,7 @@ correctGCBias = "/home/xuedowang2/app/conda/envs/py37/bin/correctGCBias"
 samtools = "~/app/samtools/bin/samtools"
 # ~/app/pbsim2/src/pbsim --depth 20 --prefix tgs --hmm_model ~/app/pbsim2/data/P6C4.model test.out.fa
 def execmd(cmd):
-    print("Exec: {}".format(cmd))
+    # print("Exec: {}".format(cmd))
     logging.info(cmd)
     os.system(cmd)
 def main():
@@ -103,7 +103,7 @@ def parse_mean_depth(bam,out_dir,n_size):
         if "#" not in l:
             a = re.split("\s+",l)
             o_size = int(a[2])
-            o_depth = int(a[6])
+            o_depth = int(float(a[6]))
             o_bp = o_bp + o_size * o_depth
     return o_bp/n_size
 def check_dir(dir):
