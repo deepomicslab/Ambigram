@@ -96,14 +96,15 @@ def g_tgs_ref(out_dir,all_chrs, depth = 20):
 def parse_mean_depth(bam,out_dir,n_size):
     cmd = "{} coverage {} > {}.scov".format(samtools, bam,out_dir)
     execmd(cmd)
+    o_size = 0
+    o_bp = 0
     for l in open(out_dir+".scov") :
         if "#" not in l:
             a = re.split("\s+",l)
             o_size = int(a[2])
             o_depth = int(a[6])
-            n_depth = o_depth*(o_size/n_size)
-            break
-    return n_depth
+            o_bp = o_bp + o_size * o_depth
+    return o_bp/n_size
 def check_dir(dir):
     if not os.path.exists(dir):
         os.makedirs(dir,exist_ok=True)
