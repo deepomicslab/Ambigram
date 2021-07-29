@@ -1966,7 +1966,7 @@ void LocalGenomicMap::checkReachability(JunctionDB *aJuncDB, bool verbose) {
             segV.push_back(seg->getNegativeVertex());
             auto segPartitionPair = findPartition(seg->getId());
 //            如果seg是病毒seg那么对任意第一个定点reachable就可以, 否则需要在自己的partition内reachable
-            if (segPartitionPair.first == 0) {
+            if (segPartitionPair.first == this->mGraph->getMSources()->back()->getId()) {
                 auto sources = this->mGraph->getMSources();
                 auto sinks = this->mGraph->getMSinks();
                 for (Vertex *v : segV) {
