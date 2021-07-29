@@ -20,7 +20,7 @@ correctGCBias = "/home/xuedowang2/app/conda/envs/py37/bin/correctGCBias"
 samtools = "~/app/samtools/bin/samtools"
 # ~/app/pbsim2/src/pbsim --depth 20 --prefix tgs --hmm_model ~/app/pbsim2/data/P6C4.model test.out.fa
 def execmd(cmd):
-    print("Exec: {}".format(cmd))
+    logging.info("Exec: {}".format(cmd))
     logging.info(cmd)
     os.system(cmd)
 def main():
@@ -113,11 +113,11 @@ def gc_correction(input_bam, out_dir, effectiveGenomeSize):
     ref = out_dir + "/mix.fa"
     corrected_bam = out_dir+".gc.bam"
     # faToTwoBit hg38_hpv.fa hg38_hpv.bit
-    cmd1 = "echo 'skip ref faToTwoBit'"
-    cmd2 = "echo 'skip generate freq.txt'"
-    if not check_dir(ref+".freq.txt"):
-        cmd1 = "{} {} {}.2bit".format(faToTwoBit, ref, ref)
-        cmd2 = "{} -b {} --effectiveGenomeSize {} -g {}.2bit --GCbiasFrequenciesFile {}.freq.txt".format(computeGCBias, input_bam, effectiveGenomeSize, ref, ref)
+    # cmd1 = "echo 'skip ref faToTwoBit'"
+    # cmd2 = "echo 'skip generate freq.txt'"
+    # if not check_dir(ref+".freq.txt"):
+    cmd1 = "{} {} {}.2bit".format(faToTwoBit, ref, ref)
+    cmd2 = "{} -b {} --effectiveGenQomeSize {} -g {}.2bit --GCbiasFrequenciesFile {}.freq.txt".format(computeGCBias, input_bam, effectiveGenomeSize, ref, ref)
     cmd3 = "{} -b {} --effectiveGenomeSize {} -g {}.2bit --GCbiasFrequenciesFile {}.freq.txt -o {}".format(correctGCBias, input_bam, effectiveGenomeSize, ref, ref, corrected_bam)
     cmd4 = "{} index {} -@ {}".format(samtools, corrected_bam, 48)
     execmd(cmd1)
