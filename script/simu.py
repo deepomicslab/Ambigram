@@ -6,6 +6,7 @@ import argparse
 import logging
 import e_size
 import re
+logging.basicConfig(level=logging.DEBUG)
 
 PYTHON = "~/miniconda3/envs/py3/bin/python"
 LOCALHAP = "/home/gzpan2/app/localhaptgs/debug/localHap"
@@ -20,9 +21,9 @@ correctGCBias = "/home/xuedowang2/app/conda/envs/py37/bin/correctGCBias"
 samtools = "~/app/samtools/bin/samtools"
 # ~/app/pbsim2/src/pbsim --depth 20 --prefix tgs --hmm_model ~/app/pbsim2/data/P6C4.model test.out.fa
 def execmd(cmd):
-    logging.info("Exec: {}".format(cmd))
+    print("Exec: {}".format(cmd))
     logging.info(cmd)
-    os.system(cmd)
+    #os.system(cmd)
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--host_ref',

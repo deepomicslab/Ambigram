@@ -26,6 +26,7 @@ protected:
     vector<EdgePath> *mRawPathEdges;
 
     vector<VertexPath *> *mCircuits;
+    unordered_map<int, vector<VertexPath *> *> *traversedCircuits;
     unordered_map<int, vector<VertexPath *> *> *dividedCircuits;
     unordered_map<int, vector<VertexPath *> *> *dividedHaploids;
     vector<VertexPath *> *mHaploids;

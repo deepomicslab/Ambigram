@@ -22,6 +22,7 @@ LocalGenomicMap::LocalGenomicMap(Graph *aGraph) {
     mHaploids = new vector<VertexPath *>();
     dividedCircuits = new unordered_map<int, vector<VertexPath *> *>();
     dividedHaploids = new unordered_map<int, vector<VertexPath *> *>();
+    traversedCircuits = new unordered_map<int, vector<VertexPath *> *>();
     usingLong = false;
     usingHic = false;
 }
@@ -50,7 +51,7 @@ void LocalGenomicMap::read_long_frags(const char *fn) {
     for(auto i: *mGraph->getMSources()) {
         (*mLongFrags)[i->getId()] = new vector<VertexPath *>();
     }
-    (*mLongFrags)[0] = new vector<VertexPath *>();
+//    (*mLongFrags)[0] = new vector<VertexPath *>();
     ifstream in(fn);
     string line, value;
     stringstream ss;
@@ -2638,9 +2639,9 @@ pair<int, int> LocalGenomicMap::findPartition(int id) {
         auto sId = (*sources)[i]->getId();
         auto eId = (*sinks)[i]->getId();
         if (id >= sId && id <= eId) {
-            if (sId == sources->back()->getId()) {
-                return make_pair(0,0);
-            } else
+//            if (sId == sources->back()->getId()) {
+//                return make_pair(0,0);
+//            } else
                 return make_pair(sId, eId);
         }
     }
@@ -2653,14 +2654,14 @@ pair<int, int> LocalGenomicMap::findLongPathPartition(VertexPath* vp) {
 //        auto tParPair = findPartition(v->getId());
 //        if(tParPair.first == 0 || tParPair.first = parPair.first)
 //    }
-    int startId = 0;
-    int endId = 0;
+    int startId = mGraph->getMSources()->back()->getId();
+    int endId = mGraph->getMSinks()->back()->getId();
     auto v = vp->begin();
     while(v != vp->end()){
         auto tParPair = findPartition((*v)->getId());
         v++;
-        if(tParPair.first == 0) continue;
-        else if(startId == 0){
+        if(tParPair.first == mGraph->getMSources()->back()->getId()) continue;
+        else if(startId == mGraph->getMSources()->back()->getId()){
             startId = tParPair.first;
             endId = tParPair.second;
         } else if (tParPair.first != startId) {
@@ -2686,8 +2687,8 @@ void LocalGenomicMap::traverse(Vertex *aStartVertex, JunctionDB *aJuncDB) {
 //    current traverse path partition
     int *partitionStart = new int();
     int *partitionEnd = new int();
-    *partitionStart = 0;
-    *partitionEnd = 0;
+    *partitionStart = mGraph->getMSources()->back()->getId();
+    *partitionEnd = mGraph->getMSinks()->back()->getId();
     auto *vp = new VertexPath();
     auto *ep = new EdgePath();
     Vertex *currentVertex;
@@ -2722,9 +2723,13 @@ void LocalGenomicMap::traverse(Vertex *aStartVertex, JunctionDB *aJuncDB) {
             currentVertex = nextEdge->getTarget();
         }
     }
-
+    if (traversedCircuits->count(*partitionStart) != 0)
+        (*traversedCircuits)[*partitionStart]->push_back(vp);
+    else {
+        (*traversedCircuits)[*partitionStart] = new vector<VertexPath *>();
+        (*traversedCircuits)[*partitionStart]->push_back(vp);
+    }
     mCircuits->push_back(vp);
-
     cout << "Traversed path: ";
     for (Vertex *v: *vp) {
         cout << v->getInfo() << " ";
@@ -2840,7 +2845,7 @@ bool LocalGenomicMap::checkPartition(int eTargetId, int *partitionStart, int *pa
         return true;
     } else {
         auto partitionPair = findPartition(eTargetId);
-        if (*partitionStart == 0) {
+        if (*partitionStart == mGraph->getMSources()->back()->getId()) {
             *partitionStart = partitionPair.first;
             *partitionEnd = partitionPair.second;
             return true;
@@ -2856,7 +2861,7 @@ bool LocalGenomicMap::checkCommon(int eTargetId, int *partitionStart, int *parti
         return true;
     } else {
         auto partitionPair = findPartition(eTargetId);
-        if (*partitionStart == 0) {
+        if (*partitionStart == mGraph->getMSources()->back()->getId()) {
             *partitionStart = partitionPair.first;
             *partitionEnd = partitionPair.second;
             return true;
@@ -2981,7 +2986,7 @@ void LocalGenomicMap::divideCircuits() {
 //    divide circuits to each partition, for common peace, divide averagely
     auto sources = mGraph->getMSources();
     int index = 0;
-    int size = sources->size() - 1;
+    int size = sources->size();
     for (int i = 0; i < size ; i ++) {
         auto seg = (*sources)[i];
         (*dividedCircuits)[seg->getId()] = new vector<VertexPath *>();
@@ -3018,6 +3023,7 @@ void LocalGenomicMap::writeCircuits(const char *outFn) {
     }
     fout.close();
 }
+//TODO if merge the virus path
 void LocalGenomicMap::writeTraversedPath(const char *outFn) {
     cout << "Write Traversed Path" << endl;
     ofstream fout(outFn);
@@ -3025,11 +3031,21 @@ void LocalGenomicMap::writeTraversedPath(const char *outFn) {
         cout << "Cannot open file " << outFn << ": no such file or directory" << endl;
         exit(1);
     }
-    for (auto circuits : *(mCircuits)) {
-        for (Vertex *v : *circuits) {
-            fout << v->getInfo() << " ";
+    for (auto &it : *traversedCircuits) {
+        auto circuits = it.second;
+        auto fSeg = mGraph->getSegmentById(it.first);
+        fout <<fSeg->getChrom()<<"_"<<fSeg->getStart()<<":";
+        for (auto circuit : *(circuits)) {
+            fout << circuit->front()->getInfo()<<" ";
+            int startId = circuit->front()->getId();
+            for (auto v = circuit->begin() + 1; v != circuit->end() -1;) {
+                if ((*v)->getId() == startId)
+                    fout<<":";
+                fout << (*v)->getInfo() << " ";
+                v++;
+            }
         }
-        fout << endl;
+        fout << "\n";
     }
 }
 
