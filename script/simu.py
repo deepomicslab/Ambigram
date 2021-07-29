@@ -111,7 +111,8 @@ def check_dir(dir):
         os.makedirs(dir,exist_ok=True)
 
 def gc_correction(input_bam, out_dir, effectiveGenomeSize):
-    cmd4 = "{} index {} -@ {}".format(samtools, input_bam, 48)
+    cmd5 = "{} index {} -@ {}".format(samtools, input_bam, 48)
+    execmd(cmd5)
     ref = out_dir + "/mix.fa"
     corrected_bam = out_dir+".gc.bam"
     # faToTwoBit hg38_hpv.fa hg38_hpv.bit
