@@ -118,6 +118,8 @@ def gc_correction(input_bam, out_dir, effectiveGenomeSize):
     # cmd2 = "echo 'skip generate freq.txt'"
     # if not check_dir(ref+".freq.txt"):
     cmd1 = "{} {} {}.2bit".format(faToTwoBit, ref, ref)
+    while not os.path.exists(input_bam+".bai"):
+        pass
     cmd2 = "{} -b {} --effectiveGenomeSize {} -g {}.2bit --GCbiasFrequenciesFile {}.freq.txt".format(computeGCBias, input_bam, effectiveGenomeSize, ref, ref)
     cmd3 = "{} -b {} --effectiveGenomeSize {} -g {}.2bit --GCbiasFrequenciesFile {}.freq.txt -o {}".format(correctGCBias, input_bam, effectiveGenomeSize, ref, ref, corrected_bam)
     cmd4 = "{} index {} -@ {}".format(samtools, corrected_bam, 48)
