@@ -88,13 +88,13 @@ def g_tgs_ref(out_dir,all_chrs, depth = 20):
     cmd1 = "{} --depth {} --prefix {} --hmm_model {} {}".format(pbsim,depth, out_dir,pbmodel, out_fa_file)
     cmd2 = "cat {}_*.fastq > {}.tgs.fastq".format(out_dir,out_dir)
     cmd3 = "sed -n '1~4s/^@/>/p;2~4p' {}.tgs.fastq > {}.tgs.fasta".format(out_dir, out_dir)
-    cmd4 = "{} {}/main.py process_tgs --ref {}/mix.fa -l {}.lh -t {}.tgs.fasta -o {}/tgsout --max_bias 0.2".format(PYTHON, hpvpip_root, out_dir,out_dir,out_dir,out_dir)
-    cmd_tgs = "{} {}/main.py process_tgs -r {}/mix.fa -l {}.balance.lh -t {}.tgs.fasta -o {}/tgs".format(PYTHON, hpvpip_root, out_dir,out_dir,out_dir,out_dir)
+    cmd4 = "{} {}/main.py process_tgs --ref {}/mix.fa -l {}.lh -t {}.tgs.fasta -o {}/tgs --max_bias 0.2".format(PYTHON, hpvpip_root, out_dir,out_dir,out_dir,out_dir)
+    # cmd_tgs = "{} {}/main.py process_tgs -r {}/mix.fa -l {}.balanced.lh -t {}.tgs.fasta -o {}/tgs".format(PYTHON, hpvpip_root, out_dir,out_dir,out_dir,out_dir)
     execmd(cmd1)
     execmd(cmd2)
     execmd(cmd3)
     execmd(cmd4)
-    execmd(cmd_tgs)
+    # execmd(cmd_tgs)
 
 def parse_mean_depth(bam,out_dir,n_size):
     cmd = "{} coverage {} > {}.scov".format(samtools, bam,out_dir)
