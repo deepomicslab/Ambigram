@@ -14,7 +14,7 @@ SAMTOOLS = "~/app/samtools/bin/samtools"
 CBC = "~/miniconda3/envs/py2/bin/cbc"
 pbsim = "~/app/pbsim2/src/pbsim"
 pbmodel = "~/app/pbsim2/data/P6C4.model"
-hpvpip_root = "~/app/hpvpip"
+hpvpip_root = "~/app/hpvpipe"
 faToTwoBit = "~/app/faToTwoBit"
 computeGCBias = "/home/xuedowang2/app/conda/envs/py37/bin/computeGCBias"
 correctGCBias = "/home/xuedowang2/app/conda/envs/py37/bin/correctGCBias"
@@ -89,10 +89,12 @@ def g_tgs_ref(out_dir,all_chrs, depth = 20):
     cmd2 = "cat {}_*.fastq > {}.tgs.fastq".format(out_dir,out_dir)
     cmd3 = "sed -n '1~4s/^@/>/p;2~4p' {}.tgs.fastq > {}.tgs.fasta".format(out_dir, out_dir)
     cmd4 = "{} {}/main.py process_tgs --ref {}/mix.fa -l {}.lh -t {}.tgs.fasta -o {}/tgsout --max_bias 0.2".format(PYTHON, hpvpip_root, out_dir,out_dir,out_dir,out_dir)
+    cmd_tgs = "{} {}/main.py process_tgs -r {}/mix.fa -l {}.balance.lh -t {}.tgs.fasta -o {}/tgs".format(PYTHON, hpvpip_root, out_dir,out_dir,out_dir,out_dir)
     execmd(cmd1)
     execmd(cmd2)
     execmd(cmd3)
     execmd(cmd4)
+    execmd(cmd_tgs)
 
 def parse_mean_depth(bam,out_dir,n_size):
     cmd = "{} coverage {} > {}.scov".format(samtools, bam,out_dir)
@@ -141,7 +143,7 @@ def run_local(out_dir,script_root,vc,v_len,selected_chrs,depth, gc_bam):
     cmd_check = "{} --op check --juncdb {}.junc --in_lh {}.lh --out_lh {}.checked.lh --lp_prefix {} --verbose".format(LOCALHAP, out_dir, out_dir, out_dir, out_dir)
     cmd_cbc = "{} {}.lp solve solu {}.sol".format(CBC,out_dir,out_dir)
     cmd_parse = "{} {}/main.py parseILP -i {}.checked.lh -s {}.sol -o {}.balanced.lh".format(PYTHON, script_root,out_dir,out_dir,out_dir)
-    cmd_solve = "{} --op solve --juncdb {}.junc --in_lh {}.balanced.lh --circuits {}.circuits --hap {}.haps --traversed {}.traversed --tgs_order {}/tgsout/tgs.juncs --verbose".format(LOCALHAP,out_dir,out_dir,out_dir,out_dir,out_dir,out_dir)
+    cmd_solve = "{} --op solve --juncdb {}.junc --in_lh {}.balanced.lh --circuits {}.circuits --hap {}.haps --traversed {}.traversed --tgs_order {}/tgs/tgs.juncs --verbose".format(LOCALHAP,out_dir,out_dir,out_dir,out_dir,out_dir,out_dir)
     execmd(cmd_seek)
     execmd(cmd_bps)
     execmd(cmd_depth)
@@ -152,7 +154,6 @@ def run_local(out_dir,script_root,vc,v_len,selected_chrs,depth, gc_bam):
     selected_chrs.append(vc)
     g_tgs_ref(out_dir,selected_chrs)
     execmd(cmd_solve)
-
 
 def simulate(mutforge, host_ref, v_ref,simple_par, out, script_root,depth, host_count, s_times):
     ref_host = Fasta(host_ref)
