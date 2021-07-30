@@ -125,7 +125,7 @@ def gc_correction(input_bam, out_dir, effectiveGenomeSize):
     while not os.path.exists(input_bam+".bai"):
         pass
     cmd2 = "{} -b {} --effectiveGenomeSize {} -g {}.2bit --GCbiasFrequenciesFile {}.freq.txt".format(computeGCBias, input_bam, effectiveGenomeSize, ref, ref)
-    cmd3 = "{} -b {} --effectiveGenomeSize {} -g {}.2bit --GCbiasFrequenciesFile {}.freq.txt -o {}".format(correctGCBias, input_bam, effectiveGenomeSize, ref, ref, corrected_bam)
+    cmd3 = "{} -b {} --effectiveGenomeSize {} -g {}.2bit --numberOfProcessors 64 --GCbiasFrequenciesFile {}.freq.txt -o {}".format(correctGCBias, input_bam, effectiveGenomeSize, ref, ref, corrected_bam)
     cmd4 = "{} index {} -@ {}".format(samtools, corrected_bam, 48)
     execmd(cmd1)
     execmd(cmd2)
