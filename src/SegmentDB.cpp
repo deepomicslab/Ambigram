@@ -3,7 +3,7 @@
 #include <fstream>
 
 #include "SegmentDB.hpp"
-#include "SVprofile.hpp"
+//#include "SVprofile.hpp"
 
 using namespace std;
 
@@ -41,15 +41,15 @@ void SegmentDB::readSegs(const char *aFilename) {
     fin.close();
 }
 
-void SegmentDB::updateBps(SVprofile *aSVprofile) {
-    vector<int> *bps = aSVprofile->getBps();
-    for (int i = 0; i < bps->size(); i++) {
-        vector<int>::iterator iterBps = lower_bound(mBps->begin(), mBps->end(), (*bps)[i]);
-        if (iterBps == mBps->end() || *iterBps != (*bps)[i]) {
-            mBps->insert(iterBps, (*bps)[i]);
-        }
-    }
-}
+//void SegmentDB::updateBps(SVprofile *aSVprofile) {
+//    vector<int> *bps = aSVprofile->getBps();
+//    for (int i = 0; i < bps->size(); i++) {
+//        vector<int>::iterator iterBps = lower_bound(mBps->begin(), mBps->end(), (*bps)[i]);
+//        if (iterBps == mBps->end() || *iterBps != (*bps)[i]) {
+//            mBps->insert(iterBps, (*bps)[i]);
+//        }
+//    }
+//}
 
 void SegmentDB::constructSegsFromBps() {
     mSegs->clear();
