@@ -225,7 +225,7 @@ def generate_var(host_chrs,v_chr,v_len,out,fa_file):
         r_start = random.randint(20000000, 25005000)
         r_end = random.randint(r_start + 1000, r_start+10000)
         del_regions = []
-        for i in range(0,3):
+        for i in range(0,2):
             tmp0 = ""
             tmp1 = ""
             pos = random.randint(r_start, r_end)
