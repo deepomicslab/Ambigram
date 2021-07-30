@@ -229,7 +229,7 @@ def generate_var(host_chrs,v_chr,v_len,out,fa_file):
             tmp1 = ""
             pos = random.randint(r_start, r_end)
             # del
-            if pos%3==0:
+            if False:
                 d_size = random.randint(500,3000)
                 while in_region(pos, del_regions) or in_region(pos+d_size,del_regions):
                     pos = random.randint(r_start, r_end)
