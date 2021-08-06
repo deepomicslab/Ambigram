@@ -19,6 +19,7 @@ faToTwoBit = "~/app/faToTwoBit"
 computeGCBias = "/home/xuedowang2/app/conda/envs/py37/bin/computeGCBias"
 correctGCBias = "/home/xuedowang2/app/conda/envs/py37/bin/correctGCBias"
 samtools = "~/app/samtools/bin/samtools"
+sim3c = "/home/gzpan2/.local/bin/sim3C"
 # ~/app/pbsim2/src/pbsim --depth 20 --prefix tgs --hmm_model ~/app/pbsim2/data/P6C4.model test.out.fa
 def execmd(cmd):
     # print("Exec: {}".format(cmd))
@@ -64,6 +65,12 @@ def main():
     simulate(args.mutforge, args.host_ref, args.v_ref,args.simple_par, args.out, args.script_root, args.depth, args.host_count, args.s_times)
 # def sim_tgs(out_dir,depth = 20):
 #     cmd1 = "{} --depth {} --prefix tgs --hmm_model {} test.out.fa"
+def g_hic(t_len,out_dir):
+    nreads = 150*t_len/15
+    cmd = "{} --simple-reads --dist  uniform -n {} -l 150 -e NlaIII -m hic {}/mix.fa {}.hic.fq".format(sim3c, nreads, out_dir,out_dir)
+    cmd_p = "{} {}/main.py process_hic --in_lh {}/test.lh --fq1 {}.hic.fq1 --fq2 {}.hic.fq2 --ref {}/mix.fa --out_dir {}".format(PYTHON,hpvpip_root, out_dir, out_dir, out_dir, out_dir, out_dir)
+    execmd(cmd)
+    execmd(cmd_p)
 
 def g_tgs_ref(out_dir,all_chrs, depth = 20):
     out_fa_file = out_dir+".out.fa"
@@ -133,7 +140,7 @@ def gc_correction(input_bam, out_dir, effectiveGenomeSize):
     execmd(cmd4)
     return corrected_bam
 
-def run_local(out_dir,script_root,vc,v_len,selected_chrs,depth, gc_bam):
+def run_local(out_dir,script_root,vc,v_len,selected_chrs,depth, gc_bam, total_size):
     cmd_seek="bash {}/seek.sh {} {}.lib1.bam {}/mix.fa".format(script_root,out_dir,out_dir,out_dir)
     cmd_bps = "{} {}/main.py bpsmap -l {}.seek.sv.txt -o {} -v {} --v_len {} --h_chrs {} --out_bed {}.bed".format(PYTHON, script_root,out_dir,out_dir,vc,v_len, ','.join(selected_chrs),out_dir)
     bed_file = out_dir+".bed"
@@ -153,6 +160,7 @@ def run_local(out_dir,script_root,vc,v_len,selected_chrs,depth, gc_bam):
     execmd(cmd_parse)
     selected_chrs.append(vc)
     g_tgs_ref(out_dir,selected_chrs)
+    g_hic(total_size,out_dir)
     execmd(cmd_solve)
 
 def simulate(mutforge, host_ref, v_ref,simple_par, out, script_root,depth, host_count, s_times):
@@ -193,7 +201,7 @@ def simulate(mutforge, host_ref, v_ref,simple_par, out, script_root,depth, host_
             total_size = total_size + v_len + sum([e_size.sizes[c] for c in selected_chrs])
             gc_bam = gc_correction(out_dir+".lib1.bam",out_dir,total_size)
             n_depth = parse_mean_depth(gc_bam,out_dir,total_size)
-            run_local(out_dir,script_root,vc,v_len,selected_chrs,n_depth,gc_bam)
+            run_local(out_dir,script_root,vc,v_len,selected_chrs,n_depth,gc_bam,total_size)
             # execmd(cmd_seek)
 def mk_fa(host_ref,host_chrs,v_ref,v_chr,out):
     # extract
@@ -221,9 +229,11 @@ def generate_var(host_chrs,v_chr,v_len,out,fa_file):
     var_file=os.path.join(out,"mix.var")
     var_out = open(var_file, "w")
     chr_num = len(host_chrs)
+    r_start = 20000000
     for hc in host_chrs:
-        r_start = random.randint(20000000, 25005000)
-        r_end = random.randint(r_start + 1000, r_start+10000)
+        # r_start = random.randint(20000000, 25005000)
+        r_start = r_start + random.randint(2000, 10000)
+        r_end = random.randint(r_start + 2000, r_start+10000)
         del_regions = []
         for i in range(0,2):
             tmp0 = ""
@@ -242,10 +252,10 @@ def generate_var(host_chrs,v_chr,v_len,out,fa_file):
                 # ins
                 rev = "f"
                 i_start = random.randint(700,v_len - 500)
-                i_end = random.randint(i_start + 300,i_start + 700)
+                i_end = random.randint(i_start + 800,i_start + 2000)
                 while in_region(i_start, del_regions) or in_region(i_end,del_regions):
-                    i_start = random.randint(100,v_len - 1500)
-                    i_end = random.randint(i_start + 500,v_len)
+                    i_start = random.randint(700,v_len - 500)
+                    i_end = random.randint(i_start + 800,i_start + 2000)
                 times = random.randint(1,3)
                 if i_start%3 == 0:
                     rev = "r"
