@@ -66,7 +66,7 @@ def main():
 # def sim_tgs(out_dir,depth = 20):
 #     cmd1 = "{} --depth {} --prefix tgs --hmm_model {} test.out.fa"
 def g_hic(t_len,out_dir):
-    nreads = 150*t_len/15
+    nreads = int(15*t_len/150)
     cmd = "{} --simple-reads --dist  uniform -n {} -l 150 -e NlaIII -m hic {}/mix.fa {}.hic.fq".format(sim3c, nreads, out_dir,out_dir)
     cmd_p = "{} {}/main.py process_hic --in_lh {}/test.lh --fq1 {}.hic.fq1 --fq2 {}.hic.fq2 --ref {}/mix.fa --out_dir {}".format(PYTHON,hpvpip_root, out_dir, out_dir, out_dir, out_dir, out_dir)
     execmd(cmd)
