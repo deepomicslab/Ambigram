@@ -14,12 +14,14 @@ SAMTOOLS = "~/app/samtools/bin/samtools"
 CBC = "~/miniconda3/envs/py2/bin/cbc"
 pbsim = "~/app/pbsim2/src/pbsim"
 pbmodel = "~/app/pbsim2/data/P6C4.model"
+nanomodel = "~/app/pbsim2/data/R95.model"
 hpvpip_root = "~/app/hpvpipe"
 faToTwoBit = "~/app/faToTwoBit"
 computeGCBias = "~/miniconda3/envs/py3.6/bin/computeGCBias"
 correctGCBias = "~/miniconda3/envs/py3.6/bin/correctGCBias"
 samtools = "~/app/samtools/bin/samtools"
 sim3c = "/home/gzpan2/.local/bin/sim3C"
+ISPB=1
 # ~/app/pbsim2/src/pbsim --depth 20 --prefix tgs --hmm_model ~/app/pbsim2/data/P6C4.model test.out.fa
 def execmd(cmd):
     # print("Exec: {}".format(cmd))
@@ -61,13 +63,19 @@ def main():
                         type=int,
                         default=1,
                         help='simple_par')
+    parser.add_argument('--pb',
+                        required=True,
+                        type=int,
+                        default=1,
+                        help='simple_par')
     args = parser.parse_args()
     if not os.path.exists(args.out):
         os.mkdir(args.out)
     # choose host chr
     # mk_fa(args.host_ref, host_chrs, args.v_ref, args.v_chr, args.out)
     # generate_var(host_chrs, args.v_chr, v_len,args.out,args.v_ref)
-    simulate(args.mutforge, args.host_ref, args.v_ref,args.simple_par, args.out, args.script_root, args.depth, args.host_count, args.s_times, args.hic)
+    simulate(args.mutforge, args.host_ref, args.v_ref,args.simple_par, args.out, args.script_root, args.depth, args.host_count, args.s_times, args.hic, args.pb)
+    ISPB = args.pb
 # def sim_tgs(out_dir,depth = 20):
 #     cmd1 = "{} --depth {} --prefix tgs --hmm_model {} test.out.fa"
 def g_hic(t_len,out_dir):
@@ -77,7 +85,7 @@ def g_hic(t_len,out_dir):
     execmd(cmd)
     execmd(cmd_p)
 
-def g_tgs_ref(out_dir,all_chrs, depth = 20):
+def g_tgs_ref(out_dir,all_chrs, pb,depth = 20):
     out_fa_file = out_dir+".out.fa"
     out_fa = open(out_fa_file,"w")
     res = {}
@@ -97,7 +105,10 @@ def g_tgs_ref(out_dir,all_chrs, depth = 20):
         out_fa.write(combined_fa+"\n")
     out_fa.close()
 #     simulate tgs
-    cmd1 = "{} --depth {} --prefix {} --hmm_model {} {}".format(pbsim,depth, out_dir,pbmodel, out_fa_file)
+    if pb == 1:
+        cmd1 = "{} --depth {} --prefix {} --hmm_model {} {}".format(pbsim,depth, out_dir,pbmodel, out_fa_file)
+    else:
+        cmd1 = "{} --depth {} --prefix {} --hmm_model {} {}".format(pbsim,depth, out_dir, nanomodel, out_fa_file)
     cmd2 = "cat {}_*.fastq > {}.tgs.fastq".format(out_dir,out_dir)
     cmd3 = "sed -n '1~4s/^@/>/p;2~4p' {}.tgs.fastq > {}.tgs.fasta".format(out_dir, out_dir)
     cmd4 = "{} {}/main.py process_tgs --ref {}/mix.fa -l {}.lh -t {}.tgs.fasta -o {}/tgs --max_bias 0.2".format(PYTHON, hpvpip_root, out_dir,out_dir,out_dir,out_dir)
@@ -145,7 +156,7 @@ def gc_correction(input_bam, out_dir, effectiveGenomeSize):
     execmd(cmd4)
     return corrected_bam
 
-def run_local(out_dir,script_root,vc,v_len,selected_chrs,depth, gc_bam, total_size):
+def run_local(out_dir,script_root,vc,v_len,selected_chrs,depth, gc_bam, total_size, pb):
     cmd_seek="bash {}/seek.sh {} {}.lib1.bam {}/mix.fa".format(script_root,out_dir,out_dir,out_dir)
     cmd_bps = "{} {}/main.py bpsmap -l {}.seek.sv.txt -o {} -v {} --v_len {} --h_chrs {} --out_bed {}.bed".format(PYTHON, script_root,out_dir,out_dir,vc,v_len, ','.join(selected_chrs),out_dir)
     bed_file = out_dir+".bed"
@@ -164,11 +175,11 @@ def run_local(out_dir,script_root,vc,v_len,selected_chrs,depth, gc_bam, total_si
     execmd(cmd_cbc)
     execmd(cmd_parse)
     selected_chrs.append(vc)
-    g_tgs_ref(out_dir,selected_chrs)
+    g_tgs_ref(out_dir,selected_chrs, pb)
     # g_hic(total_size,out_dir)
     execmd(cmd_solve)
 
-def simulate(mutforge, host_ref, v_ref,simple_par, out, script_root,depth, host_count, s_times, hic):
+def simulate(mutforge, host_ref, v_ref,simple_par, out, script_root,depth, host_count, s_times, hic, pb):
     ref_host = Fasta(host_ref)
     ref_v = Fasta(v_ref)
     host_chrs = list(ref_host.keys())[0:-3]
@@ -206,7 +217,7 @@ def simulate(mutforge, host_ref, v_ref,simple_par, out, script_root,depth, host_
             total_size = total_size + v_len + sum([e_size.sizes[c] for c in selected_chrs])
             gc_bam = gc_correction(out_dir+".lib1.bam",out_dir,total_size)
             n_depth = parse_mean_depth(gc_bam,out_dir,total_size)
-            run_local(out_dir,script_root,vc,v_len,selected_chrs,n_depth,gc_bam,total_size)
+            run_local(out_dir,script_root,vc,v_len,selected_chrs,n_depth,gc_bam,total_size, pb)
             if hic == 1:
                 g_hic(total_size,out_dir)
             # execmd(cmd_seek)
