@@ -56,13 +56,18 @@ def main():
                         required=True,
                         type=int,
                         help='simple_par')
+    parser.add_argument('--hic',
+                        required=True,
+                        type=int,
+                        default=1,
+                        help='simple_par')
     args = parser.parse_args()
     if not os.path.exists(args.out):
         os.mkdir(args.out)
     # choose host chr
     # mk_fa(args.host_ref, host_chrs, args.v_ref, args.v_chr, args.out)
     # generate_var(host_chrs, args.v_chr, v_len,args.out,args.v_ref)
-    simulate(args.mutforge, args.host_ref, args.v_ref,args.simple_par, args.out, args.script_root, args.depth, args.host_count, args.s_times)
+    simulate(args.mutforge, args.host_ref, args.v_ref,args.simple_par, args.out, args.script_root, args.depth, args.host_count, args.s_times, args.hic)
 # def sim_tgs(out_dir,depth = 20):
 #     cmd1 = "{} --depth {} --prefix tgs --hmm_model {} test.out.fa"
 def g_hic(t_len,out_dir):
@@ -160,10 +165,10 @@ def run_local(out_dir,script_root,vc,v_len,selected_chrs,depth, gc_bam, total_si
     execmd(cmd_parse)
     selected_chrs.append(vc)
     g_tgs_ref(out_dir,selected_chrs)
-    g_hic(total_size,out_dir)
+    # g_hic(total_size,out_dir)
     execmd(cmd_solve)
 
-def simulate(mutforge, host_ref, v_ref,simple_par, out, script_root,depth, host_count, s_times):
+def simulate(mutforge, host_ref, v_ref,simple_par, out, script_root,depth, host_count, s_times, hic):
     ref_host = Fasta(host_ref)
     ref_v = Fasta(v_ref)
     host_chrs = list(ref_host.keys())[0:-3]
@@ -202,6 +207,8 @@ def simulate(mutforge, host_ref, v_ref,simple_par, out, script_root,depth, host_
             gc_bam = gc_correction(out_dir+".lib1.bam",out_dir,total_size)
             n_depth = parse_mean_depth(gc_bam,out_dir,total_size)
             run_local(out_dir,script_root,vc,v_len,selected_chrs,n_depth,gc_bam,total_size)
+            if hic == 1:
+                g_hic(total_size,out_dir)
             # execmd(cmd_seek)
 def mk_fa(host_ref,host_chrs,v_ref,v_chr,out):
     # extract
