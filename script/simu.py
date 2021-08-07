@@ -73,7 +73,7 @@ def main():
 def g_hic(t_len,out_dir):
     nreads = int(15*t_len/150)
     cmd = "{} --simple-reads --dist  uniform -n {} -l 150 -e NlaIII -m hic {}/mix.fa {}.hic.fq".format(sim3c, nreads, out_dir,out_dir)
-    cmd_p = "{} {}/main.py process_hic --in_lh {}/test.lh --fq1 {}.hic.fq1 --fq2 {}.hic.fq2 --ref {}/mix.fa --out_dir {}".format(PYTHON,hpvpip_root, out_dir, out_dir, out_dir, out_dir, out_dir)
+    cmd_p = "{} {}/main.py process_hic --in_lh {}.lh --fq1 {}.hic.fq1 --fq2 {}.hic.fq2 --ref {}/mix.fa --out_dir {}".format(PYTHON,hpvpip_root, out_dir, out_dir, out_dir, out_dir, out_dir)
     execmd(cmd)
     execmd(cmd_p)
 
