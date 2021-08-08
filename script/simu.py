@@ -78,10 +78,40 @@ def main():
     ISPB = args.pb
 # def sim_tgs(out_dir,depth = 20):
 #     cmd1 = "{} --depth {} --prefix tgs --hmm_model {} test.out.fa"
-def g_hic(t_len,out_dir):
+
+
+# from pyfaidx import Fasta,Faidx
+def g_tgs_muted_ref(out_dir,all_chrs):
+    out_file = out_dir+".muted.fa"
+    out_fa = open(out_file,"w")
+    res = {}
+    for i in all_chrs:
+        res[i] = []
+    ref_host = Fasta(out_dir+".hap1.fa")
+    for k in list(ref_host.keys()):
+        if "mutated" in k:
+            continue
+        tmp_chr = k.split(":")[5].split("=")[1]
+        res[tmp_chr].append(k)
+    for key,v in res.items():
+        combined_fa = ""
+        for k in v:
+            combined_fa = combined_fa+str(ref_host[k][0:])
+        out_fa.write(">{}\n".format(key))
+        out_fa.write(combined_fa+"\n")
+    out_fa.close()
+    return out_file
+# chrs = sys.argv[2]
+# out = sys.argv[1]
+# a = chrs.split(",")
+
+
+def g_hic(muted_fa, t_len,out_dir):
     nreads = int(15*t_len/150)
-    cmd = "{} --simple-reads --dist  uniform -n {} -l 150 -e NlaIII -m hic {}/mix.fa {}.hic.fq".format(sim3c, nreads, out_dir,out_dir)
+    cmd_faidx = "{} faidx {}".format(SAMTOOLS, muted_fa)
+    cmd = "{} --simple-reads --dist  uniform -n {} -l 150 -e NlaIII -m hic {} {}.hic.fq".format(sim3c, nreads, muted_fa,out_dir)
     cmd_p = "{} {}/main.py process_hic --in_lh {}.lh --fq1 {}.hic.fq1 --fq2 {}.hic.fq2 --ref {}/mix.fa --out_dir {}".format(PYTHON,hpvpip_root, out_dir, out_dir, out_dir, out_dir, out_dir)
+    execmd(cmd_faidx)
     execmd(cmd)
     execmd(cmd_p)
 
@@ -219,7 +249,9 @@ def simulate(mutforge, host_ref, v_ref,simple_par, out, script_root,depth, host_
             n_depth = parse_mean_depth(gc_bam,out_dir,total_size)
             run_local(out_dir,script_root,vc,v_len,selected_chrs,n_depth,gc_bam,total_size, pb)
             if hic == 1:
-                g_hic(total_size,out_dir)
+                selected_chrs.append(vc)
+                muted_fa = g_tgs_muted_ref(out_dir,selected_chrs)
+                g_hic(muted_fa,total_size,out_dir)
             # execmd(cmd_seek)
 def mk_fa(host_ref,host_chrs,v_ref,v_chr,out):
     # extract
