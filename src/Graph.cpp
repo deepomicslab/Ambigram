@@ -341,7 +341,7 @@ void Graph::calculateHapDepth() {
 
     // mHaploidDepth = mAvgCoverageRaw / mAvgPloidy;
     // mHaploidDepthJunc = mAvgCoverageRawJunc / mAvgPloidy;
-    mHaploidDepth = mAvgCoverageRaw / mAvgPloidy;
+    mHaploidDepth = mAvgCoverageRaw * mPurity / mAvgPloidy;
     mHaploidDepthJunc = mHaploidDepth;
     cout << "Average ploidy: " << mAvgPloidy << endl
          << "Haploid depth: " << mHaploidDepth << endl;
