@@ -324,7 +324,8 @@ int LocalGenomicMap::balancerILP(const char *lpFn) {
     CoinPackedMatrix *matrix = new CoinPackedMatrix(false, 0, 0);
 
     double hap_cov = mGraph->getHaploidDepth();
-    double v_hap_cov = mGraph->getAvgRawCoverage()/2;
+//    double v_hap_cov = mGraph->getAvgRawCoverage()/2;
+    double v_hap_cov = mGraph->getHaploidDepth();
     int v_seg_start = mGraph->getVirusSegStart();
     int maxCopy = 999999;
     double max_cov = -1;
