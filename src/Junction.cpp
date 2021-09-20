@@ -103,13 +103,17 @@ void Junction::insertEdgesToVertices() {
     } else if (mSourceDir == '+' && mTargetDir == '-') {
         mSource->getPositiveVertex()->insertEdgeAsSource(mEdgeA);
         mTarget->getNegativeVertex()->insertEdgeAsTarget(mEdgeA);
-        mSource->getNegativeVertex()->insertEdgeAsTarget(mEdgeB);
-        mTarget->getPositiveVertex()->insertEdgeAsSource(mEdgeB);
+        if (mSource != mTarget) {
+            mSource->getNegativeVertex()->insertEdgeAsTarget(mEdgeB);
+            mTarget->getPositiveVertex()->insertEdgeAsSource(mEdgeB);
+        }
     } else if (mSourceDir == '-' && mTargetDir == '+') {
         mSource->getNegativeVertex()->insertEdgeAsSource(mEdgeA);
         mTarget->getPositiveVertex()->insertEdgeAsTarget(mEdgeA);
-        mSource->getPositiveVertex()->insertEdgeAsTarget(mEdgeB);
-        mTarget->getNegativeVertex()->insertEdgeAsSource(mEdgeB);
+        if (mSource != mTarget) {
+            mSource->getPositiveVertex()->insertEdgeAsTarget(mEdgeB);
+            mTarget->getNegativeVertex()->insertEdgeAsSource(mEdgeB);
+        }
     }
 }
 

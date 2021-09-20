@@ -7,6 +7,8 @@
 #include <bitset>
 #include <unistd.h>
 #include <deque>
+#include <set>
+#include <random>
 
 #include "LocalGenomicMap.hpp"
 #include "Exceptions.hpp"
@@ -307,11 +309,10 @@ int LocalGenomicMap::balancerILP(const char *lpFn) {
 
 
     int numSegsJuncs = segs->size() + juncs->size();
-    int numEpsilons = numSegsJuncs + sourceSinkNum;    // e(t(seg), c(seg))
+    int numEpsilons = numSegsJuncs;    // e(t(seg), c(seg))
 
     int numVariables = numSegsJuncs + juncs->size() + numEpsilons;
-    int numConstrains = segs->size() * 4 + 4 * juncs->size() +
-                        sourceSinkNum;  // "2" for source & sink      ------  t(seg)+c(seg), t(seg)-c(seg), in=t(seg), out=t(seg, t(junc)+c(junc), t(junc)-c(junc), e, source, sink
+    int numConstrains = segs->size() * 4 + 4 * juncs->size();  // "2" for source & sink      ------  t(seg)+c(seg), t(seg)-c(seg), in=t(seg), out=t(seg, t(junc)+c(junc), t(junc)-c(junc), e, source, sink
     // int numConstrains = segs->size() * 8 + juncs->size() * 6 + numEpsilons + 2;
 
     double *objective = new double[numVariables];
@@ -562,22 +563,22 @@ int LocalGenomicMap::balancerILP(const char *lpFn) {
     auto sources = mGraph->getMSources();
     auto sinks = mGraph->getMSinks();
 
-    for (int i = 0; i < sourceSize; i++) {
-        CoinPackedVector constrainSource;
-        CoinPackedVector constrainSink;
-        constrainSource.insert((*sources)[i]->getId() - 1, 1);
-        constrainSource.insert(numVariables - 2 * (i + 1), -1);
-        // cout << mGraph->getExpectedPloidy() << endl;
-        constrainLowerBound[numConstrains - 2 * (i + 1)] = mGraph->getExpectedPloidy();
-        constrainUpperBound[numConstrains - 2 * (i + 1)] = mGraph->getExpectedPloidy();
-        matrix->appendRow(constrainSource);
+    // for (int i = 0; i < sourceSize; i++) {
+    //     CoinPackedVector constrainSource;
+    //     CoinPackedVector constrainSink;
+    //     constrainSource.insert((*sources)[i]->getId() - 1, 1);
+    //     constrainSource.insert(numVariables - 2 * (i + 1), -1);
+    //     // cout << mGraph->getExpectedPloidy() << endl;
+    //     constrainLowerBound[numConstrains - 2 * (i + 1)] = mGraph->getExpectedPloidy();
+    //     constrainUpperBound[numConstrains - 2 * (i + 1)] = mGraph->getExpectedPloidy();
+    //     matrix->appendRow(constrainSource);
 
-        constrainSink.insert((*sinks)[i]->getId() - 1, 1);
-        constrainSink.insert(numVariables - 2*i - 1, -1);
-        constrainLowerBound[numConstrains - 2*i - 1] = mGraph->getExpectedPloidy();
-        constrainUpperBound[numConstrains - 2*i - 1] = mGraph->getExpectedPloidy();
-        matrix->appendRow(constrainSink);
-    }
+    //     constrainSink.insert((*sinks)[i]->getId() - 1, 1);
+    //     constrainSink.insert(numVariables - 2*i - 1, -1);
+    //     constrainLowerBound[numConstrains - 2*i - 1] = mGraph->getExpectedPloidy();
+    //     constrainUpperBound[numConstrains - 2*i - 1] = mGraph->getExpectedPloidy();
+    //     matrix->appendRow(constrainSink);
+    // }
 //    CoinPackedVector constrainSource;
 //    constrainSource.insert(mGraph->getFirstSource()->getId() - 1, 1);
 //    constrainSource.insert(numVariables - 2, -1);
@@ -603,7 +604,7 @@ int LocalGenomicMap::balancerILP(const char *lpFn) {
     max_cov += 1000;
     for (int i = 0; i < numVariables; i++) {
         if (i >= numSegsJuncs) {
-            if (i < numVariables - sourceSinkNum) {
+            if (i < numVariables) {
                 // double cred;
                 if (i < numSegsJuncs + juncs->size()) {
                     if ((*juncs)[i - numSegsJuncs]->isInferred()) {
@@ -717,13 +718,13 @@ int LocalGenomicMap::balancerILP(const char *lpFn) {
         // variableUpperBound[numSegsJuncs + 3 * segs->size() + 3 * i + 2] = si->getInfinity();
     }
     cout << "LU junc done" << endl;
-    for (int i = 0; i < sourceSize; i++) {
-        variableLowerBound[numVariables - 2 * (i + 1)] = 0;
-        variableUpperBound[numVariables - 2 * (i + 1)] = si->getInfinity();
-        //  variableUpperBound[numVariables - 2] = 0;
-        variableLowerBound[numVariables - 2*i - 1] = 0;
-        variableUpperBound[numVariables - 2*i - 1] = si->getInfinity();
-    }
+    // for (int i = 0; i < sourceSize; i++) {
+    //     variableLowerBound[numVariables - 2 * (i + 1)] = 0;
+    //     variableUpperBound[numVariables - 2 * (i + 1)] = si->getInfinity();
+    //     //  variableUpperBound[numVariables - 2] = 0;
+    //     variableLowerBound[numVariables - 2*i - 1] = 0;
+    //     variableUpperBound[numVariables - 2*i - 1] = si->getInfinity();
+    // }
 //    variableLowerBound[numVariables - 2] = 0;
 //    variableUpperBound[numVariables - 2] = si->getInfinity();
 //    //  variableUpperBound[numVariables - 2] = 0;
@@ -1942,7 +1943,7 @@ void LocalGenomicMap::checkReachability(JunctionDB *aJuncDB, bool verbose) {
         // check reachability for each vertex
         bool isSinkSourceConnectedOriginally;
         try {
-            this->connectSourceSink();
+            this->connectSourceSink();  // connect all the sinks and the corresponding sources
 //            isSinkSourceConnectedOriginally = false;
         } catch (DuplicateJunctionException &e) {
             isSinkSourceConnectedOriginally = true;
@@ -1967,7 +1968,8 @@ void LocalGenomicMap::checkReachability(JunctionDB *aJuncDB, bool verbose) {
             segV.push_back(seg->getNegativeVertex());
             auto segPartitionPair = findPartition(seg->getId());
 //            如果seg是病毒seg那么对任意第一个定点reachable就可以, 否则需要在自己的partition内reachable
-            if (segPartitionPair.first == this->mGraph->getMSources()->back()->getId()) {
+            if (false) {
+            //if (segPartitionPair.first == this->mGraph->getMSources()->back()->getId()) {
                 auto sources = this->mGraph->getMSources();
                 auto sinks = this->mGraph->getMSinks();
                 for (Vertex *v : segV) {
@@ -2537,30 +2539,30 @@ Edge *LocalGenomicMap::traverseNextEdgeByPartition(Vertex *aStartVertex, VertexP
         int support = 0;
         entry_t *entry;
         for (auto rec : *recs) {
-            for (Edge *e: *(aStartVertex->getEdgesAsSource())) {
-                if (e->hasCopy()) {
-                    int eTargetId = e->getTarget()->getId();
-//                    TODO 两个check需要更改
-                    auto isInPartition = this->checkCommon(eTargetId, partitionStart, partitionEnd);
-                    if (isInPartition) {
-                        entry = rec->findForwardEntry(e->getTarget()->getSegment()->getChrom(),
-                                                      e->getTarget()->getStart(),
-                                                      e->getTarget()->getDir());
-                        if (entry != nullptr) {
-                            if (entry->support > support) {
-                                support = entry->support;
-                                selectedEdge = e;
-                                return selectedEdge;
-                            }
-                        } else {
-                            if (support == 0) {
-                                selectedEdge = e;
-                                return selectedEdge;
-                            }
-                        }
-                    }
-                }
-            }
+//             for (Edge *e: *(aStartVertex->getEdgesAsSource())) {
+//                 if (e->hasCopy()) {
+//                     int eTargetId = e->getTarget()->getId();
+// //                    TODO 两个check需要更改
+//                     auto isInPartition = this->checkCommon(eTargetId, partitionStart, partitionEnd);
+//                     if (isInPartition) {
+//                         entry = rec->findForwardEntry(e->getTarget()->getSegment()->getChrom(),
+//                                                       e->getTarget()->getStart(),
+//                                                       e->getTarget()->getDir());
+//                         if (entry != nullptr) {
+//                             if (entry->support > support) {
+//                                 support = entry->support;
+//                                 selectedEdge = e;
+//                                 return selectedEdge;
+//                             }
+//                         } else {
+//                             if (support == 0) {
+//                                 selectedEdge = e;
+//                                 return selectedEdge;
+//                             }
+//                         }
+//                     }
+//                 }
+//             }
             for (Edge *e: *(aStartVertex->getEdgesAsSource())) {
                 if (e->hasCopy()) {
                     int eTargetId = e->getTarget()->getId();
@@ -2588,16 +2590,16 @@ Edge *LocalGenomicMap::traverseNextEdgeByPartition(Vertex *aStartVertex, VertexP
         }
     }
 // if not return, random select e in partition
-    for (Edge *e: *(aStartVertex->getEdgesAsSource())) {
-        int eTargetId = e->getTarget()->getId();
-        if (e->hasCopy()) {
-            auto isInPartition = this->checkCommon(eTargetId, partitionStart, partitionEnd);
-            if (isInPartition) {
-                selectedEdge = e;
-                return selectedEdge;
-            }
-        }
-    }
+    // for (Edge *e: *(aStartVertex->getEdgesAsSource())) {
+    //     int eTargetId = e->getTarget()->getId();
+    //     if (e->hasCopy()) {
+    //         auto isInPartition = this->checkCommon(eTargetId, partitionStart, partitionEnd);
+    //         if (isInPartition) {
+    //             selectedEdge = e;
+    //             return selectedEdge;
+    //         }
+    //     }
+    // }
 
     for (Edge *e: *(aStartVertex->getEdgesAsSource())) {
         int eTargetId = e->getTarget()->getId();
@@ -2760,21 +2762,28 @@ void LocalGenomicMap::traverseGraphByPartition(JunctionDB *aJuncDB) {
 
 void LocalGenomicMap::traverseGraph(JunctionDB *aJuncDB) {
     Vertex *currentVertex;
-//    Traverse sources first
-//    for (auto *seg : *(mGraph->getMSources())) {
-//        if (seg->hasCopy()) {
-//            currentVertex = seg->getPositiveVertex();
-//            this->traverse(currentVertex, aJuncDB);
-//        }
-//    }
+    // traverse starts from sources
+    auto sources = mGraph->getMSources();
+    vector<Segment*> segments;
+    for (Segment *seg : *(mGraph->getSegments())) {
+        //find all the segments except the sources
+        if(find(sources->begin(), sources->end(), seg) == sources->end()){
+            segments.push_back(seg);
+        }
+    }
     while (!mGraph->isCopyExhaustive()) {
-        for (Segment *seg : *(mGraph->getSegments())) {
-            if (seg->hasCopy()) {
-                currentVertex = seg->getPositiveVertex();
-                break;
+        for (Segment *src: *sources) {
+            if (src->hasCopy()) {
+                currentVertex = src->getPositiveVertex();
+                this->traverse(currentVertex, aJuncDB);
             }
         }
-        this->traverse(currentVertex, aJuncDB);
+        for (Segment *seg : segments) {
+            if (seg->hasCopy()) {
+                currentVertex = seg->getPositiveVertex();
+                this->traverse(currentVertex, aJuncDB);
+            }
+        }
         // mGraph->print();
     }
 }
@@ -3237,4 +3246,99 @@ void LocalGenomicMap::printHaploids() {
     for (VertexPath *pathV : *mHaploids) {
         this->print(*pathV);
     }
+}
+
+// Find BFB patterns
+// Find BFB patterns
+VertexPath* LocalGenomicMap::findBFB(VertexPath* currPath, int n, set<Edge *>* visited, int error) {
+    int len = currPath->size();
+    if (len == n)
+        return currPath;
+    if (len > n)
+        return NULL;
+    VertexPath* BFBpath;
+    Vertex* lastV = currPath->back();
+    EdgePath* nextEdges = lastV->getEdgesAsSource();
+    // record the original BFB pattern and visit set
+    VertexPath initPath = *currPath;
+    set<Edge *> initVisited = *visited;
+    cout<<"Current path size: "<<currPath->size()<<endl;
+    for (Edge *e: *nextEdges) {
+        *currPath = initPath;
+        *visited = initVisited;
+        if (visited->find(e) == visited->end() && this->checkBFB(currPath, e->getTarget())) {
+            visited->insert(e);
+            // cout<<e->getTarget()->getId()<<e->getTarget()->getDir()<<" "<<&e<<endl;
+            currPath->push_back(e->getTarget());
+            BFBpath = findBFB(currPath, n, visited, error);
+            if (BFBpath != NULL)
+                return BFBpath;
+        }
+    }
+    if (nextEdges->size()>0 && error>0) {// deal with special cases
+        //randomness
+        random_device rd;
+        mt19937 g(rd());
+        shuffle(nextEdges->begin(), nextEdges->end(), g);
+        Edge* e = nextEdges->front();
+        //initialization
+        *currPath = initPath;
+        *visited = initVisited;
+        error--;
+        cout<<"original: "<<visited->size()<<" "<<currPath->size()<<endl;
+        // insertion
+        if (visited->find(e) == visited->end()) {
+            visited->insert(e);
+            currPath->push_back(e->getTarget());
+            BFBpath = findBFB(currPath, n, visited, error);
+            if (BFBpath != NULL)
+                return BFBpath;
+        }
+        // deletion
+        *visited = initVisited;
+        *currPath = initPath;
+        cout<<"before deletion: "<<visited->size()<<" "<<currPath->size()<<endl;
+        currPath->pop_back();
+        BFBpath = findBFB(currPath, n, visited, error);
+        if (BFBpath != NULL)
+            return BFBpath;
+        //replacement
+        if (visited->find(e) == visited->end()) {
+            *visited = initVisited;
+            *currPath = initPath;
+            cout<<"before replacement: "<<visited->size()<<" "<<currPath->size()<<endl;
+            visited->insert(e);
+            currPath->pop_back();
+            currPath->push_back(e->getTarget());
+            BFBpath = findBFB(currPath, n, visited, error);
+            if (BFBpath != NULL)
+                return BFBpath; 
+        }
+    }
+    return NULL;
+}
+
+bool LocalGenomicMap::checkBFB(VertexPath* currPath, Vertex* v) {
+    Vertex* lastV = currPath->back();
+    cout<<v->getId()<<v->getDir()<<" ";
+    int len = currPath->size();
+    for (int i=1;i<len;i++) {
+        if (this->isPalindrome(currPath, i)) {
+            Vertex* preV = (i==len-1)?(*currPath)[i] : (*currPath)[i-1];
+            if (preV->isReverse(v)) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+bool LocalGenomicMap::isPalindrome(VertexPath* path, int start) {
+    int len = path->size();
+    int bound = (start+len)/2;
+    for (int i=start;i<bound;i++){
+        if (!(*path)[i]->isReverse((*path)[--len]))
+            return false;
+    }
+    return true;
 }

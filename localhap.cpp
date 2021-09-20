@@ -1,5 +1,6 @@
 #include <iostream>
 #include <cstring>
+#include <set>
 
 #include "Graph.hpp"
 #include "Exceptions.hpp"
@@ -226,6 +227,33 @@ int main(int argc, char *argv[]) {
             //     cout << "Logic error." << endl;
             //     return 1 ;
         }
+    }else if (strcmp(result["op"].as<std::string>().c_str(), "bfb") == 0) {
+        const char *lhRawFn = result["in_lh"].as<std::string>().c_str();
+        Graph *g = new Graph(lhRawFn);
+        LocalGenomicMap *lgm = new LocalGenomicMap(g);
+        VertexPath refPattern;
+        set<Edge *> visited;
+        visited.clear();
+        int cnt = 0;
+        for (Segment *seg: *(g->getSegments())) {
+            if (cnt >= 4)
+                break;
+            refPattern.push_back(seg->getPositiveVertex());
+            cnt++;
+        }
+        for (Vertex *v: refPattern) {
+            cout<<v->getId()<<v->getDir()<<" ";
+        }
+        cout<<"\nSearching for BFB path..."<<endl;
+        VertexPath* path = lgm->findBFB(&refPattern, 11, &visited, 3);
+        cout<<"Result: "<<endl;
+        if (path != NULL) {
+            for (Vertex *v: *path) 
+                cout<<v->getId()<<v->getDir()<<" ";
+        }
+        else
+            cout<<"No bfb path found";
+        cout<<endl;
     } else if (strcmp(argv[1], "split") == 0) {
         const char *lhFn = argv[2];
         const char *chrom = argv[3];

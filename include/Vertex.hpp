@@ -108,6 +108,8 @@ public:
 
     // print func
     void print();
+
+    bool isReverse(Vertex *aVertex);
 };
 
 #endif

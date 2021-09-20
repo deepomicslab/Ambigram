@@ -118,3 +118,9 @@ Vertex *Vertex::getComplementVertex() {
 void print() {
     // TODO
 }
+
+bool Vertex::isReverse(Vertex *aVertex) {
+    if (mId == aVertex->getId() && mDir != aVertex->getDir())
+        return true;
+    return false;
+}

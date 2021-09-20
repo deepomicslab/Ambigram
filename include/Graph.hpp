@@ -108,6 +108,8 @@ public:
 
     bool isCopyExhaustive();
 
+    bool isSourceExhaustive();
+
     bool doesJunctionExist(Junction *aJunction);
 
     void readGraph(const char *aFilename);

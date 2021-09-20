@@ -185,6 +185,11 @@ public:
     void printCircuits();
 
     void printHaploids();
+
+    /* BFB functions*/
+    VertexPath* findBFB(VertexPath* currPath, int n, set<Edge *>* visited, int error);
+    bool checkBFB(VertexPath* currPath, Vertex* v);
+    bool isPalindrome(VertexPath* path, int start);
 };
 
 #endif
