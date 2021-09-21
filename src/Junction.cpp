@@ -88,6 +88,9 @@ Edge *Junction::getEdgeA() { return mEdgeA; }
 
 Edge *Junction::getEdgeB() { return mEdgeB; }
 
+char Junction::getSourceDir() { return mSourceDir; }
+char Junction::getTargetDir() { return mTargetDir; }
+
 // functionality
 void Junction::insertEdgesToVertices() {
     if (mSourceDir == '+' && mTargetDir == '+') {

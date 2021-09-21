@@ -3,6 +3,7 @@
 
 #include "Record.hpp"
 #include "SVprofile.hpp"
+#include "Junction.hpp"
 
 using namespace std;
 
@@ -24,6 +25,7 @@ protected:
 public:
     // JunctionDB(string chr, int start, int end);
     JunctionDB(const char *aFilename);
+    JunctionDB(vector<Junction *> &junctions);
 
     ~JunctionDB();
 

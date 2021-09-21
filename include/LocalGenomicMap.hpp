@@ -190,6 +190,11 @@ public:
     VertexPath* findBFB(VertexPath* currPath, int n, set<Edge *>* visited, int error);
     bool checkBFB(VertexPath* currPath, Vertex* v);
     bool isPalindrome(VertexPath* path, int start);
+
+    /* bipartite matching*/
+    void findMaxBPMatching(vector<Junction *> &juncs, vector<Junction *> &results);
+    bool bpm(bool** connection, Segment *source, set<Segment *> &targets, bool visited[], int match[]);
+    void findCircuits(vector<vector<int>> adj);
 };
 
 #endif

@@ -9,6 +9,7 @@
 #include <deque>
 #include <set>
 #include <random>
+#include <stack>
 
 #include "LocalGenomicMap.hpp"
 #include "Exceptions.hpp"
@@ -3249,7 +3250,6 @@ void LocalGenomicMap::printHaploids() {
 }
 
 // Find BFB patterns
-// Find BFB patterns
 VertexPath* LocalGenomicMap::findBFB(VertexPath* currPath, int n, set<Edge *>* visited, int error) {
     int len = currPath->size();
     if (len == n)
@@ -3341,4 +3341,96 @@ bool LocalGenomicMap::isPalindrome(VertexPath* path, int start) {
             return false;
     }
     return true;
+}
+
+//Bipartite matching
+void LocalGenomicMap::findMaxBPMatching(vector<Junction *> &juncs, vector<Junction *> &results) {
+    //get source and target segments & construct connection matrix
+    set<Segment *> sources, targets;
+    int num = this->getGraph()->getSegments()->size()+1;
+    bool** connection = new bool*[num];
+    for (int i=0; i < num; i++) {
+        connection[i] = new bool[num];
+        memset(connection[i], false, sizeof(connection[i]));
+    }
+    for (Junction *junc: juncs){
+        sources.insert(junc->getSource());
+        targets.insert(junc->getTarget());
+        connection[junc->getSource()->getId()][junc->getTarget()->getId()] = true;  
+    }
+    int* match = new int[num];
+    memset(match, -1, sizeof(int)*num);
+
+    cout<<"Search for the max BPM..."<<endl;
+    int result = 0;
+    bool* visited = new bool[num];
+    for (Segment *s: sources) {
+        memset(visited, false, sizeof(visited));
+        cout<<"Check source: "<<s->getId()<<endl;
+        if(this->bpm(connection, s, targets, visited, match))
+            result++;
+    }
+    for (int i=0; i<num; i++) {
+        cout<<match[i]<<" ";
+        if (match[i] > 0) {
+            for (Junction *junc: juncs) {
+                if (junc->getTarget()->getId() == i && junc->getSource()->getId() == match[i])
+                    results.push_back(junc);
+            }
+        }
+    }
+    cout<<"Max BP match: "<<result<<endl;
+}
+
+bool LocalGenomicMap::bpm(bool** connection, Segment *source, set<Segment *> &targets, bool visited[], int match[]) {
+    for (Segment *t: targets) {
+        if (connection[source->getId()][t->getId()] && !visited[t->getId()]) {
+            visited[t->getId()] = true;
+            //if the target is occupied, check other matches
+            Segment *next; 
+            if (match[t->getId()] > 0) {
+                next = this->getGraph()->getSegmentById(match[t->getId()]);
+            }
+            if (match[t->getId()]<=0 || bpm(connection, next, targets, visited, match)) {
+                match[t->getId()] = source->getId();
+                cout<<source->getId()<<" -> "<<t->getId()<<endl;
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+void LocalGenomicMap::findCircuits(vector<vector<int>> adj) {
+    unordered_map<int, int> edgeCount;//number of edges for each starting segment
+    for (int i=1; i<=adj.size(); i++)
+        edgeCount[i] = adj[i].size();
+    
+    stack<int> currPath;
+    vector<int> circuit;
+    currPath.push(1);
+    int currSeg = 1;
+    
+    while (!currPath.empty()) {
+        if (edgeCount[currSeg]) {
+            currPath.push(currSeg);
+            int nextSeg = adj[currSeg].back();
+            edgeCount[currSeg]--;
+            adj[currSeg].pop_back();
+            currSeg = nextSeg;    
+        }
+        else {
+            circuit.push_back(currSeg);
+            currSeg = currPath.top();
+            currPath.pop();
+        }
+    }
+
+    for (int i=circuit.size()-1; i>=0; i--) {
+        cout<< circuit[i];
+        if (i > 0)
+            cout<< " -> ";
+        else
+            cout<<endl;
+    }
 }

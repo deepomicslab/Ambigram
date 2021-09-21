@@ -254,6 +254,48 @@ int main(int argc, char *argv[]) {
         else
             cout<<"No bfb path found";
         cout<<endl;
+    } else if (strcmp(result["op"].as<std::string>().c_str(), "bpm") == 0) {
+        const char *lhRawFn = result["in_lh"].as<std::string>().c_str();
+        Graph *g = new Graph(lhRawFn);
+        LocalGenomicMap *lgm = new LocalGenomicMap(g);
+        //Extract SV and normal edges and divide segments into two parts
+        vector<Junction *> sv, normal;
+        vector<Segment *> sources, targets;
+        int num =  g->getSegments()->size();
+        for (Junction *junc: *(g->getJunctions())){
+            if (junc->getSource()->getId()%num +1  == junc->getTarget()->getId() &&
+                junc->getSourceDir()=='+' && junc->getTargetDir()=='+') {                
+                normal.push_back(junc);
+            }
+            else {
+                sv.push_back(junc);
+            }                
+        }
+        //Find the maximum bipartite matching
+        vector<Junction *> selectedJunc;
+        lgm->findMaxBPMatching(sv, selectedJunc);
+        // for (Junction *junc: selectedJunc) {
+        //     cout<<junc->getSource()->getId()<<" -> "<<junc->getTarget()->getId()<<endl;
+        // }
+
+        //Find the Eulerian Circuit with the selected and normal junctions
+        vector<vector<int>> adj; //adjacency list
+        for (int i=0; i<=num; i++) {
+            vector<int> temp;
+            adj.push_back(temp);
+        }
+
+        for (Junction* junc: selectedJunc)
+            adj[junc->getSource()->getId()].push_back(junc->getTarget()->getId());
+        for (Junction* junc: normal)
+            adj[junc->getSource()->getId()].push_back(junc->getTarget()->getId());
+
+        lgm->findCircuits(adj);
+
+        //Traverse the graph with selected junc
+        // JunctionDB *db = new JunctionDB(selectedJunc);
+        // db->sortRecordEntry();
+    
     } else if (strcmp(argv[1], "split") == 0) {
         const char *lhFn = argv[2];
         const char *chrom = argv[3];

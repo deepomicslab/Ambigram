@@ -72,6 +72,9 @@ public:
 
     Edge *getEdgeB();
 
+    char getSourceDir();
+    char getTargetDir();
+
     // functionality
     void insertEdgesToVertices();
 

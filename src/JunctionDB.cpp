@@ -7,6 +7,7 @@
 
 
 #include "JunctionDB.hpp"
+#include "Junction.hpp"
 
 using namespace std;
 
@@ -28,6 +29,40 @@ JunctionDB::JunctionDB(const char *aFilename) {
     mRecordUUID = new vector<string>();
 
     this->readDB(aFilename);
+}
+
+JunctionDB::JunctionDB(vector<Junction *> &junctions) {
+    mRecords = new vector<Record *>();
+    mRecordUUID = new vector<string>();
+    for (Junction *junc: junctions) {
+        if (junc->getWeight() > 0) {
+            string chrom5p = junc->getSource()->getChrom(),
+                chrom3p = junc->getTarget()->getChrom();
+            char strand5p = junc->getSourceDir(), 
+                strand3p = junc->getTargetDir();
+            int pos5p = 0, pos3p = 0;
+            if (strand5p == '+' && strand3p == '+') {
+                pos5p = junc->getSource()->getEnd();
+                pos3p = junc->getTarget()->getStart();
+            }
+            else if (strand5p == '+' && strand3p == '-') {
+                pos5p = junc->getSource()->getEnd();
+                pos3p = junc->getTarget()->getEnd();
+            }
+            else if (strand5p == '-' && strand3p == '+') {
+                pos5p = junc->getSource()->getStart();
+                pos3p = junc->getTarget()->getStart();
+            }
+            else if (strand5p == '-' && strand3p == '-') {
+                pos5p = junc->getSource()->getStart();
+                pos3p = junc->getTarget()->getEnd();
+            }
+            char support = junc->getWeight()->getCoverage();
+            this->insertRecord(chrom5p, pos5p, strand5p,
+                            chrom3p, pos3p, strand3p,
+                            support);
+        }         
+    }
 }
 
 JunctionDB::~JunctionDB() {
