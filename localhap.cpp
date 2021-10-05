@@ -1,6 +1,9 @@
 #include <iostream>
+#include <fstream>
 #include <cstring>
 #include <set>
+#include <map>
+#include <string>
 
 #include "Graph.hpp"
 #include "Exceptions.hpp"
@@ -229,31 +232,178 @@ int main(int argc, char *argv[]) {
         }
     }else if (strcmp(result["op"].as<std::string>().c_str(), "bfb") == 0) {
         const char *lhRawFn = result["in_lh"].as<std::string>().c_str();
+        const char *lpFn = result["lp_prefix"].as<std::string>().c_str();
         Graph *g = new Graph(lhRawFn);
         LocalGenomicMap *lgm = new LocalGenomicMap(g);
-        VertexPath refPattern;
-        set<Edge *> visited;
-        visited.clear();
+        //enumerate all the patterns and loops
+        int segNum = g->getSegments()->size();
+        vector<vector<int>> patterns, loops;
+        vector<int> temp;
+        lgm->combinations(1,segNum,2,patterns,temp);
+        int patNum = patterns.size();
+        for (int i=0;i<patNum;i++) {
+            vector<int> pattern(2,0);
+            pattern[0] = patterns[i][1], pattern[1] = patterns[i][0];
+            patterns.push_back(pattern);
+        }
+        temp.clear();
+        lgm->combinations(1,segNum,2,loops,temp);
+        int loopNum = loops.size();
+        for (int i=0;i<loopNum;i++) {
+            vector<int> loop(2,0);
+            loop[0] = loops[i][1], loop[1] = loops[i][0];
+            loops.push_back(loop);
+        }
+        //construct map from pattern/loop to index
+        map<string, int> variableIdx;
+        for (int i=0;i<patterns.size();i++) {
+            string key = "p:"+to_string(patterns[i][0])+","+to_string(patterns[i][1]);
+            variableIdx[key] = i;
+        }
+        for (int i=0;i<loops.size();i++) {
+            string key = "l:"+to_string(loops[i][0])+","+to_string(loops[i][1]);
+            variableIdx[key] = i+patterns.size();
+        }
+        for (int i=0;i<patterns.size();i++) {
+            string key = "p:"+to_string(patterns[i][0])+","+to_string(patterns[i][1]);
+            cout<<variableIdx[key]<<" "<<key<<endl;
+        }
+        for (int i=0;i<loops.size();i++) {
+            string key = "l:"+to_string(loops[i][0])+","+to_string(loops[i][1]);
+            cout<<variableIdx[key]<<" "<<key<<endl;
+        }
+        //find copy number for both normal junctions and inversed junctions
+        vector<Junction *> *juncs = g->getJunctions();
+        double** juncCN = new double*[segNum+1];
+        for (int i=0; i <= segNum; i++) {
+            juncCN[i] = new double[2];
+            memset(juncCN[i], 0, 2*sizeof(double));
+        }
+        for (Junction *junc: *(g->getJunctions())) {
+            int sourceID = junc->getSource()->getId(), targetID = junc->getTarget()->getId();
+            if (sourceID+1 == targetID) {                
+                juncCN[sourceID][0] += junc->getWeight()->getCopyNum();
+            }
+            else if (sourceID-1 == targetID) {
+                juncCN[targetID][0] += junc->getWeight()->getCopyNum();
+            }
+            else if (sourceID == targetID) {
+                juncCN[sourceID][1] += junc->getWeight()->getCopyNum();
+            }
+        }
+        cout<<"Junction CN"<<endl;
+        for (int i=0;i<=segNum;i++) {
+            cout<<i<<","<<i+1<<" "<<juncCN[i][0]<<"\t"<<i<<","<<i<<" "<<juncCN[i][1]<<endl;
+        }
+        //construct ILP and generate .lp file for cbc
+        lgm->BFB_ILP(lpFn, patterns, loops, variableIdx, juncCN);
+        //run cbc under the directory containing test.lp
+        const char *cmd = "cbc test.lp solve solu test.sol";
+        //read patterns and loops from test.sol
+        const char *solDir = "./test.sol";
+        ifstream solFile(solDir);
+        if (!solFile) {
+            cerr << "Cannot open file " << solDir << endl;
+            exit(1);
+        }
+        int* elementCN = new int[variableIdx.size()];
+        memset(elementCN, 0, variableIdx.size()*sizeof(int));
+        string element, cn;
+        while (solFile >> element) {
+            if (element[0] == 'x') {                
+                int idx = stoi(element.substr(1));
+                if (idx < variableIdx.size()) {//exclude epsilons
+                    solFile >> cn;
+                    int copynum = stoi(cn);
+                    elementCN[idx] = copynum;
+                }
+            }
+        }
+        //construct DAG and find all topological orders
+        vector<vector<int>> adj, node2pat, node2loop;
+        bool** mLoop = new bool*[variableIdx.size()];
+        for (int i=0; i < variableIdx.size(); i++) {
+            mLoop[i] = new bool[variableIdx.size()];
+            memset(mLoop[i], false, variableIdx.size()*sizeof(bool));
+        }
+        lgm->constructDAG(adj, mLoop, node2pat, node2loop, variableIdx, elementCN);
+        int num = adj.size();
+        bool *visited = new bool[num];
+        int *indeg = new int[num];
+        for (int i = 0; i < num; i++) {
+            visited[i] = false;
+            indeg[i] = 0;
+        }
+        //deal with sepcial case: loop in loop
         int cnt = 0;
-        for (Segment *seg: *(g->getSegments())) {
-            if (cnt >= 4)
-                break;
-            refPattern.push_back(seg->getPositiveVertex());
-            cnt++;
+        for (int i = 0; i < num; i++) {
+            for (auto next = adj[i].begin(); next != adj[i].end(); next++) {
+                if (mLoop[i][*next]) {
+                    if (adj[*next].size() == 0) {
+                        visited[*next] = true;
+                        cnt++;
+                    }                        
+                    adj[i].erase(next);
+                    next--;
+                    continue;
+                }
+                indeg[*next]++;                
+            }
+            cout<<i+1<<": ";
+            for (int j=0;j<adj[i].size();j++) {
+                cout<<adj[i][j]+1<<" ";
+            }
+            cout<<endl;
         }
-        for (Vertex *v: refPattern) {
-            cout<<v->getId()<<v->getDir()<<" ";
+        
+        vector<int> res;
+        vector<vector<int>> orders;
+        lgm->allTopologicalOrders(res, visited, num-cnt, indeg, adj, orders);
+        for (auto bfb: orders) {
+            cout<<"Order 1:"<<endl;
+            for (int i=0;i<bfb.size();i++) {
+                if (node2pat[bfb[i]].size()) {
+                    int left = node2pat[bfb[i]][0],
+                        right = node2pat[bfb[i]][1];
+                    if (left<right)
+                        for(int j=left;j<=right;j++)
+                            cout<<j;
+                    else
+                        for(int j=left;j>=right;j--)
+                            cout<<j;
+                    cout<<"|";
+                }
+                else if (node2loop[bfb[i]].size()) {
+                    lgm->printLoop(node2pat, node2loop, mLoop, bfb[i]);
+                }                
+            }
+            cout<<endl;
         }
-        cout<<"\nSearching for BFB path..."<<endl;
-        VertexPath* path = lgm->findBFB(&refPattern, 11, &visited, 3);
-        cout<<"Result: "<<endl;
-        if (path != NULL) {
-            for (Vertex *v: *path) 
-                cout<<v->getId()<<v->getDir()<<" ";
-        }
-        else
-            cout<<"No bfb path found";
-        cout<<endl;
+
+
+        // VertexPath refPattern;
+        // set<Edge *> visited;
+        // visited.clear();
+        // int cnt = 0;
+        // for (Segment *seg: *(g->getSegments())) {
+        //     if (cnt >= 4)
+        //         break;
+        //     refPattern.push_back(seg->getPositiveVertex());
+        //     cnt++;
+        // }
+        // for (Vertex *v: refPattern) {
+        //     cout<<v->getId()<<v->getDir()<<" ";
+        // }
+        // cout<<"\nSearching for BFB path..."<<endl;
+        // VertexPath* path = lgm->findBFB(&refPattern, 11, &visited, 3);
+        // cout<<"Result: "<<endl;
+        // if (path != NULL) {
+        //     for (Vertex *v: *path) 
+        //         cout<<v->getId()<<v->getDir()<<" ";
+        // }
+        // else
+        //     cout<<"No bfb path found";
+        // cout<<endl;
     } else if (strcmp(result["op"].as<std::string>().c_str(), "bpm") == 0) {
         const char *lhRawFn = result["in_lh"].as<std::string>().c_str();
         Graph *g = new Graph(lhRawFn);

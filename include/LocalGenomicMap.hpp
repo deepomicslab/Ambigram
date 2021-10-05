@@ -2,6 +2,7 @@
 #define _LOCAL_GENOMIC_MAP_H_
 
 #include <unordered_map>
+#include <map>
 #include "Graph.hpp"
 #include "JunctionDB.hpp"
 
@@ -187,6 +188,11 @@ public:
     void printHaploids();
 
     /* BFB functions*/
+    void combinations(int start, int end, int len, vector<vector<int>> &per, vector<int> temp);
+    void constructDAG(vector<vector<int>> &adj, bool** mLoop, vector<vector<int>> &node2pat, vector<vector<int>> &node2loop, map<string, int> &variableIdx, int *elementCN);
+    void allTopologicalOrders(vector<int> &res, bool visited[], int num, int indeg[], vector<vector<int>> &adj, vector<vector<int>> &orders);
+    void printLoop(vector<vector<int>> &node2pat, vector<vector<int>> &node2loop, bool** mLoop, int start);
+    void BFB_ILP(const char *lpFn, vector<vector<int>> &patterns, vector<vector<int>> &loops, map<string, int> &variableIdx, double** juncCN);
     VertexPath* findBFB(VertexPath* currPath, int n, set<Edge *>* visited, int error);
     bool checkBFB(VertexPath* currPath, Vertex* v);
     bool isPalindrome(VertexPath* path, int start);
