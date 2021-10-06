@@ -240,21 +240,10 @@ int main(int argc, char *argv[]) {
         vector<vector<int>> patterns, loops;
         vector<int> temp;
         lgm->combinations(1,segNum,2,patterns,temp);
-        int patNum = patterns.size();
-        for (int i=0;i<patNum;i++) {
-            vector<int> pattern(2,0);
-            pattern[0] = patterns[i][1], pattern[1] = patterns[i][0];
-            patterns.push_back(pattern);
-        }
         temp.clear();
         lgm->combinations(1,segNum,2,loops,temp);
-        int loopNum = loops.size();
-        for (int i=0;i<loopNum;i++) {
-            vector<int> loop(2,0);
-            loop[0] = loops[i][1], loop[1] = loops[i][0];
-            loops.push_back(loop);
-        }
-        //construct map from pattern/loop to index
+
+        //construct mapping from pattern/loop to index
         map<string, int> variableIdx;
         for (int i=0;i<patterns.size();i++) {
             string key = "p:"+to_string(patterns[i][0])+","+to_string(patterns[i][1]);
@@ -272,7 +261,8 @@ int main(int argc, char *argv[]) {
             string key = "l:"+to_string(loops[i][0])+","+to_string(loops[i][1]);
             cout<<variableIdx[key]<<" "<<key<<endl;
         }
-        //find copy number for both normal junctions and inversed junctions
+
+        //find copy number for both normal junctions and fold-back inversions
         vector<Junction *> *juncs = g->getJunctions();
         double** juncCN = new double*[segNum+1];
         for (int i=0; i <= segNum; i++) {
@@ -295,12 +285,14 @@ int main(int argc, char *argv[]) {
         for (int i=0;i<=segNum;i++) {
             cout<<i<<","<<i+1<<" "<<juncCN[i][0]<<"\t"<<i<<","<<i<<" "<<juncCN[i][1]<<endl;
         }
-        //construct ILP and generate .lp file for cbc
-        lgm->BFB_ILP(lpFn, patterns, loops, variableIdx, juncCN);
-        //run cbc under the directory containing test.lp
-        const char *cmd = "cbc test.lp solve solu test.sol";
+
+        // //construct ILP and generate .lp file for cbc
+        // lgm->BFB_ILP(lpFn, patterns, loops, variableIdx, juncCN);
+
+        // //run cbc under the directory containing test.lp
+        // const char *cmd = "cbc test.lp solve solu test.sol";
         //read patterns and loops from test.sol
-        const char *solDir = "./test.sol";
+        const char *solDir = "./test1.sol";
         ifstream solFile(solDir);
         if (!solFile) {
             cerr << "Cannot open file " << solDir << endl;
@@ -319,7 +311,7 @@ int main(int argc, char *argv[]) {
                 }
             }
         }
-        //construct DAG and find all topological orders
+        //construct BFB DAG and find all topological orders
         vector<vector<int>> adj, node2pat, node2loop;
         bool** mLoop = new bool*[variableIdx.size()];
         for (int i=0; i < variableIdx.size(); i++) {
@@ -334,19 +326,10 @@ int main(int argc, char *argv[]) {
             visited[i] = false;
             indeg[i] = 0;
         }
-        //deal with sepcial case: loop in loop
+        //set up indegree
         int cnt = 0;
         for (int i = 0; i < num; i++) {
             for (auto next = adj[i].begin(); next != adj[i].end(); next++) {
-                if (mLoop[i][*next]) {
-                    if (adj[*next].size() == 0) {
-                        visited[*next] = true;
-                        cnt++;
-                    }                        
-                    adj[i].erase(next);
-                    next--;
-                    continue;
-                }
                 indeg[*next]++;                
             }
             cout<<i+1<<": ";
@@ -355,55 +338,18 @@ int main(int argc, char *argv[]) {
             }
             cout<<endl;
         }
-        
+        //find all topological orders in BFB DAG
         vector<int> res;
         vector<vector<int>> orders;
-        lgm->allTopologicalOrders(res, visited, num-cnt, indeg, adj, orders);
-        for (auto bfb: orders) {
-            cout<<"Order 1:"<<endl;
-            for (int i=0;i<bfb.size();i++) {
-                if (node2pat[bfb[i]].size()) {
-                    int left = node2pat[bfb[i]][0],
-                        right = node2pat[bfb[i]][1];
-                    if (left<right)
-                        for(int j=left;j<=right;j++)
-                            cout<<j;
-                    else
-                        for(int j=left;j>=right;j--)
-                            cout<<j;
-                    cout<<"|";
-                }
-                else if (node2loop[bfb[i]].size()) {
-                    lgm->printLoop(node2pat, node2loop, mLoop, bfb[i]);
-                }                
-            }
+        lgm->allTopologicalOrders(res, visited, num, indeg, adj, orders);
+        for (vector<int> bfb: orders) {
+            for (int i=0;i<bfb.size();i++)
+                cout<<bfb[i]+1<<" ";
             cout<<endl;
         }
-
-
-        // VertexPath refPattern;
-        // set<Edge *> visited;
-        // visited.clear();
-        // int cnt = 0;
-        // for (Segment *seg: *(g->getSegments())) {
-        //     if (cnt >= 4)
-        //         break;
-        //     refPattern.push_back(seg->getPositiveVertex());
-        //     cnt++;
-        // }
-        // for (Vertex *v: refPattern) {
-        //     cout<<v->getId()<<v->getDir()<<" ";
-        // }
-        // cout<<"\nSearching for BFB path..."<<endl;
-        // VertexPath* path = lgm->findBFB(&refPattern, 11, &visited, 3);
-        // cout<<"Result: "<<endl;
-        // if (path != NULL) {
-        //     for (Vertex *v: *path) 
-        //         cout<<v->getId()<<v->getDir()<<" ";
-        // }
-        // else
-        //     cout<<"No bfb path found";
-        // cout<<endl;
+        //print the result
+        lgm->printBFB(orders, node2pat, node2loop);
+        
     } else if (strcmp(result["op"].as<std::string>().c_str(), "bpm") == 0) {
         const char *lhRawFn = result["in_lh"].as<std::string>().c_str();
         Graph *g = new Graph(lhRawFn);

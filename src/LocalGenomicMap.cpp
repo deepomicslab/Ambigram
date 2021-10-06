@@ -3251,14 +3251,14 @@ void LocalGenomicMap::printHaploids() {
 }
 
 // Find BFB patterns
-void LocalGenomicMap::combinations(int start, int end, int len, vector<vector<int>> &per, vector<int> temp) {
+void LocalGenomicMap::combinations(int start, int end, int len, vector<vector<int>> &res, vector<int> temp) {
 	if (len == 0) {
-        per.push_back(temp);
+        res.push_back(temp);
         return;
     }
     for (int i=start;i<=end;i++) {
         temp.push_back(i);
-        combinations(i+1, end, len-1, per, temp);
+        combinations(i+1, end, len-1, res, temp);
         temp.pop_back();
     }
 }
@@ -3310,10 +3310,11 @@ void LocalGenomicMap::constructDAG(vector<vector<int>> &adj, bool** mLoop, vecto
         if (node2pat[i].size()>0) {
             //p1 -> p2
             for (int j=0; j<node2pat.size();j++) {
-                if (node2pat[j].size()>0 && node2pat[i][1] == node2pat[j][0]) {
+                if (node2pat[j].size()>0 && (node2pat[i][0] == node2pat[j][0] ||
+                    node2pat[i][1] == node2pat[j][1])) {
                     int diff1 = node2pat[i][0]-node2pat[i][1],
                         diff2 = node2pat[j][0]-node2pat[j][1];
-                    if (diff1*diff2<0 && abs(diff1)>abs(diff2)) {
+                    if (abs(diff1)>abs(diff2)) {
                         adj[i].push_back(j);
                         parents[j].push_back(i);
                     }
@@ -3321,10 +3322,11 @@ void LocalGenomicMap::constructDAG(vector<vector<int>> &adj, bool** mLoop, vecto
             }
             //p -> l
             for (int j=0; j<node2loop.size();j++) {
-                if (node2loop[j].size()>0 && node2pat[i][1] == node2loop[j][0]) {
+                if (node2loop[j].size()>0 && (node2pat[i][0] == node2loop[j][0] ||
+                    node2pat[i][1] == node2loop[j][1])) {
                     int diff1 = node2pat[i][0]-node2pat[i][1],
                         diff2 = node2loop[j][0]-node2loop[j][1];
-                    if (diff1*diff2<0 && abs(diff1)>abs(diff2)) {
+                    if (abs(diff1)>abs(diff2)) {
                         adj[i].push_back(j);
                         parents[j].push_back(i);
                     }
@@ -3336,58 +3338,34 @@ void LocalGenomicMap::constructDAG(vector<vector<int>> &adj, bool** mLoop, vecto
         if (node2loop[i].size()>0) {
             //l -> p
             for (int j=0; j<node2pat.size();j++) {
-                if (node2pat[j].size()>0 && node2loop[i][0] == node2pat[j][0]) {
+                if (node2pat[j].size()>0 && (node2loop[i][0] == node2pat[j][0] ||
+                    node2loop[i][1] == node2pat[j][1])) {
                     int diff1 = node2loop[i][0]-node2loop[i][1],
                         diff2 = node2pat[j][0]-node2pat[j][1];
-                    if (diff1*diff2>0) {//the first half of loop and the pattern have the same direction
-                        if(abs(diff1)>abs(diff2)) {
-                            adj[i].push_back(j);
-                            parents[j].push_back(i);
-                        }
-                        else {
-                            for (int parent: parents[i]) {//the pattern is the sub-pattern of one of the loop's parents
-                                if (find(adj[parent].begin(), adj[parent].end(), j) != adj[parent].end()) {
-                                    adj[i].push_back(j);
-                                    parents[j].push_back(i);
-                                    break;
-                                }
+                    if(abs(diff1)>abs(diff2)) {
+                        adj[i].push_back(j);
+                        parents[j].push_back(i);
+                    }
+                    else {
+                        for (int parent: parents[i]) {//the pattern is the sub-pattern of one of the loop's parents
+                            if (find(adj[parent].begin(), adj[parent].end(), j) != adj[parent].end()) {
+                                adj[i].push_back(j);
+                                parents[j].push_back(i);
+                                break;
                             }
                         }
-                    }
+                    }                    
                 }
             }
             //l1 -> l2            
             for (int j=0; j<node2loop.size(); j++) {
-                if (node2loop[j].size()>0) {
-                    if (find(adj[j].begin(),adj[j].end(),i) != adj[j].end()) //avoid cycle in DAG
-                        continue;
-                    if (node2loop[i][0] == node2loop[j][0]) {//back
-                        int diff1 = node2loop[i][0]-node2loop[i][1],
-                            diff2 = node2loop[j][0]-node2loop[j][1];
-                        if (diff1*diff2>0) {
-                            if(abs(diff1)>abs(diff2)) {
-                                adj[i].push_back(j);
-                                parents[j].push_back(i);
-                            }
-                            else if(abs(diff1)<abs(diff2)){
-                                for (int parent: parents[i]) {//check if two loops are siblings
-                                    if (find(adj[parent].begin(), adj[parent].end(), j) != adj[parent].end()) {
-                                        adj[i].push_back(j);
-                                        parents[j].push_back(i);
-                                        break;
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    else if (node2loop[i][1] == node2loop[j][0]) {//middle
-                        int diff1 = node2loop[i][0]-node2loop[i][1],
-                            diff2 = node2loop[j][0]-node2loop[j][1];
-                        if (diff1*diff2 < 0 && abs(diff1)>abs(diff2)) {
-                            adj[i].push_back(j);
-                            parents[j].push_back(i);
-                            mLoop[i][j] = true;
-                        }           
+                if (node2loop[j].size()>0 && (node2loop[i][0] == node2loop[j][0] || 
+                    node2loop[i][1] == node2loop[j][1])) {//back
+                    int diff1 = node2loop[i][0]-node2loop[i][1],
+                        diff2 = node2loop[j][0]-node2loop[j][1];
+                    if(abs(diff1)>abs(diff2)) {
+                        adj[i].push_back(j);
+                        parents[j].push_back(i);
                     }
                 }
             }
@@ -3399,6 +3377,9 @@ void LocalGenomicMap::allTopologicalOrders(vector<int> &res, bool visited[], int
     vector<vector<int>> &orders) {
     //All the nodes are visited
     if (res.size() == num) {
+        // for (int i: res)
+        //     cout<<i+1<<" ";
+        // cout<<endl;
         orders.push_back(res);
     }
     for (int i = 0; i < adj.size(); i++) {
@@ -3423,28 +3404,72 @@ void LocalGenomicMap::allTopologicalOrders(vector<int> &res, bool visited[], int
     }
 }
 
-void LocalGenomicMap::printLoop(vector<vector<int>> &node2pat, vector<vector<int>> &node2loop, bool** mLoop, int start) {
-    int left = node2loop[start][0],
-        right = node2loop[start][1];
-    if (left<right)
-        for(int i=left;i<=right;i++)
-            cout<<i;
-    else
-        for(int i=left;i>=right;i--)
-            cout<<i;
-    cout<<"|";
-    for (int i=0;i<node2loop.size();i++) {
-        if (node2loop[i].size()>0 && mLoop[start][i]) {
-            printLoop(node2pat, node2loop, mLoop, i);
+void LocalGenomicMap::printBFB(vector<vector<int>> &orders, vector<vector<int>> &node2pat, vector<vector<int>> &node2loop) {
+    vector<int> res;
+    for (vector<int> bfb: orders) {
+            int i;
+            res.clear();
+            for (i=0;i<bfb.size();i++) {
+                //cout<<bfb[i]+1<<" ";
+                if (node2pat[bfb[i]].size()) {
+                    if (res.size()==0) {
+                        res.push_back(node2pat[bfb[i]][0]);
+                        res.push_back(node2pat[bfb[i]][1]);
+                    }
+                    else if (res.back() == node2pat[bfb[i]][0]) {
+                        res.push_back(node2pat[bfb[i]][0]);
+                        res.push_back(node2pat[bfb[i]][1]);
+                    }
+                    else if (res.back() == node2pat[bfb[i]][1]) {
+                        res.push_back(node2pat[bfb[i]][1]);
+                        res.push_back(node2pat[bfb[i]][0]);
+                    } 
+                    else
+                        break; 
+                }
+                else if (node2loop[bfb[i]].size()) {
+                    // lgm->printLoop(node2pat, node2loop, mLoop, bfb[i]);
+                    if (res.size()==0) {
+                        res.push_back(node2loop[bfb[i]][0]);
+                        res.push_back(node2loop[bfb[i]][1]);
+                        res.push_back(node2loop[bfb[i]][1]);
+                        res.push_back(node2loop[bfb[i]][0]);
+                        continue;
+                    }
+                    int idx = res.size()-1;
+                    while (idx>=0 && res[idx] != node2loop[bfb[i]][0] && 
+                            res[idx] != node2loop[bfb[i]][1]) idx--;
+                    if (idx<0)
+                        break;
+                    if (res[idx] == node2loop[bfb[i]][0]) {
+                        res.insert(idx==res.size()-1?res.end():res.begin()+idx, {node2loop[bfb[i]][0], node2loop[bfb[i]][1], 
+                            node2loop[bfb[i]][1], node2loop[bfb[i]][0]});
+                    }
+                    else if (res[idx] == node2loop[bfb[i]][1]) {
+                        res.insert(idx==res.size()-1?res.end():res.begin()+idx, {node2loop[bfb[i]][1], node2loop[bfb[i]][0], 
+                            node2loop[bfb[i]][0], node2loop[bfb[i]][1]});
+                    }
+                }            
+            }
+            if (i == bfb.size()) {
+                cout<<"find a BFB path"<<endl;
+                // for (int j=0;j<res.size();j++)
+                //     cout<<res[j]<<" ";
+                // cout<<endl;
+                for (int j=0;j<res.size()-1;j+=2) {
+                    if (res[j]<res[j+1]) {
+                        for (int k=res[j];k<=res[j+1];k++)
+                            cout<<k;
+                    }
+                    else {
+                        for (int k=res[j];k>=res[j+1];k--)
+                            cout<<k;
+                    }
+                    cout<<"|";
+                }
+                break;
+            }                
         }
-    }
-    if (left<right)
-        for(int i=right;i>=left;i--)
-            cout<<i;
-    else
-        for(int i=right;i<=left;i++)
-            cout<<i;
-    cout<<"|";
 }
 
 void LocalGenomicMap::BFB_ILP(const char *lpFn, vector<vector<int>> &patterns, 
@@ -3454,7 +3479,7 @@ void LocalGenomicMap::BFB_ILP(const char *lpFn, vector<vector<int>> &patterns,
     int numSegments = segs->size();
     int numElements = variableIdx.size(), numEpsilons = numSegments*3;
     int numVariables = numElements+numEpsilons, numPat = patterns.size(), numLoop = loops.size();
-    int numConstrains = numSegments*2*3 + numPat + 2*numPat + 2*numLoop;
+    int numConstrains = numSegments*2*3 + 2*numPat + 2*numLoop;
 
     double *objective = new double[numVariables];
     double *variableLowerBound = new double[numVariables];
@@ -3471,16 +3496,14 @@ void LocalGenomicMap::BFB_ILP(const char *lpFn, vector<vector<int>> &patterns,
         //Σp + Σ2*l - e_i <= c_i
         CoinPackedVector constrain1, constrain2;
         for (int j=0;j<numPat;j++) {//Σp
-            if ((patterns[j][0]<=i && i<=patterns[j][1]) ||
-                (patterns[j][1]<=i && i<=patterns[j][0])) {
+            if (patterns[j][0]<=i && i<=patterns[j][1]) {
                 string key = "p:"+to_string(patterns[j][0])+","+to_string(patterns[j][1]);
                 constrain1.insert(variableIdx[key], 1);
                 constrain2.insert(variableIdx[key], 1);
             }
         }
         for (int j=0;j<numLoop;j++) {//Σ2*l
-            if ((loops[j][0]<=i && i<=loops[j][1]) ||
-                (loops[j][1]<=i && i<=loops[j][0])) {
+            if (loops[j][0]<=i && i<=loops[j][1]) {
                 string key = "l:"+to_string(loops[j][0])+","+to_string(loops[j][1]);
                 constrain1.insert(variableIdx[key], 2);
                 constrain2.insert(variableIdx[key], 2);
@@ -3502,16 +3525,14 @@ void LocalGenomicMap::BFB_ILP(const char *lpFn, vector<vector<int>> &patterns,
         //Σp + Σ2*l - e_ij <= c_ij where j=i+1
         CoinPackedVector constrain3, constrain4;
         for (int j=0;j<numPat;j++) {//Σp
-            if ((patterns[j][0]<=i && i<patterns[j][1]) ||
-                (patterns[j][1]<=i && i<patterns[j][0])) {
+            if (patterns[j][0]<=i && i<patterns[j][1]) {
                 string key = "p:"+to_string(patterns[j][0])+","+to_string(patterns[j][1]);
                 constrain3.insert(variableIdx[key], 1);
                 constrain4.insert(variableIdx[key], 1);
             }
         }
         for (int j=0;j<numLoop;j++) {//Σ2*l
-            if ((loops[j][0]<=i && i<loops[j][1]) ||
-                (loops[j][1]<=i && i<loops[j][0])) {
+            if (loops[j][0]<=i && i<loops[j][1]) {
                 string key = "l:"+to_string(loops[j][0])+","+to_string(loops[j][1]);
                 constrain3.insert(variableIdx[key], 2);
                 constrain4.insert(variableIdx[key], 2);
@@ -3535,16 +3556,17 @@ void LocalGenomicMap::BFB_ILP(const char *lpFn, vector<vector<int>> &patterns,
         memset(coef, 0, sizeof(double)*numElements);
         CoinPackedVector constrain5, constrain6;
         for (int j=0;j<numLoop;j++) {//Σl
-            if (loops[j][1] == i) {
+            if (loops[j][0] == i || loops[j][1] == i) {
                 string key = "l:"+to_string(loops[j][0])+","+to_string(loops[j][1]);
                 coef[variableIdx[key]] += 1;
             }
         }
         for (int j=0;j<numPat;j++) {//Σ(p1+p2)/2
             for (int k=0;k<numPat;k++) {
-                if (patterns[j][1] == i && patterns[j][1] == patterns[k][0]) {
+                if ((patterns[j][0] == i && patterns[k][0] == i) ||
+                    (patterns[j][1] == i && patterns[k][1] == i)) {
                     int diff1 = patterns[j][0]-patterns[j][1], diff2 = patterns[k][0]-patterns[k][1];
-                    if (diff1*diff2 < 0 && abs(diff1) > abs(diff2)) {
+                    if (abs(diff1) > abs(diff2)) {
                         string key1 = "p:"+to_string(patterns[j][0])+","+to_string(patterns[j][1]);
                         coef[variableIdx[key1]] += 0.5;
                         string key2 = "p:"+to_string(patterns[k][0])+","+to_string(patterns[k][1]);
@@ -3555,9 +3577,10 @@ void LocalGenomicMap::BFB_ILP(const char *lpFn, vector<vector<int>> &patterns,
         }
         for (int j=0;j<numPat;j++) {//Σ(p+l)/2
             for (int k=0;k<numLoop;k++) {
-                if (patterns[j][1] == i && patterns[j][1] == loops[k][0]) {
+                if ((patterns[j][0] == i && loops[k][0] == i) ||
+                    (patterns[j][1] == i && loops[k][1] == i)) {
                     int diff1 = patterns[j][0]-patterns[j][1], diff2 = loops[k][0]-loops[k][1];
-                    if (diff1*diff2 < 0 && abs(diff1) > abs(diff2)) {
+                    if (abs(diff1) > abs(diff2)) {
                         string key1 = "p:"+to_string(patterns[j][0])+","+to_string(patterns[j][1]);
                         coef[variableIdx[key1]] += 0.5;
                         string key2 = "l:"+to_string(loops[k][0])+","+to_string(loops[k][1]);
@@ -3568,9 +3591,10 @@ void LocalGenomicMap::BFB_ILP(const char *lpFn, vector<vector<int>> &patterns,
         }
         for (int j=0;j<numLoop;j++) {//Σ(l1+l2)/2 (loop2 is inserted into the middle of loop1)
             for (int k=0;k<numLoop;k++) {
-                if (loops[j][1] == i && loops[j][1] == loops[k][0]) {
+                if ((loops[j][0] == i && loops[k][0] == i) ||
+                    (loops[j][1] == i && loops[k][1] == i)) {
                     int diff1 = loops[j][0]-loops[j][1], diff2 = loops[k][0]-loops[k][1];
-                    if (diff1*diff2 < 0 && abs(diff1) > abs(diff2)) {
+                    if (abs(diff1) > abs(diff2)) {
                         string key1 = "l:"+to_string(loops[j][0])+","+to_string(loops[j][1]);
                         coef[variableIdx[key1]] += 0.5;
                         string key2 = "l:"+to_string(loops[k][0])+","+to_string(loops[k][1]);
@@ -3599,74 +3623,63 @@ void LocalGenomicMap::BFB_ILP(const char *lpFn, vector<vector<int>> &patterns,
         delete [] coef;
     }
     //inequality formula: constrains on patterns and loops
-    //p(a,b)=1 -> p(b,a)=0 or 0<=p(a,b)+p(b,a)<=1
+    //Σp(c,d)-p(a,b)>=0 where p(a,b) is a sub-pattern of p(c,d)
     for (int i=0;i<numPat;i++) {
-        if (patterns[i][0]<patterns[i][1]) {
-            CoinPackedVector constrain7;
-            string key1 = "p:"+to_string(patterns[i][0])+","+to_string(patterns[i][1]);
-            constrain7.insert(variableIdx[key1], 1);
-            string key2 = "p:"+to_string(patterns[i][1])+","+to_string(patterns[i][0]);
-            constrain7.insert(variableIdx[key2], 1);
+        CoinPackedVector constrain7;
+        bool flag = false;
+        for (int j=0;j<numPat;j++) {
+            if ((patterns[i][0] == patterns[j][0]) ||
+                (patterns[i][1] == patterns[j][1])) {
+                int diff1 = patterns[i][0]-patterns[i][1], diff2 = patterns[j][0]-patterns[j][1];
+                if (abs(diff1)<abs(diff2)) {
+                    flag = true;
+                    string key = "p:"+to_string(patterns[j][0])+","+to_string(patterns[j][1]);
+                    constrain7.insert(variableIdx[key], 1);
+                }
+            }
+        }
+        if (flag) {
+            string key = "p:"+to_string(patterns[i][0])+","+to_string(patterns[i][1]);
+            constrain7.insert(variableIdx[key], -1);
             constrainLowerBound[idx] = 0;
-            constrainUpperBound[idx] = 1;
+            constrainUpperBound[idx] = si->getInfinity();
             idx++;
             matrix->appendRow(constrain7);
         }
     }
-    //Σp(c,d)-p(a,b)>=0 where p(a,b) is a sub-pattern of p(c,d)
-    for (int i=0;i<numPat;i++) {
+    //Σp(x1,y1)+Σl(x2,y2)-l(a,b)>=0 where l(a,b) pattern is a sub-pattern of p and l
+    for (int i=0;i<numLoop;i++) {
         CoinPackedVector constrain8;
         bool flag = false;
         for (int j=0;j<numPat;j++) {
-            if (patterns[i][0] == patterns[j][1]) {
-                int diff1 = patterns[i][0]-patterns[i][1], diff2 = patterns[j][0]-patterns[j][1];
-                if (diff1*diff2<0 && abs(diff1)<abs(diff2)) {
+            if ((patterns[j][0] == loops[i][0])||
+                (patterns[j][1] == loops[i][1])) {
+                int diff1 = loops[i][0]-loops[i][1], diff2 = patterns[j][0]-patterns[j][1];
+                if (abs(diff1)<abs(diff2)) {
                     flag = true;
                     string key = "p:"+to_string(patterns[j][0])+","+to_string(patterns[j][1]);
                     constrain8.insert(variableIdx[key], 1);
                 }
             }
         }
-        if (flag) {
-            string key = "p:"+to_string(patterns[i][0])+","+to_string(patterns[i][1]);
-            constrain8.insert(variableIdx[key], -1);
-            constrainLowerBound[idx] = 0;
-            constrainUpperBound[idx] = si->getInfinity();
-            idx++;
-            matrix->appendRow(constrain8);
-        }
-    }
-    //Σp(x1,y1)+Σl(x2,y2)-l(a,b)>=0 where l(a,b) pattern is a sub-pattern of p and l
-    for (int i=0;i<numLoop;i++) {
-        CoinPackedVector constrain9;
-        bool flag = false;
-        for (int j=0;j<numPat;j++) {
-            if (patterns[j][1] == loops[i][0]) {
-                int diff1 = loops[i][0]-loops[i][1], diff2 = patterns[j][0]-patterns[j][1];
-                if (diff1*diff2<0 && abs(diff1)<abs(diff2)) {
-                    flag = true;
-                    string key = "p:"+to_string(patterns[j][0])+","+to_string(patterns[j][1]);
-                    constrain9.insert(variableIdx[key], 1);
-                }
-            }
-        }
         for (int k=0;k<numLoop;k++) { // l(a,b) can be inserted into the middle of l(x2,y2)
-            if (loops[k][1] == loops[i][0]) {
+            if ((loops[k][0] == loops[i][0]) ||
+                (loops[k][1] == loops[i][1])) {
                 int diff1 = loops[i][0]-loops[i][1], diff2 = loops[k][0]-loops[k][1];
-                if (diff1*diff2<0 && abs(diff1)<abs(diff2)) {
+                if (abs(diff1)<abs(diff2)) {
                     flag = true;
                     string key = "l:"+to_string(loops[k][0])+","+to_string(loops[k][1]);
-                    constrain9.insert(variableIdx[key], 1);
+                    constrain8.insert(variableIdx[key], 1);
                 }
             }
         }
         if (flag) {
             string key = "l:"+to_string(loops[i][0])+","+to_string(loops[i][1]);
-            constrain9.insert(variableIdx[key], -1);
+            constrain8.insert(variableIdx[key], -1);
             constrainLowerBound[idx] = 0;
             constrainUpperBound[idx] = si->getInfinity();
             idx++;
-            matrix->appendRow(constrain9);
+            matrix->appendRow(constrain8);
         }
     }
 
