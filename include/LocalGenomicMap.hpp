@@ -189,7 +189,7 @@ public:
 
     /* BFB functions*/
     void combinations(int start, int end, int len, vector<vector<int>> &per, vector<int> temp);
-    void constructDAG(vector<vector<int>> &adj, bool** mLoop, vector<vector<int>> &node2pat, vector<vector<int>> &node2loop, map<string, int> &variableIdx, int *elementCN);
+    void constructDAG(vector<vector<int>> &adj, vector<vector<int>> &node2pat, vector<vector<int>> &node2loop, map<string, int> &variableIdx, int *elementCN);
     void allTopologicalOrders(vector<int> &res, bool visited[], int num, int indeg[], vector<vector<int>> &adj, vector<vector<int>> &orders);
     void printBFB(vector<vector<int>> &orders, vector<vector<int>> &node2pat, vector<vector<int>> &node2loop);
     void BFB_ILP(const char *lpFn, vector<vector<int>> &patterns, vector<vector<int>> &loops, map<string, int> &variableIdx, double** juncCN);
@@ -201,6 +201,7 @@ public:
     void findMaxBPMatching(vector<Junction *> &juncs, vector<Junction *> &results);
     bool bpm(bool** connection, Segment *source, set<Segment *> &targets, bool visited[], int match[]);
     void findCircuits(vector<vector<int>> adj);
+    void constructCircuits(vector<vector<int>> sv);
 };
 
 #endif

@@ -3273,7 +3273,7 @@ bool compareLoops(vector<int> a, vector<int> b) {
     return (diff1>diff2); 
 }
 
-void LocalGenomicMap::constructDAG(vector<vector<int>> &adj, bool** mLoop, vector<vector<int>> &node2pat, 
+void LocalGenomicMap::constructDAG(vector<vector<int>> &adj, vector<vector<int>> &node2pat, 
                             vector<vector<int>> &node2loop, map<string, int> &variableIdx, int *elementCN) {
     vector<vector<int>> parents;
     for (auto iter=variableIdx.begin();iter!=variableIdx.end();iter++) {
@@ -3428,7 +3428,6 @@ void LocalGenomicMap::printBFB(vector<vector<int>> &orders, vector<vector<int>> 
                         break; 
                 }
                 else if (node2loop[bfb[i]].size()) {
-                    // lgm->printLoop(node2pat, node2loop, mLoop, bfb[i]);
                     if (res.size()==0) {
                         res.push_back(node2loop[bfb[i]][0]);
                         res.push_back(node2loop[bfb[i]][1]);
@@ -3453,9 +3452,9 @@ void LocalGenomicMap::printBFB(vector<vector<int>> &orders, vector<vector<int>> 
             }
             if (i == bfb.size()) {
                 cout<<"find a BFB path"<<endl;
-                // for (int j=0;j<res.size();j++)
-                //     cout<<res[j]<<" ";
-                // cout<<endl;
+                for (int j=0;j<res.size();j++)
+                    cout<<res[j]<<" ";
+                cout<<endl;
                 for (int j=0;j<res.size()-1;j+=2) {
                     if (res[j]<res[j+1]) {
                         for (int k=res[j];k<=res[j+1];k++)
@@ -3475,8 +3474,16 @@ void LocalGenomicMap::printBFB(vector<vector<int>> &orders, vector<vector<int>> 
 void LocalGenomicMap::BFB_ILP(const char *lpFn, vector<vector<int>> &patterns, 
                             vector<vector<int>> &loops, map<string, int> &variableIdx, double** juncCN) {
     OsiClpSolverInterface *si = new OsiClpSolverInterface();
-    vector<Segment *> *segs = this->getGraph()->getSegments();
-    int numSegments = segs->size();
+    int startSegID = patterns.front()[0], endSegID = patterns.back()[1];
+    cout<<"start-end: "<<startSegID<<" "<<endSegID<<endl;
+    vector<Segment *> segs;
+    for (Segment * seg: *this->getGraph()->getSegments()) {
+        cout<<seg->getId()<<" ";
+        if (startSegID<=seg->getId() && seg->getId()<=endSegID)
+            segs.push_back(seg);
+    }
+    
+    int numSegments = segs.size();
     int numElements = variableIdx.size(), numEpsilons = numSegments*3;
     int numVariables = numElements+numEpsilons, numPat = patterns.size(), numLoop = loops.size();
     int numConstrains = numSegments*2*3 + 2*numPat + 2*numLoop;
@@ -3491,7 +3498,7 @@ void LocalGenomicMap::BFB_ILP(const char *lpFn, vector<vector<int>> &patterns,
     CoinPackedMatrix *matrix = new CoinPackedMatrix(false, 0, 0);
     int idx = 0;//number of constrains/inequalities
     //inequality formula: constrains on segment and junction CNs
-    for (int i=1;i<=numSegments;i++) {
+    for (int i=startSegID;i<=endSegID;i++) {
         //Σp + Σ2*l + e_i >= c_i and 
         //Σp + Σ2*l - e_i <= c_i
         CoinPackedVector constrain1, constrain2;
@@ -3510,14 +3517,14 @@ void LocalGenomicMap::BFB_ILP(const char *lpFn, vector<vector<int>> &patterns,
             }
         }
         constrain1.insert(numElements+idx/2, 1);//e_i
-        constrainLowerBound[idx] = (*segs)[i-1]->getWeight()->getCorrectedCoverage();
+        constrainLowerBound[idx] = segs[i-startSegID]->getWeight()->getCopyNum();
         constrainUpperBound[idx] = si->getInfinity();
         idx++;
         matrix->appendRow(constrain1);
 
         constrain2.insert(numElements+idx/2, -1);//-e_i
         constrainLowerBound[idx] = -1*si->getInfinity();
-        constrainUpperBound[idx] = (*segs)[i-1]->getWeight()->getCorrectedCoverage();
+        constrainUpperBound[idx] = segs[i-startSegID]->getWeight()->getCopyNum();
         idx++;
         matrix->appendRow(constrain2);
 
@@ -3609,6 +3616,7 @@ void LocalGenomicMap::BFB_ILP(const char *lpFn, vector<vector<int>> &patterns,
                 constrain6.insert(i, coef[i]);
             }
         }
+        cout<<"Inversion CN: "<<i<<"-"<<juncCN[i][1]<<endl;
         constrain5.insert(numElements+idx/2, 1);//e_ii
         constrainLowerBound[idx] = juncCN[i][1];//c_ii
         constrainUpperBound[idx] = si->getInfinity();
@@ -3695,6 +3703,9 @@ void LocalGenomicMap::BFB_ILP(const char *lpFn, vector<vector<int>> &patterns,
         variableLowerBound[variableIdx[key]] = 0;
         variableUpperBound[variableIdx[key]] = 1;
     }
+    //reference pattern
+    // string key = "p:"+to_string(startSegID)+","+to_string(endSegID);
+    // variableLowerBound[variableIdx[key]] = variableUpperBound[variableIdx[key]] = 1;
     for (int i=0;i<numLoop;i++) {//l
         string key = "l:"+to_string(loops[i][0])+","+to_string(loops[i][1]);
         variableLowerBound[variableIdx[key]] = 0;
@@ -3876,7 +3887,7 @@ bool LocalGenomicMap::bpm(bool** connection, Segment *source, set<Segment *> &ta
     return false;
 }
 
-//Hierholzer’s Algorithm
+//Hierholzer’s Algorithm for finding an Euler circuit in a directed graph
 void LocalGenomicMap::findCircuits(vector<vector<int>> adj) {
     unordered_map<int, int> edgeCount;//number of edges for each starting segment
     for (int i=1; i<=adj.size(); i++)
@@ -3909,4 +3920,34 @@ void LocalGenomicMap::findCircuits(vector<vector<int>> adj) {
         else
             cout<<endl;
     }
+}
+
+//Construct circuits/paths
+void LocalGenomicMap::constructCircuits(vector<vector<int>> sv) {
+    vector<vector<int>> res;
+    res.push_back(sv[0]);
+    sv.erase(sv.begin());    
+    while (sv.size()) {
+        bool finished = true; 
+        int idx = 0;       
+        for (vector<int> junc: sv) {
+            if (junc[0] == res.back()[1]) {
+                finished = false;
+                res.push_back(junc);
+                sv.erase(sv.begin()+idx);
+            }
+            else if (junc[1] == res.front()[0]) {
+                finished = false;
+                res.insert(res.begin(), junc);
+                sv.erase(sv.begin()+idx);
+            }
+            idx++;
+        }
+        if (finished) break;
+    }
+    cout<<res[0][0]<<"->"<<res[0][1]<<" ";
+    for (int i=1; i<res.size(); i++) {
+        cout<<res[i][1]<<"->";
+    }
+    cout<<endl;
 }

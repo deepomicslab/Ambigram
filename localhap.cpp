@@ -236,12 +236,13 @@ int main(int argc, char *argv[]) {
         Graph *g = new Graph(lhRawFn);
         LocalGenomicMap *lgm = new LocalGenomicMap(g);
         //enumerate all the patterns and loops
-        int segNum = g->getSegments()->size();
+        int startID = 9;
+        int segNum = 12;//g->getSegments()->size();
         vector<vector<int>> patterns, loops;
         vector<int> temp;
-        lgm->combinations(1,segNum,2,patterns,temp);
+        lgm->combinations(startID,segNum,2,patterns,temp);
         temp.clear();
-        lgm->combinations(1,segNum,2,loops,temp);
+        lgm->combinations(startID,segNum,2,loops,temp);
 
         //construct mapping from pattern/loop to index
         map<string, int> variableIdx;
@@ -263,7 +264,7 @@ int main(int argc, char *argv[]) {
         }
 
         //find copy number for both normal junctions and fold-back inversions
-        vector<Junction *> *juncs = g->getJunctions();
+        vector<Junction *> inversions;
         double** juncCN = new double*[segNum+1];
         for (int i=0; i <= segNum; i++) {
             juncCN[i] = new double[2];
@@ -271,28 +272,44 @@ int main(int argc, char *argv[]) {
         }
         for (Junction *junc: *(g->getJunctions())) {
             int sourceID = junc->getSource()->getId(), targetID = junc->getTarget()->getId();
-            if (sourceID+1 == targetID) {                
-                juncCN[sourceID][0] += junc->getWeight()->getCopyNum();
+            char sourceDir = junc->getSourceDir(), targetDir = junc->getTargetDir();
+            if (sourceID<startID||sourceID>segNum||targetID<startID||targetID>segNum) continue;
+            if (sourceDir == '+' && targetDir == '+') {//ht or th
+                if (sourceID+1 == targetID) {//normal edges                
+                    juncCN[sourceID][0] += junc->getWeight()->getCopyNum();
+                }
+                else if (sourceID-1 == targetID) {//normal edges 
+                    juncCN[targetID][0] += junc->getWeight()->getCopyNum();
+                }
             }
-            else if (sourceID-1 == targetID) {
-                juncCN[targetID][0] += junc->getWeight()->getCopyNum();
-            }
-            else if (sourceID == targetID) {
-                juncCN[sourceID][1] += junc->getWeight()->getCopyNum();
-            }
+            else {//hh or tt (inversion)
+                if (abs(sourceID-targetID)<=3) {//fold-back inversion
+                    inversions.push_back(junc);
+                    if (sourceDir == '+') {
+                        int greaterID = sourceID>targetID? sourceID:targetID;
+                        juncCN[greaterID][1] += junc->getWeight()->getCopyNum();
+                    }
+                    else {
+                        int smallerID = sourceID<targetID? sourceID:targetID;
+                        juncCN[smallerID][1] += junc->getWeight()->getCopyNum();
+                    }                        
+                }
+            }            
         }
         cout<<"Junction CN"<<endl;
         for (int i=0;i<=segNum;i++) {
             cout<<i<<","<<i+1<<" "<<juncCN[i][0]<<"\t"<<i<<","<<i<<" "<<juncCN[i][1]<<endl;
         }
+        
+        //construct ILP and generate .lp file for cbc
+        lgm->BFB_ILP(lpFn, patterns, loops, variableIdx, juncCN);
 
-        // //construct ILP and generate .lp file for cbc
-        // lgm->BFB_ILP(lpFn, patterns, loops, variableIdx, juncCN);
+        //run cbc under the directory containing test.lp
+        const char *cmd = "cbc COLO829_1.lp solve solu COLO829_1.sol";
+        system(cmd);
 
-        // //run cbc under the directory containing test.lp
-        // const char *cmd = "cbc test.lp solve solu test.sol";
         //read patterns and loops from test.sol
-        const char *solDir = "./test1.sol";
+        const char *solDir = "./COLO829_1.sol";
         ifstream solFile(solDir);
         if (!solFile) {
             cerr << "Cannot open file " << solDir << endl;
@@ -313,12 +330,7 @@ int main(int argc, char *argv[]) {
         }
         //construct BFB DAG and find all topological orders
         vector<vector<int>> adj, node2pat, node2loop;
-        bool** mLoop = new bool*[variableIdx.size()];
-        for (int i=0; i < variableIdx.size(); i++) {
-            mLoop[i] = new bool[variableIdx.size()];
-            memset(mLoop[i], false, variableIdx.size()*sizeof(bool));
-        }
-        lgm->constructDAG(adj, mLoop, node2pat, node2loop, variableIdx, elementCN);
+        lgm->constructDAG(adj, node2pat, node2loop, variableIdx, elementCN);
         int num = adj.size();
         bool *visited = new bool[num];
         int *indeg = new int[num];
@@ -349,7 +361,7 @@ int main(int argc, char *argv[]) {
         }
         //print the result
         lgm->printBFB(orders, node2pat, node2loop);
-        
+
     } else if (strcmp(result["op"].as<std::string>().c_str(), "bpm") == 0) {
         const char *lhRawFn = result["in_lh"].as<std::string>().c_str();
         Graph *g = new Graph(lhRawFn);
@@ -380,13 +392,19 @@ int main(int argc, char *argv[]) {
             vector<int> temp;
             adj.push_back(temp);
         }
-
-        for (Junction* junc: selectedJunc)
+        cout<<"SV: "<<endl;
+        for (Junction* junc: selectedJunc) {
+            cout<<junc->getSource()->getId()<<"->"<<junc->getTarget()->getId()<<endl;
             adj[junc->getSource()->getId()].push_back(junc->getTarget()->getId());
-        for (Junction* junc: normal)
+        }
+        cout<<"Normal: "<<endl;
+        for (Junction* junc: normal) {
+            cout<<junc->getSource()->getId()<<"->"<<junc->getTarget()->getId()<<endl;
             adj[junc->getSource()->getId()].push_back(junc->getTarget()->getId());
+        }
 
         lgm->findCircuits(adj);
+        //lgm->constructCircuits(adj);
 
         //Traverse the graph with selected junc
         // JunctionDB *db = new JunctionDB(selectedJunc);
