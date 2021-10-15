@@ -13,6 +13,7 @@ class Weight;
 class Segment {
 protected:
     int mId;    // segment id
+    int chrId;  // chromosome id
     string mChrom;
     int mStart;
     int mEnd;
@@ -36,12 +37,13 @@ protected:
 
 public:
     // constructor and destructor
-    Segment(int aId, string aChrom, int aStart, int aEnd, double aCoverage, double aCredibility, double aCopy);
+    Segment(int aId, int chr, string aChrom, int aStart, int aEnd, double aCoverage, double aCredibility, double aCopy);
 
     ~Segment();
 
     // getter and setter
     int getId();
+    int getChrId();
 
     string getChrom();
 

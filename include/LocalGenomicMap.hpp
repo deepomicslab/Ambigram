@@ -191,8 +191,12 @@ public:
     void combinations(int start, int end, int len, vector<vector<int>> &per, vector<int> temp);
     void constructDAG(vector<vector<int>> &adj, vector<vector<int>> &node2pat, vector<vector<int>> &node2loop, map<string, int> &variableIdx, int *elementCN);
     void allTopologicalOrders(vector<int> &res, bool visited[], int num, int indeg[], vector<vector<int>> &adj, vector<vector<int>> &orders);
-    void printBFB(vector<vector<int>> &orders, vector<vector<int>> &node2pat, vector<vector<int>> &node2loop);
+    void getBFB(vector<vector<int>> &orders, vector<vector<int>> &node2pat, vector<vector<int>> &node2loop, vector<int> &res);
+    void editBFB(vector<vector<int>> bfbPaths, vector<int> &posInfo, vector<int> &output);
+    void printBFB(vector<int> &res, vector<Junction *> &inversions);
     void BFB_ILP(const char *lpFn, vector<vector<int>> &patterns, vector<vector<int>> &loops, map<string, int> &variableIdx, double** juncCN);
+    void bfbConcate(Junction *sv, bool edgeA, int pos1, int pos2, vector<vector<int>> bfbPaths, vector<int> &res);
+    void bfbInsertion(vector<Junction *> &SVs, vector<vector<int>> bfbPaths, bool edgeA[], vector<int> &res);
     VertexPath* findBFB(VertexPath* currPath, int n, set<Edge *>* visited, int error);
     bool checkBFB(VertexPath* currPath, Vertex* v);
     bool isPalindrome(VertexPath* path, int start);

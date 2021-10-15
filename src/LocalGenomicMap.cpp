@@ -3404,71 +3404,148 @@ void LocalGenomicMap::allTopologicalOrders(vector<int> &res, bool visited[], int
     }
 }
 
-void LocalGenomicMap::printBFB(vector<vector<int>> &orders, vector<vector<int>> &node2pat, vector<vector<int>> &node2loop) {
-    vector<int> res;
-    for (vector<int> bfb: orders) {
-            int i;
-            res.clear();
-            for (i=0;i<bfb.size();i++) {
-                //cout<<bfb[i]+1<<" ";
-                if (node2pat[bfb[i]].size()) {
-                    if (res.size()==0) {
+void LocalGenomicMap::getBFB(vector<vector<int>> &orders, vector<vector<int>> &node2pat, 
+                            vector<vector<int>> &node2loop, vector<int> &res) {
+    bool forwardDir = true;                                
+    for (int n=0; n<orders.size(); n++) {
+        vector<int> bfb = orders[n];
+        int i;
+        res.clear();        
+        for (i=0;i<bfb.size();i++) {
+            //cout<<bfb[i]+1<<" ";
+            if (node2pat[bfb[i]].size()) {
+                if (res.size()==0) {
+                    if (forwardDir) {
                         res.push_back(node2pat[bfb[i]][0]);
                         res.push_back(node2pat[bfb[i]][1]);
-                    }
-                    else if (res.back() == node2pat[bfb[i]][0]) {
-                        res.push_back(node2pat[bfb[i]][0]);
-                        res.push_back(node2pat[bfb[i]][1]);
-                    }
-                    else if (res.back() == node2pat[bfb[i]][1]) {
-                        res.push_back(node2pat[bfb[i]][1]);
-                        res.push_back(node2pat[bfb[i]][0]);
-                    } 
-                    else
-                        break; 
-                }
-                else if (node2loop[bfb[i]].size()) {
-                    if (res.size()==0) {
-                        res.push_back(node2loop[bfb[i]][0]);
-                        res.push_back(node2loop[bfb[i]][1]);
-                        res.push_back(node2loop[bfb[i]][1]);
-                        res.push_back(node2loop[bfb[i]][0]);
-                        continue;
-                    }
-                    int idx = res.size()-1;
-                    while (idx>=0 && res[idx] != node2loop[bfb[i]][0] && 
-                            res[idx] != node2loop[bfb[i]][1]) idx--;
-                    if (idx<0)
-                        break;
-                    if (res[idx] == node2loop[bfb[i]][0]) {
-                        res.insert(idx==res.size()-1?res.end():res.begin()+idx, {node2loop[bfb[i]][0], node2loop[bfb[i]][1], 
-                            node2loop[bfb[i]][1], node2loop[bfb[i]][0]});
-                    }
-                    else if (res[idx] == node2loop[bfb[i]][1]) {
-                        res.insert(idx==res.size()-1?res.end():res.begin()+idx, {node2loop[bfb[i]][1], node2loop[bfb[i]][0], 
-                            node2loop[bfb[i]][0], node2loop[bfb[i]][1]});
-                    }
-                }            
-            }
-            if (i == bfb.size()) {
-                cout<<"find a BFB path"<<endl;
-                for (int j=0;j<res.size();j++)
-                    cout<<res[j]<<" ";
-                cout<<endl;
-                for (int j=0;j<res.size()-1;j+=2) {
-                    if (res[j]<res[j+1]) {
-                        for (int k=res[j];k<=res[j+1];k++)
-                            cout<<k;
                     }
                     else {
-                        for (int k=res[j];k>=res[j+1];k--)
-                            cout<<k;
+                        res.push_back(node2pat[bfb[i]][1]);
+                        res.push_back(node2pat[bfb[i]][0]);
                     }
-                    cout<<"|";
                 }
-                break;
-            }                
+                else if (res.back() == node2pat[bfb[i]][0]) {
+                    res.push_back(node2pat[bfb[i]][0]);
+                    res.push_back(node2pat[bfb[i]][1]);
+                }
+                else if (res.back() == node2pat[bfb[i]][1]) {
+                    res.push_back(node2pat[bfb[i]][1]);
+                    res.push_back(node2pat[bfb[i]][0]);
+                } 
+                else
+                    break; 
+            }
+            else if (node2loop[bfb[i]].size()) {
+                if (res.size()==0) {
+                    if (forwardDir) {
+                        res.push_back(node2loop[bfb[i]][0]);
+                        res.push_back(node2loop[bfb[i]][1]);
+                        res.push_back(node2loop[bfb[i]][1]);
+                        res.push_back(node2loop[bfb[i]][0]);
+                    }
+                    else {
+                        res.push_back(node2loop[bfb[i]][1]);
+                        res.push_back(node2loop[bfb[i]][0]);
+                        res.push_back(node2loop[bfb[i]][0]);
+                        res.push_back(node2loop[bfb[i]][1]);
+                    }
+                    continue;
+                }
+                int idx = res.size()-1;
+                while (idx>=0 && res[idx] != node2loop[bfb[i]][0] && 
+                        res[idx] != node2loop[bfb[i]][1]) idx--;
+                if (idx<0)
+                    break;
+                if (res[idx] == node2loop[bfb[i]][0]) {
+                    res.insert(idx==res.size()-1?res.end():res.begin()+idx, {node2loop[bfb[i]][0], node2loop[bfb[i]][1], 
+                        node2loop[bfb[i]][1], node2loop[bfb[i]][0]});
+                }
+                else if (res[idx] == node2loop[bfb[i]][1]) {
+                    res.insert(idx==res.size()-1?res.end():res.begin()+idx, {node2loop[bfb[i]][1], node2loop[bfb[i]][0], 
+                        node2loop[bfb[i]][0], node2loop[bfb[i]][1]});
+                }
+            }            
         }
+        if (i == bfb.size())
+            break;    
+        else if (n == orders.size() && forwardDir) {
+            n = 0;
+            forwardDir = false;
+        }
+    }
+}
+
+void LocalGenomicMap::editBFB(vector<vector<int>> bfbPaths, vector<int> &posInfo, vector<int> &output) {
+    for (int i=0; i<=posInfo.size()-6; i+=6) {
+        int chr1 = posInfo[i], pos1 = posInfo[i+1], sourceID = posInfo[i+2],
+            chr2 = posInfo[i+3], pos2 = posInfo[i+4], targetID = posInfo[i+5];
+        //cout<<chr1<<" "<<pos1<<" "<<sourceID<<" "<<chr2<<" "<<pos2<<" "<<targetID<<endl;
+        output.insert(output.end(), bfbPaths[chr1].begin(), bfbPaths[chr1].begin()+pos1+1);
+        output.push_back(sourceID);
+        output.push_back(-1), output.push_back(-1);//sign for translocation
+        output.push_back(targetID);
+        output.insert(output.end(), bfbPaths[chr2].begin()+pos2+1, bfbPaths[chr2].end()); 
+    }
+}
+
+void LocalGenomicMap::printBFB(vector<int> &res, vector<Junction *> &inversions) {
+    cout<<"find a BFB path"<<endl;
+    for (int j=0;j<res.size()-1;j+=2) {
+        if (res[j] == -1)
+            continue;
+        cout<<res[j]<<"-"<<res[j+1]<<"|";
+    }
+    cout<<endl;
+    //deal with imperfect inversions
+    for (int j=1;j<res.size()-1;j+=2) {
+        if (res[j] == -1)
+            continue;
+        for (Junction* junc: inversions) {
+            int sourceSegID = junc->getSource()->getId(),
+                targetSegID = junc->getTarget()->getId();
+            char sourceDir = junc->getSourceDir();
+            if ((sourceSegID<=res[j] && res[j]<=targetSegID) ||
+                (targetSegID<=res[j] && res[j]<=sourceSegID)) {
+                if (sourceDir == '+') {
+                    if (res[j]>res[j-1]) {
+                        res[j] = sourceSegID;
+                        res[j+1] = targetSegID;
+                    }
+                    else {
+                        res[j] = targetSegID;
+                        res[j+1] = sourceSegID;
+                    }
+                }
+                else {
+                    if (res[j]>res[j-1]) {
+                        res[j] = targetSegID;
+                        res[j+1] = sourceSegID;
+                    }
+                    else {
+                        res[j] = sourceSegID;
+                        res[j+1] = targetSegID;
+                    }
+                }
+            }
+        }
+    }
+
+    for (int j=0;j<res.size()-1;j+=2) {
+        if (res[j] == -1) {            
+            cout<<" -> ";
+            continue;
+        }
+        if (res[j]<res[j+1]) {
+            for (int k=res[j];k<=res[j+1];k++)
+                cout<<k;
+        }
+        else {
+            for (int k=res[j];k>=res[j+1];k--)
+                cout<<k;
+        }
+        cout<<"|";
+    }
+    cout<<endl;
 }
 
 void LocalGenomicMap::BFB_ILP(const char *lpFn, vector<vector<int>> &patterns, 
@@ -3486,7 +3563,7 @@ void LocalGenomicMap::BFB_ILP(const char *lpFn, vector<vector<int>> &patterns,
     int numSegments = segs.size();
     int numElements = variableIdx.size(), numEpsilons = numSegments*3;
     int numVariables = numElements+numEpsilons, numPat = patterns.size(), numLoop = loops.size();
-    int numConstrains = numSegments*2*3 + 2*numPat + 2*numLoop;
+    int numConstrains = numSegments*2*3 + numPat + 2*numPat + 2*numLoop;
 
     double *objective = new double[numVariables];
     double *variableLowerBound = new double[numVariables];
@@ -3631,9 +3708,30 @@ void LocalGenomicMap::BFB_ILP(const char *lpFn, vector<vector<int>> &patterns,
         delete [] coef;
     }
     //inequality formula: constrains on patterns and loops
-    //Σp(c,d)-p(a,b)>=0 where p(a,b) is a sub-pattern of p(c,d)
+    //0<=p(a,b)+Σp(b,c)<=1: constrains on directions
     for (int i=0;i<numPat;i++) {
         CoinPackedVector constrain7;
+        bool flag = false;
+        for (int j=0;j<numPat;j++) {
+            if (patterns[i][1]==patterns[j][0]) {                
+                flag = true;          
+                string key = "p:"+to_string(patterns[j][0])+","+to_string(patterns[j][1]);
+                constrain7.insert(variableIdx[key], 1);                
+            }
+        }
+        if (flag) {
+            string key = "p:"+to_string(patterns[i][0])+","+to_string(patterns[i][1]);
+            constrain7.insert(variableIdx[key], 1);
+            constrainLowerBound[idx] = 0;
+            constrainUpperBound[idx] = 1;
+            idx++;
+            matrix->appendRow(constrain7);
+        }
+    }
+
+    //Σp(c,d)-p(a,b)>=0 where p(a,b) is a sub-pattern of p(c,d)
+    for (int i=0;i<numPat;i++) {
+        CoinPackedVector constrain8;
         bool flag = false;
         for (int j=0;j<numPat;j++) {
             if ((patterns[i][0] == patterns[j][0]) ||
@@ -3642,22 +3740,22 @@ void LocalGenomicMap::BFB_ILP(const char *lpFn, vector<vector<int>> &patterns,
                 if (abs(diff1)<abs(diff2)) {
                     flag = true;
                     string key = "p:"+to_string(patterns[j][0])+","+to_string(patterns[j][1]);
-                    constrain7.insert(variableIdx[key], 1);
+                    constrain8.insert(variableIdx[key], 1);
                 }
             }
         }
         if (flag) {
             string key = "p:"+to_string(patterns[i][0])+","+to_string(patterns[i][1]);
-            constrain7.insert(variableIdx[key], -1);
+            constrain8.insert(variableIdx[key], -1);
             constrainLowerBound[idx] = 0;
             constrainUpperBound[idx] = si->getInfinity();
             idx++;
-            matrix->appendRow(constrain7);
+            matrix->appendRow(constrain8);
         }
     }
     //Σp(x1,y1)+Σl(x2,y2)-l(a,b)>=0 where l(a,b) pattern is a sub-pattern of p and l
     for (int i=0;i<numLoop;i++) {
-        CoinPackedVector constrain8;
+        CoinPackedVector constrain9;
         bool flag = false;
         for (int j=0;j<numPat;j++) {
             if ((patterns[j][0] == loops[i][0])||
@@ -3666,7 +3764,7 @@ void LocalGenomicMap::BFB_ILP(const char *lpFn, vector<vector<int>> &patterns,
                 if (abs(diff1)<abs(diff2)) {
                     flag = true;
                     string key = "p:"+to_string(patterns[j][0])+","+to_string(patterns[j][1]);
-                    constrain8.insert(variableIdx[key], 1);
+                    constrain9.insert(variableIdx[key], 1);
                 }
             }
         }
@@ -3677,17 +3775,17 @@ void LocalGenomicMap::BFB_ILP(const char *lpFn, vector<vector<int>> &patterns,
                 if (abs(diff1)<abs(diff2)) {
                     flag = true;
                     string key = "l:"+to_string(loops[k][0])+","+to_string(loops[k][1]);
-                    constrain8.insert(variableIdx[key], 1);
+                    constrain9.insert(variableIdx[key], 1);
                 }
             }
         }
         if (flag) {
             string key = "l:"+to_string(loops[i][0])+","+to_string(loops[i][1]);
-            constrain8.insert(variableIdx[key], -1);
+            constrain9.insert(variableIdx[key], -1);
             constrainLowerBound[idx] = 0;
             constrainUpperBound[idx] = si->getInfinity();
             idx++;
-            matrix->appendRow(constrain8);
+            matrix->appendRow(constrain9);
         }
     }
 
@@ -3734,6 +3832,58 @@ void LocalGenomicMap::BFB_ILP(const char *lpFn, vector<vector<int>> &patterns,
     si->writeMps(lpFn);
     si->writeLp(lpFn);
 
+}
+
+//Deal with complex case: concatenation
+void LocalGenomicMap::bfbConcate(Junction *sv, bool edgeA, int pos1, int pos2, vector<vector<int>> bfbPaths, vector<int> &res) {
+    Edge *e = edgeA? sv->getEdgeA():sv->getEdgeB();
+    //find the breakage positions and merge bfb paths
+    vector<Segment *> segs = *this->getGraph()->getSegments();
+    bool found = false;
+    int sourceID = e->getSource()->getId(), targetID = e->getTarget()->getId();
+    char sourceDir = e->getSource()->getDir(), targetDir = e->getTarget()->getDir();
+    int chr1 = segs[sourceID-1]->getChrId(), chr2 = segs[targetID-1]->getChrId();
+    cout<<(edgeA?"True":"False")<<endl;
+    cout<<sourceID<<sourceDir<<" -> "<<targetID<<targetDir<<endl;         
+    for (int i=pos1; i<bfbPaths[chr1].size()-1; i+=2) {
+        if ((bfbPaths[chr1][i] <= sourceID && sourceID <= bfbPaths[chr1][i+1] && sourceDir == '+') ||
+            (bfbPaths[chr1][i] >= sourceID && sourceID >= bfbPaths[chr1][i+1] && sourceDir == '-')){                          
+            pos1 = i;                        
+            for (int j=pos2; j<bfbPaths[chr2].size()-1; j+=2) {
+                if ((bfbPaths[chr2][j] <= targetID && targetID <= bfbPaths[chr2][j+1] && targetDir == '+') ||
+                    (bfbPaths[chr2][j] >= targetID && targetID >= bfbPaths[chr2][j+1] && targetDir == '-')) {
+                    pos2 = j;                               
+                    found = true;                          
+                    break;
+                }
+            }
+        } 
+        if (found)
+            break;
+    }
+    if (found) {
+        cout<<chr1<<": "<<pos1<<" -> "<<chr2<<": "<<pos2<<endl;
+        res.push_back(chr1), res.push_back(pos1), res.push_back(sourceID);
+        res.push_back(chr2), res.push_back(pos2), res.push_back(targetID);
+    }
+    else 
+        cout<<"Cannot concatenate the two bfb paths."<<endl;    
+}
+
+// deal with complex case: insertion
+void LocalGenomicMap::bfbInsertion(vector<Junction *> &SVs, vector<vector<int>> bfbPaths, bool edgeA[], vector<int> &res) {
+    int pos1 = 0, pos2 = 0;
+    for (int i=0; i<SVs.size(); i++) {
+        vector<int> copy = res;
+        this->bfbConcate(SVs[i], edgeA[i], pos1, pos2, bfbPaths, res);
+        int n = res.size();
+        if (copy.size() == n) {
+            cout<<"Cannot insert all the SVs into the main chromosome."<<endl;
+            break;
+        }
+        pos1 = res[n-2];
+        pos2 = i==SVs.size()? res[1] : 0;
+    }    
 }
 
 VertexPath* LocalGenomicMap::findBFB(VertexPath* currPath, int n, set<Edge *>* visited, int error) {

@@ -179,7 +179,12 @@ void Graph::readGraph(const char *aFilename) {
             int start = atoi(strtok(NULL, ":"));
             int end = atoi(strtok(NULL, ":"));
             double segCred = 1.0;
-            this->addSegment(segId, chrom, start, end, segCoverage, segCred, segCopy);
+            int chrId;
+            for (int i=0; i<sourceIds.size(); i++) {
+                if (sourceIds[i]<=segId && segId<=sinkIds[i])
+                    chrId = i;
+            }
+            this->addSegment(segId, chrId, chrom, start, end, segCoverage, segCred, segCopy);
         } else if (strcmp(token, "JUNC") == 0) {
             char *sourceNode = strtok(NULL, " ");
             char *targetNode = strtok(NULL, " ");
@@ -506,9 +511,8 @@ Segment *Graph::getSegmentByChromEnd(string aChrom, int aEnd) {
     throw SegmentDoesNotExistException(aEnd);
 }
 
-Segment *
-Graph::addSegment(int aId, string aChrom, int aStart, int aEnd, double aCoverage, double aCredibility, double aCopy) {
-    Segment *seg = new Segment(aId, aChrom, aStart, aEnd, aCoverage, aCredibility, aCopy);
+Segment *Graph::addSegment(int aId, int chr, string aChrom, int aStart, int aEnd, double aCoverage, double aCredibility, double aCopy) {
+    Segment *seg = new Segment(aId, chr, aChrom, aStart, aEnd, aCoverage, aCredibility, aCopy);
     mSegments->push_back(seg);
     return seg;
 }

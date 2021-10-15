@@ -143,7 +143,7 @@ public:
     Segment *getSegmentByChromEnd(string aChrom, int aEnd);
 
     Segment *
-    addSegment(int aId, string aChrom, int aStart, int aEnd, double aCoverage, double aCredibility, double aCopy);
+    addSegment(int aId, int chr, string aChrom, int aStart, int aEnd, double aCoverage, double aCredibility, double aCopy);
 
     Junction *
     addJunction(Vertex *aSource, Vertex *aTarget, double aCoverage, double aCredibility, double aCopy, bool aInferred,

@@ -5,8 +5,9 @@
 
 using namespace std;
 
-Segment::Segment(int aId, string aChrom, int aStart, int aEnd, double aCoverage, double aCredibility, double aCopy) {
+Segment::Segment(int aId, int chr, string aChrom, int aStart, int aEnd, double aCoverage, double aCredibility, double aCopy) {
     mId = aId;
+    chrId = chr;
     mChrom = aChrom;
     mStart = aStart;
     mEnd = aEnd;
@@ -27,6 +28,7 @@ Segment::Segment(int aId, string aChrom, int aStart, int aEnd, double aCoverage,
 Segment::~Segment() { ; }
 
 int Segment::getId() { return mId; }
+int Segment::getChrId() { return chrId; }
 
 string Segment::getChrom() { return mChrom; }
 
