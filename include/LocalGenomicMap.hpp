@@ -192,8 +192,10 @@ public:
     void constructDAG(vector<vector<int>> &adj, vector<vector<int>> &node2pat, vector<vector<int>> &node2loop, map<string, int> &variableIdx, int *elementCN);
     void allTopologicalOrders(vector<int> &res, bool visited[], int num, int indeg[], vector<vector<int>> &adj, vector<vector<int>> &orders);
     void getBFB(vector<vector<int>> &orders, vector<vector<int>> &node2pat, vector<vector<int>> &node2loop, vector<int> &res);
+    void readBFBProps(string &mainChr, vector<string> &insChr, vector<string> &conChr, vector<int> &startSegs, const char *lhRawFn);
     void editBFB(vector<vector<int>> bfbPaths, vector<int> &posInfo, vector<int> &output);
-    void printBFB(vector<int> &res, vector<Junction *> &inversions);
+    void editInversions(vector<int> &res, vector<Junction *> &inversions, double** juncCN);
+    void printBFB(vector<int> &res);
     void BFB_ILP(const char *lpFn, vector<vector<int>> &patterns, vector<vector<int>> &loops, map<string, int> &variableIdx, double** juncCN);
     void bfbConcate(Junction *sv, bool edgeA, int pos1, int pos2, vector<vector<int>> bfbPaths, vector<int> &res);
     void bfbInsertion(vector<Junction *> &SVs, vector<vector<int>> bfbPaths, bool edgeA[], vector<int> &res);

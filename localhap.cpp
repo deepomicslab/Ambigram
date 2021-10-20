@@ -239,11 +239,11 @@ int main(int argc, char *argv[]) {
         vector<Segment *> sources = *g->getMSources();
         vector<Segment *> sinks = *g->getMSinks();
         vector<vector<int>> bfbPaths;
-        vector<vector<Junction *>> fbInversions;
+        //construct bfb path on each chromosome
         for (int n=0; n<g->getMSources()->size(); n++) {
             //enumerate all the patterns and loops
             int startID = sources[n]->getId();
-            int endID = sinks[n]->getId();//g->getSegments()->size();
+            int endID = sinks[n]->getId();
             vector<vector<int>> patterns, loops;
             vector<int> temp;
             lgm->combinations(startID,endID,2,patterns,temp);
@@ -255,17 +255,11 @@ int main(int argc, char *argv[]) {
             for (int i=0;i<patterns.size();i++) {
                 string key = "p:"+to_string(patterns[i][0])+","+to_string(patterns[i][1]);
                 variableIdx[key] = i;
-            }
-            for (int i=0;i<loops.size();i++) {
-                string key = "l:"+to_string(loops[i][0])+","+to_string(loops[i][1]);
-                variableIdx[key] = i+patterns.size();
-            }
-            for (int i=0;i<patterns.size();i++) {
-                string key = "p:"+to_string(patterns[i][0])+","+to_string(patterns[i][1]);
                 cout<<variableIdx[key]<<" "<<key<<endl;
             }
             for (int i=0;i<loops.size();i++) {
                 string key = "l:"+to_string(loops[i][0])+","+to_string(loops[i][1]);
+                variableIdx[key] = i+patterns.size();
                 cout<<variableIdx[key]<<" "<<key<<endl;
             }
 
@@ -273,7 +267,7 @@ int main(int argc, char *argv[]) {
             vector<Junction *> inversions;
             double** juncCN = new double*[endID+1];
             for (int i=0; i <= endID; i++) {
-                juncCN[i] = new double[2];
+                juncCN[i] = new double[2];//0: normal junction   1: inversion
                 memset(juncCN[i], 0, 2*sizeof(double));
             }
             for (Junction *junc: *(g->getJunctions())) {
@@ -284,12 +278,12 @@ int main(int argc, char *argv[]) {
                     if (sourceID+1 == targetID) {//normal edges                
                         juncCN[sourceID][0] += junc->getWeight()->getCopyNum();
                     }
-                    else if (sourceID-1 == targetID) {//normal edges 
+                    else if (sourceID-1 == targetID) {//normal edges (negative strand)
                         juncCN[targetID][0] += junc->getWeight()->getCopyNum();
                     }
                 }
                 else {//hh or tt (inversion)
-                    if (abs(sourceID-targetID)<=3) {//fold-back inversion
+                    if (abs(sourceID-targetID)<=3) {//fold-back inversion (with error of 3 bp)
                         inversions.push_back(junc);
                         if (sourceDir == '+') {
                             int greaterID = sourceID>targetID? sourceID:targetID;
@@ -302,14 +296,14 @@ int main(int argc, char *argv[]) {
                     }
                 }            
             }
-            fbInversions.push_back(inversions);
+            //check if there is any fold-back inversion
             cout<<"Junction CN"<<endl;
             int inversionCNSum = 0;
             for (int i=0;i<=endID;i++) {
                 inversionCNSum += juncCN[i][1];
                 cout<<i<<","<<i+1<<" "<<juncCN[i][0]<<"\t"<<i<<","<<i<<" "<<juncCN[i][1]<<endl;
             }
-            if (inversionCNSum == 0) {
+            if (inversionCNSum == 0) {//no fold-back inversion
                 vector<int> temp({startID, endID, endID, startID});
                 bfbPaths.push_back(temp);
                 continue;
@@ -322,14 +316,15 @@ int main(int argc, char *argv[]) {
             string str = "cbc "+string(lpFn) +".lp solve solu "+string(lpFn)+".sol";
             const char *cmd = str.c_str();
             system(cmd);
+            //read patterns and loops from .sol
             str = "./" + string(lpFn)+".sol";
-            //read patterns and loops from test.sol
             const char *solDir = str.c_str();
             ifstream solFile(solDir);
             if (!solFile) {
                 cerr << "Cannot open file " << solDir << endl;
                 exit(1);
             }
+            //copy number of patterns and loops
             int* elementCN = new int[variableIdx.size()];
             memset(elementCN, 0, variableIdx.size()*sizeof(int));
             string element, cn;
@@ -369,6 +364,7 @@ int main(int argc, char *argv[]) {
             vector<int> res;
             vector<vector<int>> orders;
             lgm->allTopologicalOrders(res, visited, num, indeg, adj, orders);
+            cout<<"All topological orders: "<<endl;
             for (vector<int> bfb: orders) {
                 for (int i=0;i<bfb.size();i++)
                     cout<<bfb[i]+1<<" ";
@@ -376,15 +372,20 @@ int main(int argc, char *argv[]) {
             }
             //get one valid bfb path
             vector<int> path;
-            lgm->getBFB(orders, node2pat, node2loop, path);
+            lgm->getBFB(orders, node2pat, node2loop, path);//get a valid BFB path
+            lgm->editInversions(path, inversions, juncCN);//edit the imperfect fold-back inversions (with deletion)
             bfbPaths.push_back(path);
         }        
         //print the result
-        for (int i=0;i<bfbPaths.size();i++) {
-            vector<Junction *> temp;
-            lgm->printBFB(bfbPaths[i], temp);
-        }
+        for (int i=0;i<bfbPaths.size();i++)
+            lgm->printBFB(bfbPaths[i]);
 
+        //parameters for dealing with other SVs
+        string mainChr;
+        vector<string> insChr, conChr;
+        vector<int> startSegs;//starting segments for insertions
+        lgm->readBFBProps(mainChr, insChr, conChr, startSegs, lhRawFn);//read properties        
+        
         //find other SVs based on graph of segments
         vector<Junction *> insertionSV, concatenationSV;
         vector<Segment *> segments = *g->getSegments();
@@ -420,42 +421,51 @@ int main(int argc, char *argv[]) {
                 continue;
             Segment *source = junc->getSource();
             Segment *target = junc->getTarget();
-            int chr1 = source->getChrId(), chr2 = target->getChrId();
+            int chr1 = source->getChrId(), chr2 = target->getChrId();//index for chromosome
+            string chrNum1 = source->getChrom(), chrNum2 = target->getChrom();//chromosome name
             int sourceId = source->getId(), targetId = target->getId();
-            // if (chr1 != chr2 && (chr1 == 1 || chr2 == 1)) {
-            //     concatenationSV.push_back(junc);             
-            // }
-            // else
-            //SVs 
-            if (chr1 != chr2) {
-                insertionSV.push_back(junc);
-                connections[sourceId][targetId] = insertionSV.size()-1;
-                connections[targetId][sourceId] = insertionSV.size()-1;
+            //sv for concatenation
+            if (chr1 != chr2 && find(conChr.begin(),conChr.end(),chrNum1)!=conChr.end() &&
+                find(conChr.begin(),conChr.end(),chrNum2)!=conChr.end()) {
+                concatenationSV.push_back(junc);             
             }
-            else if (chr1 == chr2 && chr1 != 1) {
-                if ((minSeg[chr1] <= sourceId && sourceId <= maxSeg[chr1]) &&
-                    (minSeg[chr1] <= targetId && targetId <= maxSeg[chr1])) {
+            //sv for insertion
+            if (find(insChr.begin(),insChr.end(),chrNum1)!=insChr.end() &&
+                find(insChr.begin(),insChr.end(),chrNum2)!=insChr.end()) {
+                if (chr1 != chr2) {
+                    insertionSV.push_back(junc);
+                    connections[sourceId][targetId] = insertionSV.size()-1;
+                    connections[targetId][sourceId] = insertionSV.size()-1;
+                }
+                else if (chrNum1 != mainChr) {//chr1==chr2: normal junctions for insertion
+                    if ((minSeg[chr1] <= sourceId && sourceId <= maxSeg[chr1]) &&
+                        (minSeg[chr1] <= targetId && targetId <= maxSeg[chr1])) {
                         insertionSV.push_back(junc);
                         connections[sourceId][targetId] = insertionSV.size()-1;
                         connections[targetId][sourceId] = insertionSV.size()-1;
                     }
+                }
             }
         }
+        cout<<"sv for concatenation: "<<endl;
+        for (Junction *junc: concatenationSV) {
+            cout<<junc->getSource()->getId()<<" "<<junc->getTarget()->getId()<<endl;
+        }
+        cout<<"sv for insertion: "<<endl;
         for (Junction *junc: insertionSV) {
             cout<<junc->getSource()->getId()<<" "<<junc->getTarget()->getId()<<endl;
         }
         
-        vector<int> props{5, 6};
-        vector<bool *> isForward;
-        vector<vector<Junction *>> svPaths;
-        for (int i=0; i<props.size(); i++) {
+        //construct bfb paths with insertion        
+        for (int i=0; i<startSegs.size(); i++) {
+            if (insertionSV.size() == 0) break;
             //find a path by traversing all the SVs with DFS
             vector<int> segs;//segments in sequence
             bool finished = false;
             bool *visited = new bool[segNum];
             memset(visited, false, segNum*sizeof(bool));
             stack<int> s;
-            int startSeg = props[i];
+            int startSeg = startSegs[i];
             int startChr = segments[startSeg-1]->getChrId();
             s.push(startSeg);//starting segment
             visited[startSeg] = true;
@@ -481,6 +491,7 @@ int main(int argc, char *argv[]) {
             }
             if (segments[segs.back()-1]->getChrId() != startChr)
                 segs.push_back(startSeg);
+            cout<<"The sequence of segments"<<endl;
             for (int idx: segs)
                 cout<<idx<<" ";
             cout<<endl;
@@ -495,7 +506,7 @@ int main(int argc, char *argv[]) {
                 Junction *sv = insertionSV[connections[segs[i]][segs[i+1]]];
                 Edge *e = sv->getEdgeA();
                 int chr1 = sv->getSource()->getChrId(), chr2 = sv->getTarget()->getChrId();
-                cout<<chr1<<" "<<chr2<<" "<<endl;
+                //cout<<chr1<<" "<<chr2<<" "<<endl;
                 if (chr1 == chr2) continue;
                 svPath.push_back(sv);
                 int sourceId = e->getSource()->getId(), targetId = e->getTarget()->getId();                
@@ -503,29 +514,26 @@ int main(int argc, char *argv[]) {
                     edgeA[cnt] = false;
                 cnt++;
             }
-            svPaths.push_back(svPath);
-            isForward.push_back(edgeA);
-        }
-
-        for (int i=0; i<svPaths.size(); i++) {
-            cout<<"bfb paths with insertions"<<endl;
+            //print bfb path with insertions
+            cout<<"bfb path with insertions: "<<i<<endl;
             vector<int> res;
-            lgm->bfbInsertion(svPaths[i], bfbPaths, isForward[i], res);
+            lgm->bfbInsertion(svPath, bfbPaths, edgeA, res);
+            // for (int n: res)
+            //     cout<<n<<" ";
+            // cout<<endl;
             vector<int> output;
             lgm->editBFB(bfbPaths, res, output);
-            vector<Junction *> temp;
-            lgm->printBFB(output, temp);
+            lgm->printBFB(output);
         }
-        
+        //construct bfb paths with concatenation        
         for (int i=0; i<concatenationSV.size(); i++) {
-            cout<<"bfb paths with concatenation"<<endl;
+            cout<<"bfb paths with concatenation: "<<i<<endl;
             vector<int> res;
-            lgm->bfbConcate(concatenationSV[i], true, 0, 0, bfbPaths, res);
+            lgm->bfbConcate(concatenationSV[i], true, 2, 0, bfbPaths, res);//start from position 2 of the main chromosome
             if (!res.empty()) {
                 vector<int> output;
                 lgm->editBFB(bfbPaths, res, output);
-                vector<Junction *> temp;
-                lgm->printBFB(output, temp);
+                lgm->printBFB(output);
             }         
         }
 
