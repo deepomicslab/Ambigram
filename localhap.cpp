@@ -235,6 +235,8 @@ int main(int argc, char *argv[]) {
         const char *lhRawFn = result["in_lh"].as<std::string>().c_str();
         const char *lpFn = result["lp_prefix"].as<std::string>().c_str();
         Graph *g = new Graph(lhRawFn);
+        g->calculateHapDepth();
+        g->calculateCopyNum();
         LocalGenomicMap *lgm = new LocalGenomicMap(g);
         vector<Segment *> sources = *g->getMSources();
         vector<Segment *> sinks = *g->getMSinks();
@@ -274,12 +276,15 @@ int main(int argc, char *argv[]) {
                 int sourceID = junc->getSource()->getId(), targetID = junc->getTarget()->getId();
                 char sourceDir = junc->getSourceDir(), targetDir = junc->getTargetDir();
                 if (sourceID<startID||sourceID>endID||targetID<startID||targetID>endID) continue;
+                double copyNum = junc->getWeight()->getCopyNum();
+                if (0.5 < copyNum && copyNum < 1)
+                    copyNum = 1;//round small CN to 1
                 if (sourceDir == '+' && targetDir == '+') {//ht or th: not consider deletion on the chromosome
                     if (sourceID+1 == targetID) {//normal edges                
-                        juncCN[sourceID][0] += junc->getWeight()->getCopyNum();
+                        juncCN[sourceID][0] += copyNum;
                     }
                     else if (sourceID-1 == targetID) {//normal edges (negative strand)
-                        juncCN[targetID][0] += junc->getWeight()->getCopyNum();
+                        juncCN[targetID][0] += copyNum;
                     }
                 }
                 else {//hh or tt (inversion)
@@ -287,11 +292,11 @@ int main(int argc, char *argv[]) {
                         inversions.push_back(junc);
                         if (sourceDir == '+') {
                             int greaterID = sourceID>targetID? sourceID:targetID;
-                            juncCN[greaterID][1] += junc->getWeight()->getCopyNum();
+                            juncCN[greaterID][1] += copyNum;
                         }
                         else {
                             int smallerID = sourceID<targetID? sourceID:targetID;
-                            juncCN[smallerID][1] += junc->getWeight()->getCopyNum();
+                            juncCN[smallerID][1] += copyNum;
                         }                        
                     }
                 }            

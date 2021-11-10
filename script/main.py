@@ -1,6 +1,7 @@
 import argparse
 
 import os
+from re import S
 import sys
 
 os.environ["MKL_NUM_THREADS"] = "1"
@@ -453,7 +454,230 @@ class MainArgParser:
 
         sol = parseILP.parse_ilp_result(args.sol_file)
         parseILP.generate_balanced_lh(args.balanced_lh, args.checked_lh, sol)
+    
+    # change sv positions in bed.txt
+    def updateBed(self):
+        parser = argparse.ArgumentParser(description='Change sv positions in bed.txt according to sv file')
+        parser.add_argument('-i', '--in_sv',
+                            dest='sv',
+                            required=True,
+                            help='Input sv file')
+        parser.add_argument('-b', '--bed_file',
+                            dest='bed',
+                            required=True,
+                            help='A bed file constructed by localHap bfb path.')
+        args = parser.parse_args(sys.argv[2:])
+        #read sv infomation
+        sv_file = open(args.sv, "r")
+        sv = []
+        for line in sv_file.readlines():
+            if line[:8] == "chrom_5p":
+                continue
+            arr = line.split("\t")
+            arr[1] = int(arr[1])
+            arr[4] = int(arr[4])
+            sv.append(arr)
+            print(sv[-1])
+        #read bed strings
+        bed_file = open(args.bed, "r")
+        bed = []
+        for line in bed_file.readlines():
+            arr = line.split(" ")
+            arr[1] = int(arr[1])
+            arr[2] = int(arr[2])
+            arr[-1] = arr[-1][0]
+            bed.append(arr)
+            print(bed[-1])
+        #update break positions
+        for i in range(0, len(bed)-1):
+            if bed[i][0] == bed[i+1][0] and bed[i][3] == bed[i+1][3]:
+                continue
+            #fold-back inversion
+            for info in sv:
+                if bed[i][0] in info and bed[i+1][0] in info:
+                    if  (info[1] in range(bed[i][1], bed[i][2]+1) and info[4] in range(bed[i+1][1], bed[i+1][2]+1)) or \
+                        (info[4] in range(bed[i][1], bed[i][2]+1) and info[1] in range(bed[i+1][1], bed[i+1][2]+1)): 
+                        pos1 = 0
+                        pos2 = 0
+                        if info[2] == bed[i][-1] and info[5] == bed[i+1][-1]:
+                            pos1 = info[1]
+                            pos2 = info[4]
+                        elif info[5] == bed[i][-1] and info[2] == bed[i+1][-1]:
+                            pos1 = info[4]
+                            pos2 = info[1]
+                        else:
+                            continue
+                        #for translocation
+                        if info[0] != info[3]:
+                            if info[1] in range(bed[i][1], bed[i][2]+1):
+                                pos1 = info[1]
+                                pos2 = info[4]
+                            else:
+                                pos1 = info[4]
+                                pos2 = info[1]
+                        #change the positions
+                        if bed[i][3] == "forward":
+                            bed[i][2] = pos1
+                        else:
+                            bed[i][1] = pos1
+                        if bed[i+1][3] == "forward":
+                            bed[i+1][1] = pos2
+                        else:
+                            bed[i+1][2] = pos2
+        #re-write the bed file
+        res = ""
+        for info in bed:
+            for entry in info:
+                res += str(entry)+" "
+            res += "\n"
+        bed_file = open(args.bed, "w")
+        bed_file.write(res)  
 
+    def bfb2fasta(self):
+        import pybedtools
+        parser = argparse.ArgumentParser(description='Convert a segment (in bed format) into a bp sequence according to the fasta file')
+        parser.add_argument('-i', '--in_fasta',
+                            dest='inFasta',
+                            required=True,
+                            help='Input fasta file')
+        parser.add_argument('-b', '--bed_file',
+                            dest='bed',
+                            required=True,
+                            help='A bed file constructed by bfb path.')
+        # parser.add_argument('-s', '--segment',
+        #                     dest='segment',
+        #                     required=True,
+        #                     help='A string of segment in bed format. e.g., chr6:150336:256499')
+        parser.add_argument('-t', '--out_txt',
+                            dest='outTxt',
+                            required=True,
+                            help='A string of output directory')
+        parser.add_argument('-o', '--out_fasta',
+                            dest='outFasta',
+                            required=True,
+                            help='A fasta file consisting of bfb path')
+        args = parser.parse_args(sys.argv[2:])
+        #read bed strings
+        bed_file = open(args.bed, "r")
+        lines = bed_file.readlines()
+        bedStr = ""
+        for line in lines:
+            bedStr += line+"\n"
+        #extract the bp sequence from fasta
+        seg = pybedtools.BedTool(bedStr, from_string=True)
+        fasta = pybedtools.example_filename(args.inFasta)
+        seg = seg.sequence(fi=fasta, s=True)
+        #output the result
+        # if os.path.exists(args.output):
+        txt = open(args.outTxt, "w")
+        txt.write(open(seg.seqfn).read())
+        # print(open(seg.seqfn).read())
+        #convert BedTool output into bp sequence (with inversion and translocation)
+        txt = open(args.outTxt, "r")
+        lines = txt.readlines()
+        res = ">BFBPATH\n"
+        for i in range(0, len(lines)):
+            if i%2 != 0:
+                continue
+            res += lines[i+1][:-1]#the last char: \n
+            print(i/2+1, len(lines[i+1]))
+            # print(lines[i+1][:-1])
+
+        outFile = open(args.outFasta, "w")
+        outFile.write(res)
+
+    def vcf2sv(self):
+        parser = argparse.ArgumentParser(description='Convert a vcf.txt file into a sv file for generate_lh()')
+        parser.add_argument('-i', '--in_vcf',
+                            dest='vcf',
+                            required=True,
+                            help='Input vcf file')
+        parser.add_argument('-o', '--out_sv',
+                            dest='output',
+                            required=True,
+                            help='A name of output')
+        args = parser.parse_args(sys.argv[2:])
+        vcf = open(args.vcf, "r")
+        res = "chrom_5p\tbkpos_5p\tstrand_5p\tchrom_3p\tbkpos_3p\tstrand_3p\tavg_cn\n"
+        for line in vcf.readlines():
+            entry = line.split("\t")
+            res += entry[0]+"\t"+entry[1]+"\t"+entry[2]+"\t"
+            res += entry[3]+"\t"+entry[4]+"\t"+entry[5]+"\t"
+            res += entry[8]+"\n"
+        outFile = open(args.output, "w")
+        outFile.write(res)
+
+    def seg2fasta(self):
+        import pybedtools
+        parser = argparse.ArgumentParser(description='Convert a segment file into the fasta file')
+        parser.add_argument('-i', '--in_seg',
+                            dest='seg',
+                            required=True,
+                            help='Input segment file')
+        parser.add_argument('-r', '--ref_fasta',
+                            dest='ref',
+                            required=True,
+                            help='Reference fasta file')
+        parser.add_argument('-o', '--out_fasta',
+                            dest='fasta',
+                            required=True,
+                            help='A name/directory of output')
+        args = parser.parse_args(sys.argv[2:])
+        #read segments
+        segs = open(args.seg, "r")
+        bedStr = ""
+        for line in segs.readlines():
+            info = line.split("\t")[0]
+            chr = info.split(":")[0]
+            pos = info.split(":")[1]
+            bedStr += chr+" "+pos.split("-")[0]+" "+pos.split("-")[1]+" forward 1 +\n"
+        print(bedStr)
+        #extract the bp sequence from fasta
+        seg = pybedtools.BedTool(bedStr, from_string=True)
+        fasta = pybedtools.example_filename(args.ref)
+        seg = seg.sequence(fi=fasta, s=True)
+        #output the result
+        outFasta = open(args.fasta, "w")
+        outFasta.write(open(seg.seqfn).read())
+
+    def parse_snif_vcf(self):
+        parser = argparse.ArgumentParser(description='Convert a Sniffles vcf file into sv file')
+        parser.add_argument('-i', '--in_vcf',
+                            dest='vcf',
+                            required=True,
+                            help='Input vcf file')
+        parser.add_argument('-o', '--out_sv',
+                            dest='sv',
+                            required=True,
+                            help='Output sv file')
+        args = parser.parse_args(sys.argv[2:])
+        # read vcf file
+        vcf = open(args.vcf, "r")
+        res = "chrom_5p\tbkpos_5p\tstrand_5p\tchrom_3p\tbkpos_3p\tstrand_3p\tavg_cn\n"
+        inv = ["++","--"]        
+        trans = ["[","]","N"]
+        for line in vcf.readlines():
+            entry = line.split("\t")
+            if line[0] != '#':
+                strands = entry[7].split(";")[11][-2:]                
+                if strands in inv or (entry[4][0] in trans and len(entry[4])>1):
+                    new_str = strands
+                    if strands == "+-":
+                        new_str = "++"
+                    elif strands == "++":
+                        new_str = "+-"
+                    elif strands == "--":
+                        new_str = "-+"
+                    elif strands == "-+":
+                        new_str = "--"
+                    chrom_3p = entry[7].split(";")[2][5:]
+                    pos_3p = entry[7].split(";")[3][4:]
+                    num_vReads = entry[9].split(":")[-1]
+                    res += entry[0]+"\t"+entry[1]+"\t"+new_str[0]+"\t" \
+                        +chrom_3p+"\t"+pos_3p+"\t"+new_str[1]+"\t"+num_vReads
+        #output the result
+        bfb_sv = open(args.sv, "w")
+        bfb_sv.write(res)
 
 if __name__ == '__main__':
     MainArgParser()

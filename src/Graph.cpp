@@ -359,6 +359,7 @@ void Graph::calculateCopyNum() {
     double ratio = getRatio();
     double hDP = getHaploidDepth();
     for (Segment *seg : *mSegments) {
+        break;//no need to change for bfb
 //        TODO 判断virus seg
         double segCopy;
         if(seg->getId() >= mVirusSegStart) {

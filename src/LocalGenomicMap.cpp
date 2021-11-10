@@ -3578,7 +3578,7 @@ void LocalGenomicMap::editInversions(vector<int> &res, vector<Junction *> &inver
                     juncCN[segID][1]--;
                 else
                     continue;
-                //edit the fold-ba k inversion
+                //edit the fold-back inversion
                 if (sourceDir == '+') {
                     if (res[j]>res[j-1]) {
                         res[j] = sourceSegID;
@@ -3606,29 +3606,41 @@ void LocalGenomicMap::editInversions(vector<int> &res, vector<Junction *> &inver
 
 void LocalGenomicMap::printBFB(vector<int> &res) {
     cout<<"find a BFB path"<<endl;
+    vector<Segment *> segs = *this->getGraph()->getSegments();
     for (int j=0;j<res.size()-1;j+=2) {
         if (res[j] == -1)
             continue;
         cout<<res[j]<<"-"<<res[j+1]<<"|";
     }
     cout<<endl;
-    
+    string bedStr = "";
     for (int j=0;j<res.size()-1;j+=2) {
         if (res[j] == -1) {            
             cout<<" -> ";
             continue;
         }
         if (res[j]<res[j+1]) {
-            for (int k=res[j];k<=res[j+1];k++)
+            for (int k=res[j];k<=res[j+1];k++) {
                 cout<<k;
+                //write down bp sequence
+                bedStr += segs[k-1]->getChrom()+" "+to_string(segs[k-1]->getStart())+" "+to_string(segs[k-1]->getEnd())+" forward 1 +\n";
+            }
         }
         else {
-            for (int k=res[j];k>=res[j+1];k--)
+            for (int k=res[j];k>=res[j+1];k--) {
                 cout<<k;
+                //write down bp sequence
+                bedStr += segs[k-1]->getChrom()+" "+to_string(segs[k-1]->getStart())+" "+to_string(segs[k-1]->getEnd())+" reverse 1 -\n";
+            }
         }
         cout<<"|";
     }
     cout<<endl;
+    //output the bed file
+    ofstream bedFile;
+    bedFile.open("bed.txt");
+    bedFile<<bedStr;
+    bedFile.close();
 }
 
 void LocalGenomicMap::BFB_ILP(const char *lpFn, vector<vector<int>> &patterns, 
