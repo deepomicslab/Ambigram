@@ -240,6 +240,20 @@ int main(int argc, char *argv[]) {
         LocalGenomicMap *lgm = new LocalGenomicMap(g);
         vector<Segment *> sources = *g->getMSources();
         vector<Segment *> sinks = *g->getMSinks();
+
+        //output copy numbers of junctions
+        // string sample = result["lp_prefix"].as<std::string>();
+        // stringstream juncInfo;
+        // for(Junction* junc: *g->getJunctions()) {
+        //     juncInfo << sample << "\t"<<junc->getSource()->getId()<<":"<<junc->getSourceDir()<<":"
+        //         <<junc->getTarget()->getId()<<":"<<junc->getTargetDir()<<"\t"<<junc->getWeight()->getCopyNum()<<"\n";            
+        // }
+        // ofstream juncFile;
+        // juncFile.open("COLO829_juncCN.txt",std::ios_base::app);
+        // juncFile<<juncInfo.str();
+        // juncFile.close();
+        // exit(0);
+
         vector<vector<int>> bfbPaths;
         //construct bfb path on each chromosome
         for (int n=0; n<g->getMSources()->size(); n++) {
@@ -289,7 +303,8 @@ int main(int argc, char *argv[]) {
                 }
                 else {//hh or tt (inversion)
                     if (abs(sourceID-targetID)<=3) {//fold-back inversion (with error of 3 bp)
-                        inversions.push_back(junc);
+                        if(sourceID != targetID)
+                            inversions.push_back(junc);
                         if (sourceDir == '+') {
                             int greaterID = sourceID>targetID? sourceID:targetID;
                             juncCN[greaterID][1] += copyNum;
@@ -303,13 +318,17 @@ int main(int argc, char *argv[]) {
             }
             //check if there is any fold-back inversion
             cout<<"Junction CN"<<endl;
-            int inversionCNSum = 0;
+            double inversionCNSum = 0;
             for (int i=0;i<=endID;i++) {
                 inversionCNSum += juncCN[i][1];
                 cout<<i<<","<<i+1<<" "<<juncCN[i][0]<<"\t"<<i<<","<<i<<" "<<juncCN[i][1]<<endl;
             }
-            if (inversionCNSum == 0) {//no fold-back inversion
+            //copy number of patterns and loops
+            int* elementCN = new int[variableIdx.size()];
+            memset(elementCN, 0, variableIdx.size()*sizeof(int));
+            if (abs(inversionCNSum)<0.000001) {//no fold-back inversion
                 vector<int> temp({startID, endID, endID, startID});
+                lgm->editInversions(temp, inversions, juncCN, elementCN, variableIdx);
                 bfbPaths.push_back(temp);
                 continue;
             }
@@ -328,10 +347,7 @@ int main(int argc, char *argv[]) {
             if (!solFile) {
                 cerr << "Cannot open file " << solDir << endl;
                 exit(1);
-            }
-            //copy number of patterns and loops
-            int* elementCN = new int[variableIdx.size()];
-            memset(elementCN, 0, variableIdx.size()*sizeof(int));
+            }            
             string element, cn;
             while (solFile >> element) {
                 if (element[0] == 'x') {                
@@ -378,12 +394,13 @@ int main(int argc, char *argv[]) {
             //get one valid bfb path
             vector<int> path;
             lgm->getBFB(orders, node2pat, node2loop, path);//get a valid BFB path
-            lgm->editInversions(path, inversions, juncCN);//edit the imperfect fold-back inversions (with deletion)
+            //output the text for visualization
+            lgm->editInversions(path, inversions, juncCN, elementCN, variableIdx);//edit the imperfect fold-back inversions (with deletion)
             bfbPaths.push_back(path);
         }        
         //print the result
-        for (int i=0;i<bfbPaths.size();i++)
-            lgm->printBFB(bfbPaths[i]);
+        // for (int i=0;i<bfbPaths.size();i++)
+        //     lgm->printBFB(bfbPaths[i]);
 
         //parameters for dealing with other SVs
         string mainChr;
@@ -507,7 +524,9 @@ int main(int argc, char *argv[]) {
             vector<Junction *> svPath;
             //find valid SVs in sequence
             int cnt = 0;
-            for (int i=0; i<segs.size()-1; i+=1) {            
+            for (int i=0; i<segs.size()-1; i+=1) {
+                if(connections[segs[i]][segs[i+1]] == -1)
+                    break;
                 Junction *sv = insertionSV[connections[segs[i]][segs[i+1]]];
                 Edge *e = sv->getEdgeA();
                 int chr1 = sv->getSource()->getChrId(), chr2 = sv->getTarget()->getChrId();
@@ -520,6 +539,8 @@ int main(int argc, char *argv[]) {
                 cnt++;
             }
             //print bfb path with insertions
+            if(svPath.empty())
+                continue;
             cout<<"bfb path with insertions: "<<i<<endl;
             vector<int> res;
             lgm->bfbInsertion(svPath, bfbPaths, edgeA, res);
@@ -528,7 +549,7 @@ int main(int argc, char *argv[]) {
             // cout<<endl;
             vector<int> output;
             lgm->editBFB(bfbPaths, res, output);
-            lgm->printBFB(output);
+            //lgm->printBFB(output);
         }
         //construct bfb paths with concatenation        
         for (int i=0; i<concatenationSV.size(); i++) {
@@ -538,7 +559,7 @@ int main(int argc, char *argv[]) {
             if (!res.empty()) {
                 vector<int> output;
                 lgm->editBFB(bfbPaths, res, output);
-                lgm->printBFB(output);
+                //lgm->printBFB(output);
             }         
         }
 

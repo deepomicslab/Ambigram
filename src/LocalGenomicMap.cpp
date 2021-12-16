@@ -3555,13 +3555,62 @@ void LocalGenomicMap::editBFB(vector<vector<int>> bfbPaths, vector<int> &posInfo
     chr = posInfo[posInfo.size()-3], pos = posInfo[posInfo.size()-2], segID = posInfo[posInfo.size()-1];
     output.push_back(segID);
     output.insert(output.end(), bfbPaths[chr].begin()+pos+1, bfbPaths[chr].end());
+    //text output for visualization
+    string bfbRes = "";
+    vector<Junction*> juncs = *this->getGraph()->getJunctions();
+    for (int i=1;i<output.size()-1;i+=2) {
+        if (output[i] != -1)
+            continue; 
+        Junction* junc = NULL;
+        for(Junction* j: juncs) {
+            if((j->getSource()->getId()==output[i-2]&&j->getTarget()->getId()==output[i+1]) ||
+            (j->getSource()->getId()==output[i+1]&&j->getTarget()->getId()==output[i-2])) {
+                junc = j;
+                break;
+            }
+        }
+        if(junc != NULL) {
+            char strand_5p = junc->getSourceDir(),
+                strand_3p = junc->getTargetDir();
+            if(junc->getSource()->getId()==output[i+1]) {
+                if(strand_5p=='+'&&strand_3p=='+') {
+                    strand_5p = '-';
+                    strand_3p = '-';
+                }
+                else if(strand_5p=='-'&&strand_3p=='-') {
+                    strand_5p = '+';
+                    strand_3p = '+';
+                }
+            }
+            if(bfbRes != "") bfbRes += "\t";
+            bfbRes += to_string(junc->getWeight()->getCopyNum())+":"+to_string(output[i-2])+":"+strand_5p+":"+to_string(output[i+1])+":"+strand_3p;
+        }
+    }
+    bfbRes += "\n";
+    ofstream bfbFile;
+    bfbFile.open("bfbPaths.txt",std::ios_base::app);
+    bfbFile<<bfbRes;
+    bfbFile.close();
+    printBFB(output);
 }
 
-void LocalGenomicMap::editInversions(vector<int> &res, vector<Junction *> &inversions, double** juncCN) {
+void LocalGenomicMap::editInversions(vector<int> &res, vector<Junction *> &inversions,
+                            double** juncCN, int* elementCN, map<string, int> &variableIdx) {
+    //text output for visualization
+    string bfbRes = "";
+    vector<Segment*> segs = *this->getGraph()->getSegments();
+    bool isPositive = true;
+    if(res[1]<res[0]) isPositive = false;
     //deal with imperfect inversions
     for (int j=1;j<res.size()-1;j+=2) {
         if (res[j] == -1)
-            continue;
+            continue;        
+        if (abs(res[j]-res[j-1])==abs(res[j+2]-res[j+1])) {
+            string key = "l:"+to_string(min(res[j-1],res[j]))+","+to_string(max(res[j-1],res[j]));
+            bfbRes += to_string(elementCN[variableIdx[key]])+":";
+        }
+        else
+            bfbRes += "1:";
         for (Junction* junc: inversions) {
             int sourceSegID = junc->getSource()->getId(),
                 targetSegID = junc->getTarget()->getId();
@@ -3601,10 +3650,23 @@ void LocalGenomicMap::editInversions(vector<int> &res, vector<Junction *> &inver
                 }
             }
         }
+        char strand_5p = isPositive? '+':'-',
+            strand_3p = isPositive? '-':'+';
+        bfbRes += to_string(res[j])+":"+strand_5p+":"+to_string(res[j+1])+":"+strand_3p;
+        if(j<res.size()-3) bfbRes += "\t";
+        isPositive = !isPositive;
     }
+    bfbRes += "\n";    
+    ofstream bfbPaths;
+    bfbPaths.open("bfbPaths.txt",std::ios_base::app);
+    bfbPaths<<bfbRes;
+    bfbPaths.close();
+    printBFB(res);
 }
 
 void LocalGenomicMap::printBFB(vector<int> &res) {
+    //text output for visualization
+    string bfbRes = "";
     cout<<"find a BFB path"<<endl;
     vector<Segment *> segs = *this->getGraph()->getSegments();
     for (int j=0;j<res.size()-1;j+=2) {
@@ -3615,27 +3677,41 @@ void LocalGenomicMap::printBFB(vector<int> &res) {
     cout<<endl;
     string bedStr = "";
     for (int j=0;j<res.size()-1;j+=2) {
-        if (res[j] == -1) {            
-            cout<<" -> ";
+        if (res[j] == -1) { 
+            bfbRes += "->";
+            cout<<"->";
             continue;
         }
         if (res[j]<res[j+1]) {
             for (int k=res[j];k<=res[j+1];k++) {
-                cout<<k;
+                bfbRes += to_string(k);
+                if(k<res[j+1]) bfbRes += ":";
+                cout<<k<<":";
                 //write down bp sequence
                 bedStr += segs[k-1]->getChrom()+" "+to_string(segs[k-1]->getStart())+" "+to_string(segs[k-1]->getEnd())+" forward 1 +\n";
             }
         }
         else {
             for (int k=res[j];k>=res[j+1];k--) {
-                cout<<k;
+                bfbRes += to_string(k);
+                if(;k>res[j+1]) bfbRes += ":";
+                cout<<k<<":";
                 //write down bp sequence
                 bedStr += segs[k-1]->getChrom()+" "+to_string(segs[k-1]->getStart())+" "+to_string(segs[k-1]->getEnd())+" reverse 1 -\n";
             }
         }
-        cout<<"|";
+        if(j<res.size()-3&&res[j+2]!=-1) {
+            bfbRes += "|";
+            cout<<"|";
+        }
     }
+    bfbRes += "\n";
     cout<<endl;
+    ofstream bfbPaths;
+    bfbPaths.open("bfbPaths.txt",std::ios_base::app);
+    bfbPaths<<bfbRes;
+    bfbPaths.close();
+
     //output the bed file
     ofstream bedFile;
     bedFile.open("bed.txt");

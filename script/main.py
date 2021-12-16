@@ -659,8 +659,12 @@ class MainArgParser:
         for line in vcf.readlines():
             entry = line.split("\t")
             if line[0] != '#':
-                strands = entry[7].split(";")[11][-2:]                
-                if strands in inv or (entry[4][0] in trans and len(entry[4])>1):
+                strands = ""
+                for item in entry[7].split(";"):
+                    if item[:8] == "STRANDS=":
+                        strands = item[-2:]
+                        break                                             
+                if strands in inv or (entry[4][0] in trans and len(entry[4])>1) or entry[4]=="<TRA>":
                     new_str = strands
                     if strands == "+-":
                         new_str = "++"
@@ -673,6 +677,10 @@ class MainArgParser:
                     chrom_3p = entry[7].split(";")[2][5:]
                     pos_3p = entry[7].split(";")[3][4:]
                     num_vReads = entry[9].split(":")[-1]
+                    if chrom_3p[0] != 'c':
+                        chrom_3p = "chr"+chrom_3p
+                    if entry[0][0] != 'c':
+                        entry[0] = "chr"+entry[0]
                     res += entry[0]+"\t"+entry[1]+"\t"+new_str[0]+"\t" \
                         +chrom_3p+"\t"+pos_3p+"\t"+new_str[1]+"\t"+num_vReads
         #output the result

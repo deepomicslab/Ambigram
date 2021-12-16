@@ -69,6 +69,7 @@ function subsampling()
     samtools view -s $1 -b $2 > ${3}.sam
     samtools sort -O BAM ${3}.sam -o ${3}.bam --threads 8
     samtools index ${3}.bam
+    rm -f ${3}.sam
 }
 
 # mix normal data with tumor data
@@ -110,9 +111,9 @@ function align_tenx()
 # align_ngs ./bfb_r1.fq.gz ./bfb_r2.fq.gz bfb ./hg38.fa
 
 # coverage
-# subsampling 0.67 ./bfb.bam bfb_20x
-# subsampling 0.33 ./bfb.bam bfb_10x
-# subsampling 0.17 ./bfb.bam bfb_5x
+subsampling 0.67 ./bfb2_lr.bam bfb2_lr_20x
+subsampling 0.33 ./bfb2_lr.bam bfb2_lr_10x
+subsampling 0.17 ./bfb2_lr.bam bfb2_lr_5x
 
 # tumor purity
 # align_ngs ./normal_r1.fq.gz ./normal_r2.fq.gz normal ./hg38.fa
@@ -132,4 +133,4 @@ function align_tenx()
 # 1: reads file
 # 2: prefix 
 # 3: reference (hg38)
-align_nanopore ./bfb1_ont/pass.fastq bfb1_ont ./hg38.fa
+# align_nanopore ./bfb1_ont/pass.fastq bfb1_ont ./hg38.fa

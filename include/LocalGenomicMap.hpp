@@ -194,7 +194,7 @@ public:
     void getBFB(vector<vector<int>> &orders, vector<vector<int>> &node2pat, vector<vector<int>> &node2loop, vector<int> &res);
     void readBFBProps(string &mainChr, vector<string> &insChr, vector<string> &conChr, vector<int> &startSegs, const char *lhRawFn);
     void editBFB(vector<vector<int>> bfbPaths, vector<int> &posInfo, vector<int> &output);
-    void editInversions(vector<int> &res, vector<Junction *> &inversions, double** juncCN);
+    void editInversions(vector<int> &res, vector<Junction *> &inversions, double** juncCN, int* elementCN, map<string, int> &variableIdx);
     void printBFB(vector<int> &res);
     void BFB_ILP(const char *lpFn, vector<vector<int>> &patterns, vector<vector<int>> &loops, map<string, int> &variableIdx, double** juncCN);
     void bfbConcate(Junction *sv, bool edgeA, int pos1, int pos2, vector<vector<int>> bfbPaths, vector<int> &res);
