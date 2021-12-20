@@ -235,8 +235,8 @@ int main(int argc, char *argv[]) {
         const char *lhRawFn = result["in_lh"].as<std::string>().c_str();
         const char *lpFn = result["lp_prefix"].as<std::string>().c_str();
         Graph *g = new Graph(lhRawFn);
-        g->calculateHapDepth();
-        g->calculateCopyNum();
+        // g->calculateHapDepth();
+        // g->calculateCopyNum();
         LocalGenomicMap *lgm = new LocalGenomicMap(g);
         vector<Segment *> sources = *g->getMSources();
         vector<Segment *> sinks = *g->getMSinks();
