@@ -4004,7 +4004,7 @@ void LocalGenomicMap::BFB_ILP(const char *lpFn, vector<vector<int>> &patterns, v
             constrain10.insert(variableIdx[key], 1);            
         }
         constrainLowerBound[idx] = 1;
-        constrainUpperBound[idx] = si->getInfinity();;
+        constrainUpperBound[idx] = 5;
         idx++;
         matrix->appendRow(constrain10);
         //p(x,y)+l(x,y)-Σ[p(x,y1)+l(x,y1)]-Σ[p(x1,y)+l(x1,y)]>=0
@@ -4030,7 +4030,7 @@ void LocalGenomicMap::BFB_ILP(const char *lpFn, vector<vector<int>> &patterns, v
                 key = "p:"+to_string(patterns[i][0])+","+to_string(patterns[i][1]);
                 constrain11.insert(variableIdx[key], 1);//scaling coefficient
                 constrainLowerBound[idx] = 0;
-                constrainUpperBound[idx] = 5;
+                constrainUpperBound[idx] = si->getInfinity();
                 idx++;
                 matrix->appendRow(constrain11);
             }
