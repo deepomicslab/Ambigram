@@ -112,6 +112,8 @@ public:
 
     bool doesJunctionExist(Junction *aJunction);
 
+    Junction* findJunction(Junction *aJunction);
+
     void readGraph(const char *aFilename);
 
     void writeGraph(const char *aFilename);

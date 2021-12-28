@@ -19,7 +19,8 @@ int main(int argc, char *argv[]) {
 
     options.add_options()
             ("op", "operate: check or solve", cxxopts::value<std::string>())
-            ("juncdb", "Junction database", cxxopts::value<std::string>())
+            ("juncdb", "Junction database", cxxopts::value<std::string>()->default_value(""))
+            ("junc_info", "Use extra junction information", cxxopts::value<bool>()->default_value("false"))
             ("in_lh", "Input lh file", cxxopts::value<std::string>())
             ("out_lh", "Checked local hap input file, lh format", cxxopts::value<std::string>())
             ("lp_prefix", "ILP out file prefix, only for check", cxxopts::value<std::string>())
@@ -234,12 +235,29 @@ int main(int argc, char *argv[]) {
     }else if (strcmp(result["op"].as<std::string>().c_str(), "bfb") == 0) {
         const char *lhRawFn = result["in_lh"].as<std::string>().c_str();
         const char *lpFn = result["lp_prefix"].as<std::string>().c_str();
+        const char *juncsFn = result["juncdb"].as<std::string>().c_str();
+        const bool juncsInfo = result["junc_info"].as<bool>();//wether add extra junction iformation into ILP constrains
         Graph *g = new Graph(lhRawFn);
-        // g->calculateHapDepth();
-        // g->calculateCopyNum();
+        g->calculateHapDepth();
+        g->calculateCopyNum();
         LocalGenomicMap *lgm = new LocalGenomicMap(g);
         vector<Segment *> sources = *g->getMSources();
         vector<Segment *> sinks = *g->getMSinks();
+        //construct segment intervals
+        unordered_map<int,int> intervals;
+        for(int i=0; i<sources.size(); i++) {
+            for(int j=sources[i]->getId(); j<=sinks[i]->getId(); j++)
+                intervals.insert(pair<int,int>(j,i));
+        }
+        //get information of third-generation data
+        vector<vector<int>> components;
+        lgm->readComponents(components, juncsFn, intervals);//third-generation data information
+        for(int i=0; i<components.size(); i++) {
+            for(int j=0; j<components[i].size(); j++) {
+                cout<<components[i][j]<<" ";
+            }
+            cout<<endl;
+        }
 
         //output copy numbers of junctions
         // string sample = result["lp_prefix"].as<std::string>();
@@ -326,15 +344,21 @@ int main(int argc, char *argv[]) {
             //copy number of patterns and loops
             int* elementCN = new int[variableIdx.size()];
             memset(elementCN, 0, variableIdx.size()*sizeof(int));
-            if (abs(inversionCNSum)<0.000001) {//no fold-back inversion
+            //pick components in the segment interval
+            vector<vector<int>> validComponents;
+            for(int i=0; i<components.size(); i++) {
+                if(intervals[components[i][0]]==n) validComponents.push_back(components[i]);
+            }
+
+            if (abs(inversionCNSum)<0.000001&&validComponents.size()==0) {//no fold-back inversion
                 vector<int> temp({startID, endID, endID, startID});
                 lgm->editInversions(temp, inversions, juncCN, elementCN, variableIdx);
                 bfbPaths.push_back(temp);
                 continue;
             }
-            
+                        
             //construct ILP and generate .lp file for cbc
-            lgm->BFB_ILP(lpFn, patterns, loops, variableIdx, juncCN);
+            lgm->BFB_ILP(lpFn, patterns, loops, variableIdx, juncCN, validComponents, juncsInfo);
 
             //run cbc under the directory containing test.lp
             string str = "cbc "+string(lpFn) +".lp solve solu "+string(lpFn)+".sol";
@@ -349,7 +373,12 @@ int main(int argc, char *argv[]) {
                 exit(1);
             }            
             string element, cn;
+            bool infeasible = false;
             while (solFile >> element) {
+                if(element == "Infeasible") {
+                    infeasible = true;
+                    break;
+                }
                 if (element[0] == 'x') {                
                     int idx = stoi(element.substr(1));
                     if (idx < variableIdx.size()) {//exclude epsilons
@@ -358,6 +387,12 @@ int main(int argc, char *argv[]) {
                         elementCN[idx] = copynum;
                     }
                 }
+            }
+            if(infeasible) {
+                vector<int> temp({startID, endID, endID, startID});
+                lgm->editInversions(temp, inversions, juncCN, elementCN, variableIdx);
+                bfbPaths.push_back(temp);
+                continue;
             }
             //construct BFB DAG and find all topological orders
             vector<vector<int>> adj, node2pat, node2loop;
@@ -397,10 +432,7 @@ int main(int argc, char *argv[]) {
             //output the text for visualization
             lgm->editInversions(path, inversions, juncCN, elementCN, variableIdx);//edit the imperfect fold-back inversions (with deletion)
             bfbPaths.push_back(path);
-        }        
-        //print the result
-        // for (int i=0;i<bfbPaths.size();i++)
-        //     lgm->printBFB(bfbPaths[i]);
+        }                
 
         //parameters for dealing with other SVs
         string mainChr;
@@ -562,6 +594,10 @@ int main(int argc, char *argv[]) {
                 //lgm->printBFB(output);
             }         
         }
+
+        //print the result
+        for (int i=0;i<bfbPaths.size();i++)
+            lgm->printBFB(bfbPaths[i]);
 
     } else if (strcmp(result["op"].as<std::string>().c_str(), "bpm") == 0) {
         const char *lhRawFn = result["in_lh"].as<std::string>().c_str();

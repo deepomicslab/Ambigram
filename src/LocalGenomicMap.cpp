@@ -3278,6 +3278,7 @@ void LocalGenomicMap::constructDAG(vector<vector<int>> &adj, vector<vector<int>>
     vector<vector<int>> parents;
     for (auto iter=variableIdx.begin();iter!=variableIdx.end();iter++) {
         if(elementCN[iter->second] > 0) {     
+            cout<<iter->first<<" "<<elementCN[iter->second]<<endl;
             vector<int> temp;
             //push an empty vector<int>
             adj.push_back(temp), parents.push_back(temp);
@@ -3285,6 +3286,7 @@ void LocalGenomicMap::constructDAG(vector<vector<int>> &adj, vector<vector<int>>
             string key = iter->first;
             temp.push_back(stoi(key.substr(2, key.find(",")-2)));
             temp.push_back(stoi(key.substr(key.find(",")+1)));
+            temp.push_back(elementCN[iter->second]);//copy number
             if (key[0] == 'p') {
                 node2pat.push_back(temp);
                 temp.clear();//synchronize the index
@@ -3412,74 +3414,97 @@ void LocalGenomicMap::getBFB(vector<vector<int>> &orders, vector<vector<int>> &n
     for (int n=0; n<orders.size(); n++) {
         vector<int> bfb = orders[n];
         int i;
-        res.clear();        
+        vector<int> path;
         for (i=0;i<bfb.size();i++) {
             //cout<<bfb[i]+1<<" ";
             if (node2pat[bfb[i]].size()) {
-                if (res.size()==0) {
+                if (path.size()==0) {
                     if (forwardDir) {
-                        res.push_back(node2pat[bfb[i]][0]);
-                        res.push_back(node2pat[bfb[i]][1]);
+                        path.push_back(node2pat[bfb[i]][0]);
+                        path.push_back(node2pat[bfb[i]][1]);
                     }
                     else {
-                        res.push_back(node2pat[bfb[i]][1]);
-                        res.push_back(node2pat[bfb[i]][0]);
+                        path.push_back(node2pat[bfb[i]][1]);
+                        path.push_back(node2pat[bfb[i]][0]);
                     }
                 }
-                else if (res.back() == node2pat[bfb[i]][0]) {
-                    res.push_back(node2pat[bfb[i]][0]);
-                    res.push_back(node2pat[bfb[i]][1]);
+                else if (path.back() == node2pat[bfb[i]][0]) {
+                    path.push_back(node2pat[bfb[i]][0]);
+                    path.push_back(node2pat[bfb[i]][1]);
                 }
-                else if (res.back() == node2pat[bfb[i]][1]) {
-                    res.push_back(node2pat[bfb[i]][1]);
-                    res.push_back(node2pat[bfb[i]][0]);
+                else if (path.back() == node2pat[bfb[i]][1]) {
+                    path.push_back(node2pat[bfb[i]][1]);
+                    path.push_back(node2pat[bfb[i]][0]);
                 } 
                 else
                     break; 
             }
             else if (node2loop[bfb[i]].size()) {
-                // cout<<"idx: "<<i<<" l:"<<node2loop[bfb[i]][0]<<","<<node2loop[bfb[i]][1]<<endl;
-                if (res.size()==0) {
-                    if (forwardDir) {
-                        res.push_back(node2loop[bfb[i]][0]);
-                        res.push_back(node2loop[bfb[i]][1]);
-                        res.push_back(node2loop[bfb[i]][1]);
-                        res.push_back(node2loop[bfb[i]][0]);
-                    }
-                    else {
-                        res.push_back(node2loop[bfb[i]][1]);
-                        res.push_back(node2loop[bfb[i]][0]);
-                        res.push_back(node2loop[bfb[i]][0]);
-                        res.push_back(node2loop[bfb[i]][1]);
+                cout<<"idx: "<<i+1<<" l:"<<node2loop[bfb[i]][0]<<","<<node2loop[bfb[i]][1]<<" CN: "<<node2loop[bfb[i]][2]<<endl;
+                int cn = 1;//node2loop[bfb[i]][2];
+                if (path.size()==0) {
+                    while(cn--) {
+                        if (forwardDir) {
+                            path.push_back(node2loop[bfb[i]][0]);
+                            path.push_back(node2loop[bfb[i]][1]);
+                            path.push_back(node2loop[bfb[i]][1]);
+                            path.push_back(node2loop[bfb[i]][0]);
+                        }
+                        else {
+                            path.push_back(node2loop[bfb[i]][1]);
+                            path.push_back(node2loop[bfb[i]][0]);
+                            path.push_back(node2loop[bfb[i]][0]);
+                            path.push_back(node2loop[bfb[i]][1]);
+                        }
                     }
                     continue;
                 }
-                int idx = res.size()-1;
-                while (idx>=0 && res[idx] != node2loop[bfb[i]][0] && 
-                            res[idx] != node2loop[bfb[i]][1]) idx-=2;
-                if (idx<=0)
-                    break;
-                if (idx<res.size()-1 && res[idx-1]!=res[idx+2])
-                    break;
-                if (res[idx] == node2loop[bfb[i]][0] && res[idx]-res[idx-1]<0) {
-                    res.insert(idx==res.size()-1?res.end():res.begin()+idx+1, {node2loop[bfb[i]][0], node2loop[bfb[i]][1], 
-                        node2loop[bfb[i]][1], node2loop[bfb[i]][0]});
+                bool flag = true;
+                while(cn--&&flag){
+                    int idx = path.size()-1;
+                    while(idx>=0) {//find a insertion position
+                        if(path[idx]==node2loop[bfb[i]][0]&&path[idx]-path[idx-1]<0) {
+                            if(idx == path.size()-1) break;
+                            else if(path[idx-1]==path[idx+2]) break;
+                        }
+                        else if(path[idx]==node2loop[bfb[i]][1]&&path[idx]-path[idx-1]>0) {
+                            if(idx == path.size()-1) break;
+                            else if(path[idx-1]==path[idx+2]) break;
+                        }
+                        idx -= 2;
+                    }
+                    // while (idx>=0 && !(path[idx]== node2loop[bfb[i]][0]&&path[idx]-path[idx-1]<0) && 
+                    //             !(path[idx]==node2loop[bfb[i]][1]&&path[idx]-path[idx-1]>0)) idx-=2;
+                    if (idx<=0||idx<path.size()-1 && path[idx-1]!=path[idx+2]) {
+                        flag = false;
+                        break;
+                    }
+                    if (path[idx] == node2loop[bfb[i]][0] && path[idx]-path[idx-1]<0) {
+                        path.insert(idx==path.size()-1?path.end():path.begin()+idx+1, {node2loop[bfb[i]][0], node2loop[bfb[i]][1], 
+                            node2loop[bfb[i]][1], node2loop[bfb[i]][0]});
+                    }
+                    else if (path[idx] == node2loop[bfb[i]][1] && path[idx]-path[idx-1]>0) {
+                        path.insert(idx==path.size()-1?path.end():path.begin()+idx+1, {node2loop[bfb[i]][1], node2loop[bfb[i]][0], 
+                            node2loop[bfb[i]][0], node2loop[bfb[i]][1]});
+                    }
+                    else {
+                        flag = false;
+                        break;
+                    }
                 }
-                else if (res[idx] == node2loop[bfb[i]][1] && res[idx]-res[idx-1]>0) {
-                    res.insert(idx==res.size()-1?res.end():res.begin()+idx+1, {node2loop[bfb[i]][1], node2loop[bfb[i]][0], 
-                        node2loop[bfb[i]][0], node2loop[bfb[i]][1]});
-                }
-                else
-                    break;
+                if(flag == false) break;
             }            
         }
-        cout<<"Possible path: ";
-        for (int n: res) {
+        cout<<"Order: ";
+        for(int j=0; j<i; j++)
+            cout<<bfb[j]+1<<" ";
+        cout<<"\nPossible path: ";
+        for (int n: path) {
             cout<<n<<" ";
         }
         cout<<endl;
-        if (i == bfb.size())
-            break;    
+        if(path.size()>res.size()) res = path;//find the longest result
+        if (i == bfb.size()) break;
         else if (n == orders.size()-1 && forwardDir) {
             n = 0;
             forwardDir = false;
@@ -3722,8 +3747,8 @@ void LocalGenomicMap::printBFB(vector<int> &res) {
     bedFile.close();
 }
 
-void LocalGenomicMap::BFB_ILP(const char *lpFn, vector<vector<int>> &patterns, 
-                            vector<vector<int>> &loops, map<string, int> &variableIdx, double** juncCN) {
+void LocalGenomicMap::BFB_ILP(const char *lpFn, vector<vector<int>> &patterns, vector<vector<int>> &loops, 
+                        map<string, int> &variableIdx, double** juncCN, vector<vector<int>> &components, const bool juncsInfo) {
     OsiClpSolverInterface *si = new OsiClpSolverInterface();
     int startSegID = patterns.front()[0], endSegID = patterns.back()[1];
     cout<<"start-end: "<<startSegID<<" "<<endSegID<<endl;
@@ -3928,6 +3953,7 @@ void LocalGenomicMap::BFB_ILP(const char *lpFn, vector<vector<int>> &patterns,
             matrix->appendRow(constrain8);
         }
     }
+    int scale = 2;
     //Σp(x1,y1)+Σl(x2,y2)-l(a,b)>=0 where l(a,b) pattern is a sub-pattern of p and l
     for (int i=0;i<numLoop;i++) {
         CoinPackedVector constrain9;
@@ -3964,33 +3990,52 @@ void LocalGenomicMap::BFB_ILP(const char *lpFn, vector<vector<int>> &patterns,
         }
     }
 
-    //p(x,y)+2l(x,y)-Σl(x,y1)-Σl(x1,y)>=0
-    // for (int i=0;i<numLoop;i++) {
-    //     CoinPackedVector constrain10;
-    //     bool flag = false;        
-    //     for (int k=0;k<numLoop;k++) {
-    //         if ((loops[k][0] == loops[i][0]) ||
-    //             (loops[k][1] == loops[i][1])) {
-    //             int diff1 = loops[i][0]-loops[i][1], diff2 = loops[k][0]-loops[k][1];
-    //             if (abs(diff1)>abs(diff2)) {
-    //                 flag = true;
-    //                 string key = "l:"+to_string(loops[k][0])+","+to_string(loops[k][1]);
-    //                 constrain10.insert(variableIdx[key], -1);
-    //             }
-    //         }
-    //     }
-    //     if (flag) {
-    //         string key = "l:"+to_string(loops[i][0])+","+to_string(loops[i][1]);
-    //         constrain10.insert(variableIdx[key], 2);//scaling coefficient
-    //         key = "p:"+to_string(patterns[i][0])+","+to_string(patterns[i][1]);
-    //         constrain10.insert(variableIdx[key], 1);//scaling coefficient
-    //         constrainLowerBound[idx] = 0;
-    //         constrainUpperBound[idx] = si->getInfinity();
-    //         idx++;
-    //         matrix->appendRow(constrain10);
-    //     }
-    // }
-
+    //third-generation information
+    if(components.size()>0&&juncsInfo) {
+        CoinPackedVector constrain10;
+        for(int i=0; i<components.size(); i++) {     
+            int s = min(components[i].front(), components[i].back()),
+                e = max(components[i].front(), components[i].back());
+            if(s==startSegID&&e==endSegID) continue; // ignore end-to-end case, e.g. 1-6
+            cout<<"Round: "<<i+1<<"\t"<<s<<"-"<<e<<endl;
+            string key = "l:"+to_string(s)+","+to_string(e);
+            constrain10.insert(variableIdx[key], 1);
+            key = "p:"+to_string(s)+","+to_string(e);
+            constrain10.insert(variableIdx[key], 1);            
+        }
+        constrainLowerBound[idx] = 1;
+        constrainUpperBound[idx] = si->getInfinity();;
+        idx++;
+        matrix->appendRow(constrain10);
+        //p(x,y)+l(x,y)-Σ[p(x,y1)+l(x,y1)]-Σ[p(x1,y)+l(x1,y)]>=0
+        for (int i=0;i<numPat;i++) {
+            CoinPackedVector constrain11;
+            bool flag = false;        
+            for (int k=0;k<numLoop;k++) {
+                if ((loops[k][0] == patterns[i][0]) ||
+                    (loops[k][1] == patterns[i][1])) {
+                    int diff1 = patterns[i][0]-patterns[i][1], diff2 = loops[k][0]-loops[k][1];
+                    if (abs(diff1)>abs(diff2)) {
+                        flag = true;
+                        string key = "l:"+to_string(loops[k][0])+","+to_string(loops[k][1]);
+                        constrain11.insert(variableIdx[key], -1);
+                        key = "p:"+to_string(patterns[k][0])+","+to_string(patterns[k][1]);
+                        constrain11.insert(variableIdx[key], -1);
+                    }
+                }
+            }
+            if (flag) {
+                string key = "l:"+to_string(loops[i][0])+","+to_string(loops[i][1]);
+                constrain11.insert(variableIdx[key], 1);//scaling coefficient
+                key = "p:"+to_string(patterns[i][0])+","+to_string(patterns[i][1]);
+                constrain11.insert(variableIdx[key], 1);//scaling coefficient
+                constrainLowerBound[idx] = 0;
+                constrainUpperBound[idx] = 5;
+                idx++;
+                matrix->appendRow(constrain11);
+            }
+        }
+    }
 
     cout<<"ILP formula done"<<endl;
 
@@ -4089,6 +4134,64 @@ void LocalGenomicMap::bfbInsertion(vector<Junction *> &SVs, vector<vector<int>> 
     }    
 }
 
+void LocalGenomicMap::readComponents(vector<vector<int>>& res, const char *juncsFn, unordered_map<int,int>& intervals) {
+    ifstream inFile(juncsFn);
+    string line;
+    Graph* g = this->getGraph();
+    if(juncsFn=="") return;
+    while (getline(inFile, line)) {
+        istringstream iss(line);
+        vector<int> segs;
+        vector<char> sign;
+        string temp;
+        while(iss >> temp) {
+            segs.push_back(stoi(temp.substr(0,temp.length())));
+            sign.push_back(temp.back());
+        }
+        //process inversion, translocation, and component
+        int lastIdx = 0;
+        for(int i=1; i<segs.size(); i++) {
+            if(intervals[segs[lastIdx]] != intervals[segs[i]] ||
+                sign[i-1] != sign[i]) {//break points                        
+                //add component
+                if(i-lastIdx>=2) {
+                    vector<int> subset;
+                    subset.assign(segs.begin()+lastIdx, segs.begin()+i);
+                    sort(subset.begin(), subset.end());
+                    res.push_back(subset);
+                }
+                //add junction (inversion or translocation)
+                int sourceId = segs[i-1], targetId = segs[i];
+                char sourceDir = sign[i-1], targetDir = sign[i];
+                cout<<sourceId<<sourceDir<<" -> "<<targetId<<targetDir<<endl;
+                double junCoverage = g->getAvgCoverage();
+                Junction* junc1 = new Junction(g->getSegmentById(sourceId), g->getSegmentById(targetId), sourceDir, targetDir, junCoverage, 1, 1, false, true, false);
+                Junction* junc2 = g->findJunction(junc1);
+                if(junc2 == NULL) {
+                    g->addJunction(sourceId, sourceDir, targetId, targetDir, junCoverage, 1, 1, false, true, false);
+                }
+                else {
+                    junc2->getWeight()->setCopyNum(1);
+                }
+                lastIdx = i;
+            }
+        }
+        if(segs.size()-lastIdx>=2) {
+            //add trailing component
+            vector<int> subset;
+            subset.assign(segs.begin()+lastIdx, segs.end());
+            sort(subset.begin(), subset.end());
+            res.push_back(subset);
+        }
+    }
+    //remove duplicates
+    sort(res.begin(), res.end());
+    res.erase(unique(res.begin(), res.end()), res.end());
+}
+
+/*
+* old version
+*/
 VertexPath* LocalGenomicMap::findBFB(VertexPath* currPath, int n, set<Edge *>* visited, int error) {
     int len = currPath->size();
     if (len == n)

@@ -485,6 +485,18 @@ bool Graph::doesJunctionExist(Junction *aJunction) {
     return false;
 }
 
+Junction* Graph::findJunction(Junction *aJunction) {
+    vector<string> aJuncInfo = aJunction->getInfo();
+    for (Junction *junc : *mJunctions) {
+        vector<string> juncInfo = junc->getInfo();
+        if ((juncInfo[0] == aJuncInfo[0] && juncInfo[1] == aJuncInfo[1]) ||
+            (juncInfo[0] == aJuncInfo[1] && juncInfo[1] == aJuncInfo[0])) {
+            return junc;
+        }
+    }
+    return NULL;
+}
+
 Segment *Graph::getSegmentById(int aSegId) {
     for (Segment *seg : *mSegments) {
         if (seg->getId() == aSegId) {
