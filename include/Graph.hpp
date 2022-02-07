@@ -47,7 +47,7 @@ protected:
 
 public:
     Graph();
-
+    Graph(vector<Segment *> segs, vector<Junction *> juncs, vector<Segment *> sources, vector<Segment *> sinks);
     Graph(const char *aFilename);
 
     ~Graph();

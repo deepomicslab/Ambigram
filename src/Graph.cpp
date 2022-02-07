@@ -22,6 +22,17 @@ Graph::Graph() {
     mSinks = new vector<Segment *>();
 }
 
+Graph::Graph(vector<Segment *> segs, vector<Junction *> juncs, vector<Segment *> sources, vector<Segment *> sinks) {
+    mPurity = -1;
+    mAvgPloidy = -1;
+    mAvgTumorPloidy = -1;
+
+    *mSegments = segs;
+    *mJunctions = juncs;
+    *mSources = sources;
+    *mSinks = sinks;
+}
+
 Graph::Graph(const char *aFilename) {
     mPurity = -1;
     mAvgPloidy = 0;

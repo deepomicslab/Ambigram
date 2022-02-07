@@ -38,7 +38,7 @@ protected:
 public:
     // constructor and destructor
     Segment(int aId, int chr, string aChrom, int aStart, int aEnd, double aCoverage, double aCredibility, double aCopy);
-
+    Segment(int aId, int chr, Segment* seg);
     ~Segment();
 
     // getter and setter

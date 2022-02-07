@@ -24,6 +24,25 @@ Segment::Segment(int aId, int chr, string aChrom, int aStart, int aEnd, double a
     mPositiveVertex->setSegment(this);
     mNegativeVertex->setSegment(this);
 }
+Segment::Segment(int aId, int chr, Segment* seg) {
+    mId = aId;
+    chrId = chr;
+    mChrom = seg->getChrom();
+    mStart = seg->getStart();
+    mEnd = seg->getEnd();
+    mCredibility = seg->getCredibility();
+
+    mHasLowerBoundLimit = true;
+    mHasCheckedOrphan = false;
+    mIsOrphan = false;
+
+    mWeight = new Weight(seg->getWeight()->getCoverage());
+    mWeight->setCopyNum(seg->getWeight()->getCopyNum());
+    mPositiveVertex = new Vertex(aId, '+', mWeight, mCredibility);
+    mNegativeVertex = new Vertex(aId, '-', mWeight, mCredibility);
+    mPositiveVertex->setSegment(this);
+    mNegativeVertex->setSegment(this);
+}
 
 Segment::~Segment() { ; }
 

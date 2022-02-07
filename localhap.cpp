@@ -20,7 +20,6 @@ int main(int argc, char *argv[]) {
     options.add_options()
             ("op", "operate: check or solve", cxxopts::value<std::string>())
             ("juncdb", "Junction database", cxxopts::value<std::string>()->default_value(""))
-            ("junc_info", "Use extra junction information", cxxopts::value<bool>()->default_value("false"))
             ("in_lh", "Input lh file", cxxopts::value<std::string>())
             ("out_lh", "Checked local hap input file, lh format", cxxopts::value<std::string>())
             ("lp_prefix", "ILP out file prefix, only for check", cxxopts::value<std::string>())
@@ -30,7 +29,10 @@ int main(int argc, char *argv[]) {
             ("hap", "Haplotype out file, only for solve", cxxopts::value<std::string>())
             ("traversed", "traversed path out file, only for solve", cxxopts::value<std::string>())
             ("circuits", "Circuits out file, only for solve", cxxopts::value<std::string>())
-            ("help", "Print usage");
+            ("help", "Print usage")
+            // BFB
+            ("junc_info", "Use extra junction information", cxxopts::value<bool>()->default_value("false"))
+            ("max_error", "The maximal acceptable rate", cxxopts::value<double>()->default_value("-1"));
     auto result = options.parse(argc, argv);
     if (result.count("help")) {
         std::cout << options.help() << std::endl;
@@ -236,19 +238,53 @@ int main(int argc, char *argv[]) {
         const char *lhRawFn = result["in_lh"].as<std::string>().c_str();
         const char *lpFn = result["lp_prefix"].as<std::string>().c_str();
         const char *juncsFn = result["juncdb"].as<std::string>().c_str();
-        const bool juncsInfo = result["junc_info"].as<bool>();//wether add extra junction iformation into ILP constrains
+        const bool juncsInfo = result["junc_info"].as<bool>();//whether add extra junction iformation into ILP constrains
+        const double maxError = result["max_error"].as<double>();
+
+        // string bfbRes = "\n"+string(lhRawFn)+" "+string(juncsFn)+"\n";
+        // ofstream outString;
+        // outString.open("bfbPaths.txt",std::ios_base::app);
+        // outString<<bfbRes;
+        // outString.close();
+
+
         Graph *g = new Graph(lhRawFn);
         g->calculateHapDepth();
         g->calculateCopyNum();
         LocalGenomicMap *lgm = new LocalGenomicMap(g);
+        //read options from input
+        string mainChr;
+        int insMode = 0, conMode = 0;//0: pre-BFB insertion/concatenation, 1: post-BFB insertion/concatenation
+        vector<string> insChr, conChr;
+        vector<int> startSegs;//starting segments for insertions
+        int virusInfo[3] = {0};
+        lgm->readBFBProps(mainChr, insMode, insChr, conMode, conChr, virusInfo, startSegs, lhRawFn);//read properties
+        unordered_map<int, int> originalSegs;
+        //Insertion Mode 1: pre-BFB insertion        
+        if(insMode == 1) {
+            lgm->insertBeforeBFB(g, insChr, originalSegs);
+            delete lgm;
+            lgm = new LocalGenomicMap(g);
+        }
+        //Concatenation Mode 1: pre-BFB concatenation
+        else if(conMode == 1) {
+            lgm->concatBeforeBFB(g, conChr, originalSegs);
+            delete lgm;
+            lgm = new LocalGenomicMap(g);
+        }
+
         vector<Segment *> sources = *g->getMSources();
         vector<Segment *> sinks = *g->getMSinks();
+
         //construct segment intervals
         unordered_map<int,int> intervals;
         for(int i=0; i<sources.size(); i++) {
-            for(int j=sources[i]->getId(); j<=sinks[i]->getId(); j++)
+            for(int j=sources[i]->getId(); j<=sinks[i]->getId(); j++) {
+                cout<<j<<"-"<<i<<endl;
                 intervals.insert(pair<int,int>(j,i));
+            }
         }
+
         //get information of third-generation data
         vector<vector<int>> components;
         lgm->readComponents(components, juncsFn, intervals);//third-generation data information
@@ -258,19 +294,9 @@ int main(int argc, char *argv[]) {
             }
             cout<<endl;
         }
-
-        //output copy numbers of junctions
-        // string sample = result["lp_prefix"].as<std::string>();
-        // stringstream juncInfo;
-        // for(Junction* junc: *g->getJunctions()) {
-        //     juncInfo << sample << "\t"<<junc->getSource()->getId()<<":"<<junc->getSourceDir()<<":"
-        //         <<junc->getTarget()->getId()<<":"<<junc->getTargetDir()<<"\t"<<junc->getWeight()->getCopyNum()<<"\n";            
-        // }
-        // ofstream juncFile;
-        // juncFile.open("COLO829_juncCN.txt",std::ios_base::app);
-        // juncFile<<juncInfo.str();
-        // juncFile.close();
-        // exit(0);
+        
+        //record target CN of segments
+        vector<int> targetCN(g->getSegments()->size(),0);
 
         vector<vector<int>> bfbPaths;
         //construct bfb path on each chromosome
@@ -311,7 +337,7 @@ int main(int argc, char *argv[]) {
                 double copyNum = junc->getWeight()->getCopyNum();
                 if (0.5 < copyNum && copyNum < 1)
                     copyNum = 1;//round small CN to 1
-                if (sourceDir == '+' && targetDir == '+') {//ht or th: not consider deletion on the chromosome
+                if (sourceDir == targetDir) {//ht or th: not consider deletion on the chromosome
                     if (sourceID+1 == targetID) {//normal edges                
                         juncCN[sourceID][0] += copyNum;
                     }
@@ -351,6 +377,7 @@ int main(int argc, char *argv[]) {
             }
 
             if (abs(inversionCNSum)<0.000001&&validComponents.size()==0) {//no fold-back inversion
+                for(int i=startID-1; i<endID; i++) targetCN[i] += 2;//compute target CN of segments
                 vector<int> temp({startID, endID, endID, startID});
                 lgm->editInversions(temp, inversions, juncCN, elementCN, variableIdx);
                 bfbPaths.push_back(temp);
@@ -358,7 +385,7 @@ int main(int argc, char *argv[]) {
             }
                         
             //construct ILP and generate .lp file for cbc
-            lgm->BFB_ILP(lpFn, patterns, loops, variableIdx, juncCN, validComponents, juncsInfo);
+            lgm->BFB_ILP(lpFn, patterns, loops, variableIdx, juncCN, validComponents, juncsInfo, maxError);
 
             //run cbc under the directory containing test.lp
             string str = "cbc "+string(lpFn) +".lp solve solu "+string(lpFn)+".sol";
@@ -374,11 +401,18 @@ int main(int argc, char *argv[]) {
             }            
             string element, cn;
             bool infeasible = false;
+            double cn_error = 0;
+            ofstream errorString;
+            errorString.open("./result.txt",std::ios_base::app);
             while (solFile >> element) {
                 if(element == "Infeasible") {
                     infeasible = true;
                     break;
                 }
+                // if(element == "value") {
+                //     solFile >> element;
+                //     errorString<<element<<" ";
+                // }
                 if (element[0] == 'x') {                
                     int idx = stoi(element.substr(1));
                     if (idx < variableIdx.size()) {//exclude epsilons
@@ -386,9 +420,50 @@ int main(int argc, char *argv[]) {
                         int copynum = stoi(cn);
                         elementCN[idx] = copynum;
                     }
+                    else {//epsilons (errors)
+                        if((idx-variableIdx.size())%3==0) {
+                            double seg_error;
+                            solFile >> seg_error;
+                            cn_error += seg_error;
+                        }
+                    }
                 }
             }
+            //compute target CN of segments based loop/pattern
+            for (auto iter=variableIdx.begin();iter!=variableIdx.end();iter++) {
+                if(elementCN[iter->second] > 0) {
+                    string key = iter->first;
+                    int idx1 = stoi(key.substr(2, key.find(",")-2)), idx2 = stoi(key.substr(key.find(",")+1));
+                    for(int i=idx1-1; i<idx2; i++) {
+                        if(key[0]=='p') targetCN[i] += elementCN[iter->second];
+                        else targetCN[i] += elementCN[iter->second]*2;
+                    }
+                }
+            }
+
+            // vector<int> segCN(endID, 0);
+            // for (auto iter=variableIdx.begin();iter!=variableIdx.end();iter++) {
+            //     if(elementCN[iter->second] > 0) {
+            //         string key = iter->first;
+            //         int idx1 = stoi(key.substr(2, key.find(",")-2)), idx2 = stoi(key.substr(key.find(",")+1));
+            //         for(int i=idx1-1; i<idx2; i++) {
+            //             if(key[0]=='p') segCN[i-1] += elementCN[iter->second];
+            //             else segCN[i-1] += elementCN[iter->second]*2;
+            //         }
+            //     }
+            // }
+            // int cn_diff = 0;                        
+            // for(int i=startID-1; i<endID; i++) {
+            //     cn_diff += (*g->getSegments())[i]->getWeight()->getCopyNum()-segCN[i];
+            // }
+            
+            // output errors
+            // errorString<<cn_error<<endl;
+            // errorString.close();
+            // exit(0);
+
             if(infeasible) {
+                for(int i=startID-1; i<endID; i++) targetCN[i] += 2;//compute target CN of segments
                 vector<int> temp({startID, endID, endID, startID});
                 lgm->editInversions(temp, inversions, juncCN, elementCN, variableIdx);
                 bfbPaths.push_back(temp);
@@ -428,176 +503,56 @@ int main(int argc, char *argv[]) {
             }
             //get one valid bfb path
             vector<int> path;
-            lgm->getBFB(orders, node2pat, node2loop, path);//get a valid BFB path
+            lgm->getBFB(orders, node2pat, node2loop, path);//get a valid BFB path            
             //output the text for visualization
             lgm->editInversions(path, inversions, juncCN, elementCN, variableIdx);//edit the imperfect fold-back inversions (with deletion)
+            if(insMode==1 || conMode==1) lgm->printOriginalBFB(path, originalSegs);
             bfbPaths.push_back(path);
-        }                
+        }              
+        //output target CN
+        ofstream targetCNString;
+        targetCNString.open("./target_cn.txt",std::ios_base::app);
+        double diffCN = 0;
+        for(int i=0; i<targetCN.size(); i++) {
+            diffCN += targetCN[i]-(*g->getSegments())[i]->getWeight()->getCopyNum();
+            // targetCNString<<string(lhRawFn)<<"\t"<<i+1<<"\t"<< (*g->getSegments())[i]->getChrom()<<":"<<(*g->getSegments())[i]->getStart()<<"-"<<
+            // (*g->getSegments())[i]->getEnd()<<"\t"<<(*g->getSegments())[i]->getWeight()->getCopyNum() <<"\t"<<targetCN[i]<<"\t"<<string(juncsFn) <<endl;
+        }
+        targetCNString<<string(lhRawFn)<<"\t"<<diffCN<<"\tnumSeg: "<<targetCN.size()<<endl;
+        targetCNString.close();
 
-        //parameters for dealing with other SVs
-        string mainChr;
-        vector<string> insChr, conChr;
-        vector<int> startSegs;//starting segments for insertions
-        lgm->readBFBProps(mainChr, insChr, conChr, startSegs, lhRawFn);//read properties        
+        //Insertion Mode 2: post-BFB insertion     
+        if(insMode == 2) lgm->insertAfterBFB(insChr, mainChr, startSegs, bfbPaths);
+        //Concatenation Mode 2: post-BFB Concatenation 
+        if(conMode == 2) lgm->concatAfterBFB(conChr, bfbPaths);
         
-        //find other SVs based on graph of segments
-        vector<Junction *> insertionSV, concatenationSV;
-        vector<Segment *> segments = *g->getSegments();
-        int segNum = segments.size()+1;
-        int** connections = new int*[segNum];
-        for (int i=0; i < segNum; i++) {
-            connections[i] = new int[segNum];
-            memset(connections[i], -1, segNum*sizeof(int));
-        }
-        //find a range for normal links of each chromosome
-        vector<int> maxSeg, minSeg;
-        for (int i=0; i<g->getMSources()->size(); i++) {
-            maxSeg.push_back((*g->getMSources())[i]->getId());
-            minSeg.push_back((*g->getMSinks())[i]->getId());
-        }
-        for (Junction *junc: *g->getJunctions()) {
-            if (junc->isInferred())
-                continue;
-            Segment *source = junc->getSource();
-            Segment *target = junc->getTarget();
-            int chr1 = source->getChrId(), chr2 = target->getChrId();
-            if (chr1 != chr2) {
-                int s = source->getId(), e = target->getId();
-                if (s > maxSeg[chr1]) maxSeg[chr1] = s;
-                if (s < minSeg[chr1]) minSeg[chr1] = s;
-                if (e > maxSeg[chr2]) maxSeg[chr2] = e;
-                if (e < minSeg[chr2]) minSeg[chr2] = e;
-            }
-        }        
-        //get all SVs for insertion
-        for (Junction *junc: *g->getJunctions()) {
-            if (junc->isInferred())
-                continue;
-            Segment *source = junc->getSource();
-            Segment *target = junc->getTarget();
-            int chr1 = source->getChrId(), chr2 = target->getChrId();//index for chromosome
-            string chrNum1 = source->getChrom(), chrNum2 = target->getChrom();//chromosome name
-            int sourceId = source->getId(), targetId = target->getId();
-            //sv for concatenation
-            if (chr1 != chr2 && find(conChr.begin(),conChr.end(),chrNum1)!=conChr.end() &&
-                find(conChr.begin(),conChr.end(),chrNum2)!=conChr.end()) {
-                concatenationSV.push_back(junc);             
-            }
-            //sv for insertion
-            if (find(insChr.begin(),insChr.end(),chrNum1)!=insChr.end() &&
-                find(insChr.begin(),insChr.end(),chrNum2)!=insChr.end()) {
-                if (chr1 != chr2) {
-                    insertionSV.push_back(junc);
-                    connections[sourceId][targetId] = insertionSV.size()-1;
-                    connections[targetId][sourceId] = insertionSV.size()-1;
-                }
-                else if (chrNum1 != mainChr) {//chr1==chr2: normal junctions for insertion
-                    if ((minSeg[chr1] <= sourceId && sourceId <= maxSeg[chr1]) &&
-                        (minSeg[chr1] <= targetId && targetId <= maxSeg[chr1])) {
-                        insertionSV.push_back(junc);
-                        connections[sourceId][targetId] = insertionSV.size()-1;
-                        connections[targetId][sourceId] = insertionSV.size()-1;
+        //deal with insertion of virus
+        if(virusInfo[0] != 0) {
+            for(vector<int> path: bfbPaths) {
+                cout<<"bfb path with virus: "<<endl;
+                for(int i = 1; i<path.size(); i+=2) {
+                    cout<<i<<": "<<virusInfo[0]<<" "<<virusInfo[1]<<" "<<virusInfo[2]<<endl;
+                    if(path[i-1]<=virusInfo[1]&&virusInfo[2]<=path[i]) {
+                        path.insert(path.begin()+i, {virusInfo[1],-1,-1,virusInfo[0],virusInfo[0],-1,-1,virusInfo[2]});
+                        i += 8;
                     }
-                }
-            }
-        }
-        cout<<"sv for concatenation: "<<endl;
-        for (Junction *junc: concatenationSV) {
-            cout<<junc->getSource()->getId()<<" "<<junc->getTarget()->getId()<<endl;
-        }
-        cout<<"sv for insertion: "<<endl;
-        for (Junction *junc: insertionSV) {
-            cout<<junc->getSource()->getId()<<" "<<junc->getTarget()->getId()<<endl;
-        }
-        
-        //construct bfb paths with insertion        
-        for (int i=0; i<startSegs.size(); i++) {
-            if (insertionSV.size() == 0) break;
-            //find a path by traversing all the SVs with DFS
-            vector<int> segs;//segments in sequence
-            bool finished = false;
-            bool *visited = new bool[segNum];
-            memset(visited, false, segNum*sizeof(bool));
-            stack<int> s;
-            int startSeg = startSegs[i];
-            int startChr = segments[startSeg-1]->getChrId();
-            s.push(startSeg);//starting segment
-            visited[startSeg] = true;
-            while (!s.empty()) {
-                int front = s.top();
-                // cout<<front<<" "<<segments[front-1]->getChrId()<<endl;
-                segs.push_back(front);
-                s.pop();
-                //adjacent segments
-                for (int next=segNum-1; next>=1; next--) {
-                    if (!visited[next] && connections[front][next] != -1) {
-                        s.push(next);
-                        visited[next] = true;
-                        if (segments[next-1]->getChrId() == startChr) {
-                            segs.push_back(next);
-                            finished = true;
-                            break;
-                        }
+                    else if(path[i]<=virusInfo[1]&&virusInfo[2]<=path[i-1]) {
+                        path.insert(path.begin()+i, {virusInfo[2],-1,-1,virusInfo[0],virusInfo[0],-1,-1,virusInfo[1]});
+                        i += 8;
                     }
-                }
-                if (finished)
-                    break;
+                    if(i<path.size()-1&& (path[i]==virusInfo[2]&&path[i+1]==virusInfo[1] 
+                        || path[i]==virusInfo[1]&&path[i+1]==virusInfo[2])) {
+                        path.insert(path.begin()+i+1, {-1,-1,virusInfo[0],virusInfo[0],-1,-1});
+                        i += 6;
+                    }                
+                }    
+                lgm->printBFB(path);
             }
-            if (segments[segs.back()-1]->getChrId() != startChr)
-                segs.push_back(startSeg);
-            cout<<"The sequence of segments"<<endl;
-            for (int idx: segs)
-                cout<<idx<<" ";
-            cout<<endl;
-
-            //construct the bool array for SV directions
-            bool *edgeA = new bool[segs.size()];
-            memset(edgeA, true, segs.size()*sizeof(bool));
-            vector<Junction *> svPath;
-            //find valid SVs in sequence
-            int cnt = 0;
-            for (int i=0; i<segs.size()-1; i+=1) {
-                if(connections[segs[i]][segs[i+1]] == -1)
-                    break;
-                Junction *sv = insertionSV[connections[segs[i]][segs[i+1]]];
-                Edge *e = sv->getEdgeA();
-                int chr1 = sv->getSource()->getChrId(), chr2 = sv->getTarget()->getChrId();
-                //cout<<chr1<<" "<<chr2<<" "<<endl;
-                if (chr1 == chr2) continue;
-                svPath.push_back(sv);
-                int sourceId = e->getSource()->getId(), targetId = e->getTarget()->getId();                
-                if (sourceId == segs[i+1] && targetId == segs[i])
-                    edgeA[cnt] = false;
-                cnt++;
-            }
-            //print bfb path with insertions
-            if(svPath.empty())
-                continue;
-            cout<<"bfb path with insertions: "<<i<<endl;
-            vector<int> res;
-            lgm->bfbInsertion(svPath, bfbPaths, edgeA, res);
-            // for (int n: res)
-            //     cout<<n<<" ";
-            // cout<<endl;
-            vector<int> output;
-            lgm->editBFB(bfbPaths, res, output);
-            //lgm->printBFB(output);
-        }
-        //construct bfb paths with concatenation        
-        for (int i=0; i<concatenationSV.size(); i++) {
-            cout<<"bfb paths with concatenation: "<<i<<endl;
-            vector<int> res;
-            lgm->bfbConcate(concatenationSV[i], true, 2, 0, bfbPaths, res);//start from position 2 of the main chromosome
-            if (!res.empty()) {
-                vector<int> output;
-                lgm->editBFB(bfbPaths, res, output);
-                //lgm->printBFB(output);
-            }         
         }
 
         //print the result
-        for (int i=0;i<bfbPaths.size();i++)
-            lgm->printBFB(bfbPaths[i]);
+        // for (int i=0;i<bfbPaths.size();i++)
+        //     lgm->printBFB(bfbPaths[i]);
 
     } else if (strcmp(result["op"].as<std::string>().c_str(), "bpm") == 0) {
         const char *lhRawFn = result["in_lh"].as<std::string>().c_str();
