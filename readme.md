@@ -22,11 +22,12 @@ localHap --op bfb --help
 
 ### Prerequisites
 
-- SVAS (https://github.com/paprikachan/SVAS) integrates SEG and SV files into a .lh file, which is the standard input file of Ambigram.
-- SpecHap (https://github.com/deepomicslab/SpecHap) extracts barcodes from 10x data.
-- hpvpipe (https://github.com/panguangze/hpvpipe) generate JUNCS files by processing PB or ONT data.
-- Python3 (https://www.python.org/downloads/)
-- samtools (https://github.com/samtools/samtools) deals with .bam files. 
+- [SVAS](https://github.com/paprikachan/SVAS) integrates SEG and SV files into a .lh file, which is the standard input file of Ambigram.
+- [SpecHap](https://github.com/deepomicslab/SpecHap) extracts barcodes from 10x data.
+- [hpvpipe](https://github.com/panguangze/hpvpipe) generate JUNCS files by processing PB or ONT data.
+- [Python3](https://www.python.org/downloads/)
+- [samtools](https://github.com/samtools/samtools) deals with .bam files. 
+- [pysam](https://pysam.readthedocs.io/en/latest/) counts the coverage of genomic positions by reads in region.
 
 ## Using Ambigram
 
@@ -34,7 +35,7 @@ localHap --op bfb --help
 
 Ambigram supports various data types including Illumina pair-end (PE) reads, Oxford Nanopore (ONT) long reads, Pacific Biosciences (PB) long reads, 10x Genomics linked-reads with varying tumor purity and sequencing depth. The procedures and methods to process various data sets are available on the other GitHub page (https://github.com/deepomicslab/Onion-BFB_Paper). 
 
-In general, we need two files: (1) SEG file that indicates genomic regions including chromosome names, start and end coordinates, and copy numbers; (2) SV file that consists of start and end chromosome names, break points, and strands as well as copy number of each SV junction. We need to run a script (SVAS/scripts/csv_sv.py) to convert the SV and SEG files into a LH file, which is the standard input file of our algorithm. Here is a set of sample input files:
+In general, we need two files: (1) SEG file that indicates genomic regions including chromosome names, start and end coordinates, and copy numbers; (2) SV file that consists of start and end chromosome names, break points, and strands as well as copy number of each SV junction. We provide a script for users to generate the SEG file by inputting a SV file and the corresponding BAM file based on SV break points and read depth. Then we need to run a script (SVAS/scripts/csv_sv.py) to convert the SV and SEG files into a LH file, which is the standard input file of our algorithm. Here is a set of sample input files:
 
 * **example_seg.txt**
 
@@ -85,10 +86,16 @@ JUNC H:4:+ H:5:+ 105.0 7.0 U B
 JUNC H:5:+ H:6:+ 75.0 5.0 U B
 ```
 
+To generate the SEG file from a SV file and the corresponding BAM file, run the following command:
+
+```
+python localhaptgs/script/generate_seg.py --sv_file=[path to SV file] --bam_file=[path to bam file] --wgs_depth=[whole genome average depth (default: 100)] --tumor_purity=[sample tumor purity (default: 1)]
+```
+
 To convert the SEG and SV files into a LH file, run the following command:
 
 ```
-python SVAS/scripts/csv_sv.py call --sv_fn=./bfb_sv.txt --seg_fn=../test_seg.txt --sample=test --seg_only=1 --bfb_sv=1
+python SVAS/scripts/csv_sv.py call --sv_fn=[path to SV file] --seg_fn=[path to SEG file] --sample=[output sample name] --seg_only=1 --bfb_sv=1
 ```
 
 Besides, we can input a JUNCS file that contains extra information from TGS data (10x, PB, and ONT), which may help Ambigram resolve more accurate BFB paths. A JUNCS file that comprises groups of segments, which are probably connected in order as patterns or loops on BFB paths. On the one hand, we can use BarcodeExtractor in SpecHap to get barcodes from 10x data and run the script (process_barcode.py) to generate the JUNCS file. On the other hand, we can use another script (hpvpipe/main.py process_tgs) to directly get the JUNCS file from PB or ONT data. Here is a sample JUNCS file:

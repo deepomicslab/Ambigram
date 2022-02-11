@@ -370,7 +370,7 @@ void Graph::calculateCopyNum() {
     double ratio = getRatio();
     double hDP = getHaploidDepth();
     for (Segment *seg : *mSegments) {
-        break;//no need to change for bfb
+        if(seg->getWeight()->getCopyNum()>0) continue;
 //        TODO 判断virus seg
         double segCopy;
         if(seg->getId() >= mVirusSegStart) {
@@ -383,9 +383,11 @@ void Graph::calculateCopyNum() {
         // seg->getWeight()->setAdjustedCoverage(max(segAdjustedCoverage, 0.0));
         // seg->getWeight()->setCoverage(seg->getWeight()->getAdjustedCoverage());
         seg->getWeight()->setCopyNum(max(segCopy, 0.0));
+        cout<<"SEG"<<seg->getId()<<" "<<seg->getWeight()->getCoverage()<<" "<<seg->getWeight()->getCopyNum()<<endl;
     }
 
     for (Junction *junc : *mJunctions) {
+        if(junc->getWeight()->getCopyNum()>0) continue;
 //        double juncCopy = junc->getWeight()->getCoverage() / mHaploidDepthJunc;
         double juncCopy;
         if (junc->isInferred()) {
