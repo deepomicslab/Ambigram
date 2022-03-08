@@ -3893,6 +3893,7 @@ void LocalGenomicMap::concatBeforeBFB(Graph*& g, vector<string>& conChr, unorder
     for(Junction* junc: juncs) {
         int startSegID = junc->getSource()->getId(), targetSegID = junc->getTarget()->getId();
         int id1 = segConversion[startSegID]-1, id2 = segConversion[targetSegID]-1;
+        cout<<startSegID<<"-"<<targetSegID<<" "<<id1+1<<"-"<<id2+1<<endl;
         if(id1==-1 || id2 == -1) continue;
         char dir1 = junc->getSourceDir(), dir2 = junc->getTargetDir();
         if(startSegID==sID||startSegID==eID||targetSegID==sID||targetSegID==eID) {
@@ -3902,7 +3903,6 @@ void LocalGenomicMap::concatBeforeBFB(Graph*& g, vector<string>& conChr, unorder
                 dir1 = '+', dir2 = '+';
             }
         }
-        cout<<startSegID<<"-"<<targetSegID<<" "<<id1+1<<"-"<<id2+1<<endl;
         mJuncs.push_back(new Junction(mSegs[id1],mSegs[id2],dir1,dir2,junc->getWeight()->getCoverage(),
             junc->getCredibility(),junc->getWeight()->getCopyNum(),junc->isInferred(),junc->hasLowerBoundLimit(),false));
     }
@@ -4004,11 +4004,11 @@ void LocalGenomicMap::editBFB(vector<vector<int>> bfbPaths, vector<int> &posInfo
             bfbRes += to_string(junc->getWeight()->getCopyNum())+":"+to_string(output[i-2])+":"+strand_5p+":"+to_string(output[i+1])+":"+strand_3p;
         }
     }
-    // bfbRes += "\n";
-    // ofstream bfbFile;
-    // bfbFile.open("bfbPaths.txt",std::ios_base::app);
-    // bfbFile<<bfbRes;
-    // bfbFile.close();
+    bfbRes += "\n";
+    ofstream bfbFile;
+    bfbFile.open("bfbPaths.txt",std::ios_base::app);
+    bfbFile<<bfbRes;
+    bfbFile.close();
     printBFB(output);
 }
 
@@ -4075,11 +4075,11 @@ void LocalGenomicMap::editInversions(vector<int> &res, vector<Junction *> &inver
         if(j<res.size()-3) bfbRes += "\t";
         isPositive = !isPositive;
     }
-    // bfbRes += "\n";    
-    // ofstream bfbPaths;
-    // bfbPaths.open("bfbPaths.txt",std::ios_base::app);
-    // bfbPaths<<bfbRes;
-    // bfbPaths.close();
+    bfbRes += "\n";    
+    ofstream bfbPaths;
+    bfbPaths.open("bfbPaths.txt",std::ios_base::app);
+    bfbPaths<<bfbRes;
+    bfbPaths.close();
     printBFB(res);
 }
 
@@ -4126,10 +4126,10 @@ void LocalGenomicMap::printBFB(vector<int> &res) {
     }
     bfbRes += "\n";
     cout<<endl;
-    // ofstream bfbPaths;
-    // bfbPaths.open("bfbPaths.txt",std::ios_base::app);
-    // bfbPaths<<bfbRes;
-    // bfbPaths.close();
+    ofstream bfbPaths;
+    bfbPaths.open("bfbPaths.txt",std::ios_base::app);
+    bfbPaths<<bfbRes;
+    bfbPaths.close();
 
     //output the bed file
     // ofstream bedFile;
@@ -4139,6 +4139,7 @@ void LocalGenomicMap::printBFB(vector<int> &res) {
 }
 
 void LocalGenomicMap::printOriginalBFB(vector<int> &res, unordered_map<int, int> &m) {
+    string bfbRes = "";
     cout<<"find a BFB path with insertion first"<<endl;
     vector<Segment *> segs = *this->getGraph()->getSegments();
     for (int j=0;j<res.size()-1;j+=2) {
@@ -4148,25 +4149,36 @@ void LocalGenomicMap::printOriginalBFB(vector<int> &res, unordered_map<int, int>
     }
     cout<<endl;
     for (int j=0;j<res.size()-1;j+=2) {
-        if (res[j] == -1) { 
+        if (res[j] == -1) {
+            bfbRes += "->";
             cout<<"->";
             continue;
         }
         if (res[j]<res[j+1]) {
             for (int k=res[j];k<=res[j+1];k++) {
+                bfbRes += to_string(m[k]);
+                if(k<res[j+1]) bfbRes += ":";
                 cout<<m[k]<<":";
             }
         }
         else {
             for (int k=res[j];k>=res[j+1];k--) {
+                bfbRes += to_string(m[k]);
+                if(k>res[j+1]) bfbRes += ":";
                 cout<<m[k]<<":";
             }
         }
         if(j<res.size()-3&&res[j+2]!=-1) {
+            bfbRes += "|";
             cout<<"|";
         }
     }
     cout<<endl;
+    bfbRes += "\n";
+    ofstream bfbPaths;
+    bfbPaths.open("bfbPaths.txt",std::ios_base::app);
+    bfbPaths<<bfbRes;
+    bfbPaths.close();
 }
 
 void LocalGenomicMap::BFB_ILP(const char *lpFn, vector<vector<int>> &patterns, vector<vector<int>> &loops, 
