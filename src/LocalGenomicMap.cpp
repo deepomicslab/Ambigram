@@ -4569,6 +4569,381 @@ void LocalGenomicMap::BFB_ILP(const char *lpFn, vector<vector<int>> &patterns, v
     si->writeLp(lpFn);
 
 }
+void LocalGenomicMap::BFB_ILP_SC(const char *lpFn, vector<vector<int>> &patterns, vector<vector<int>> &loops, map<string, int> &variableIdx, 
+                        vector<Graph*> graphs, const double maxError, const bool seqMode) {
+    int numGraphs = graphs.size();
+    OsiClpSolverInterface *si = new OsiClpSolverInterface();
+    int startSegID = patterns.front()[0], endSegID = patterns.back()[1];
+    cout<<"start-end: "<<startSegID<<" "<<endSegID<<endl;    
+    
+    int numSegments = segs.size();
+    int numElements = variableIdx.size()*numGraphs, numEpsilons = numSegments*3*numGraphs;
+    int numVariables = numElements+numEpsilons, numPat = patterns.size(), numLoop = loops.size();
+    int numConstrains = (numSegments*2*3 + 3*numLoop)+(seqMode? numPat*numPat*3 : numPat);
+    numConstrains *= numGraphs;
+
+    double *objective = new double[numVariables];
+    double *variableLowerBound = new double[numVariables];
+    double *variableUpperBound = new double[numVariables];
+    double *constrainLowerBound = new double[numConstrains];
+    double *constrainUpperBound = new double[numConstrains];
+    cout << "Declare done" << endl;
+
+    CoinPackedMatrix *matrix = new CoinPackedMatrix(false, 0, 0);
+    int idx = 0;//number of constrains/inequalities
+    for(int n=0; n<numGraphs; n++) {
+        vector<Segment *> segs;
+        for (Segment * seg: graphs[n]->getSegments()) {
+            cout<<seg->getId()<<" ";
+            if (startSegID<=seg->getId() && seg->getId()<=endSegID)
+                segs.push_back(seg);
+        }
+        //calculate the loop/pattern index
+        for (int i=0; i<numPat; i++) {
+            string key = "p:"+to_string(patterns[i][0])+","+to_string(patterns[i][1]);
+            variableIdx[key] += n*(numPat+numLoop);
+            key = "l:"+to_string(patterns[i][0])+","+to_string(patterns[i][1]);
+            variableIdx[key] += n*(numPat+numLoop);
+        }
+        //find copy number for both normal junctions and fold-back inversions
+        vector<Junction *> inversions;
+        double** juncCN = new double*[endSegID+1];
+        for (int i=0; i <= endSegID; i++) {
+            juncCN[i] = new double[2];//0: normal junction   1: inversion
+            memset(juncCN[i], 0, 2*sizeof(double));
+        }
+        for (Junction *junc: *grpahs[n]->getJunctions()) {
+            int sourceID = junc->getSource()->getId(), targetID = junc->getTarget()->getId();
+            char sourceDir = junc->getSourceDir(), targetDir = junc->getTargetDir();
+            if (sourceID<startID||sourceID>endSegID||targetID<startID||targetID>endSegID) continue;
+            double copyNum = junc->getWeight()->getCopyNum();
+            if (0.5 < copyNum && copyNum < 1)
+                copyNum = 1;//round small CN to 1
+            if (sourceDir == targetDir) {//ht or th: not consider deletion on the chromosome
+                if (sourceID+1 == targetID) {//normal edges                
+                    juncCN[sourceID][0] += copyNum;
+                }
+                else if (sourceID-1 == targetID) {//normal edges (negative strand)
+                    juncCN[targetID][0] += copyNum;
+                }
+            }
+            else {//hh or tt (inversion)
+                if (abs(sourceID-targetID)<=3) {//fold-back inversion (with error of 3 bp)
+                    if(sourceID != targetID)
+                        inversions.push_back(junc);
+                    if (sourceDir == '+') {
+                        int greaterID = sourceID>targetID? sourceID:targetID;
+                        juncCN[greaterID][1] += copyNum;
+                    }
+                    else {
+                        int smallerID = sourceID<targetID? sourceID:targetID;
+                        juncCN[smallerID][1] += copyNum;
+                    }                        
+                }
+            }            
+        }
+
+        //inequality formula: constrains on segment and junction CNs
+        for (int i=startSegID;i<=endSegID;i++) {
+            //Σp + Σ2*l + e_i >= c_i and 
+            //Σp + Σ2*l - e_i <= c_i
+            CoinPackedVector constrain1, constrain2;
+            for (int j=0;j<numPat;j++) {//Σp
+                if (patterns[j][0]<=i && i<=patterns[j][1]) {
+                    string key = "p:"+to_string(patterns[j][0])+","+to_string(patterns[j][1]);
+                    constrain1.insert(variableIdx[key], 1);
+                    constrain2.insert(variableIdx[key], 1);
+                }
+            }
+            for (int j=0;j<numLoop;j++) {//Σ2*l
+                if (loops[j][0]<=i && i<=loops[j][1]) {
+                    string key = "l:"+to_string(loops[j][0])+","+to_string(loops[j][1]);
+                    constrain1.insert(variableIdx[key], 2);
+                    constrain2.insert(variableIdx[key], 2);
+                }
+            }
+            constrain1.insert(numElements+idx/2, 1);//e_i
+            constrainLowerBound[idx] = segs[i-startSegID]->getWeight()->getCopyNum();
+            constrainUpperBound[idx] = si->getInfinity();
+            idx++;
+            matrix->appendRow(constrain1);
+
+            constrain2.insert(numElements+idx/2, -1);//-e_i
+            constrainLowerBound[idx] = -1*si->getInfinity();
+            constrainUpperBound[idx] = segs[i-startSegID]->getWeight()->getCopyNum();
+            idx++;
+            matrix->appendRow(constrain2);
+
+            //Σp + Σ2*l + e_ij >= c_ij where j=i+1 and
+            //Σp + Σ2*l - e_ij <= c_ij where j=i+1
+            CoinPackedVector constrain3, constrain4;
+            for (int j=0;j<numPat;j++) {//Σp
+                if (patterns[j][0]<=i && i<patterns[j][1]) {
+                    string key = "p:"+to_string(patterns[j][0])+","+to_string(patterns[j][1]);
+                    constrain3.insert(variableIdx[key], 1);
+                    constrain4.insert(variableIdx[key], 1);
+                }
+            }
+            for (int j=0;j<numLoop;j++) {//Σ2*l
+                if (loops[j][0]<=i && i<loops[j][1]) {
+                    string key = "l:"+to_string(loops[j][0])+","+to_string(loops[j][1]);
+                    constrain3.insert(variableIdx[key], 2);
+                    constrain4.insert(variableIdx[key], 2);
+                }
+            }
+            constrain3.insert(numElements+idx/2, 1);//e_ij
+            constrainLowerBound[idx] = juncCN[i][0];//c_ij where j=i+1
+            constrainUpperBound[idx] = si->getInfinity();
+            idx++;
+            matrix->appendRow(constrain3);
+
+            constrain4.insert(numElements+idx/2, -1);//-e_ij
+            constrainLowerBound[idx] = -1*si->getInfinity();
+            constrainUpperBound[idx] = juncCN[i][0];//c_ij where j=i+1
+            idx++;
+            matrix->appendRow(constrain4);
+
+            //Σl + Σ(p1+p2)/2 + Σ(p+l)/2 + Σ(l1+l2)/2 + e_ii >= c_ii and
+            //Σl + Σ(p1+p2)/2 + Σ(p+l)/2 + Σ(l1+l2)/2 - e_ii <= c_ii
+            double *coef = new double[numElements];
+            memset(coef, 0, sizeof(double)*numElements);
+            CoinPackedVector constrain5, constrain6;
+            for (int j=0;j<numLoop;j++) {//Σl
+                if (loops[j][0] == i || loops[j][1] == i) {
+                    string key = "l:"+to_string(loops[j][0])+","+to_string(loops[j][1]);
+                    coef[variableIdx[key]] += 1;
+                }
+            }
+            for (int j=0;j<numPat;j++) {//Σ(p1+p2)/2
+                for (int k=0;k<numPat;k++) {
+                    if ((patterns[j][0] == i && patterns[k][0] == i) ||
+                        (patterns[j][1] == i && patterns[k][1] == i)) {
+                        int diff1 = patterns[j][0]-patterns[j][1], diff2 = patterns[k][0]-patterns[k][1];
+                        if (abs(diff1) > abs(diff2)) {
+                            string key1 = "p:"+to_string(patterns[j][0])+","+to_string(patterns[j][1]);
+                            coef[variableIdx[key1]] += 0.5;
+                            string key2 = "p:"+to_string(patterns[k][0])+","+to_string(patterns[k][1]);
+                            coef[variableIdx[key2]] += 0.5;
+                        }
+                    }
+                }
+            }
+            for (int j=0;j<numPat;j++) {//Σ(p+l)/2
+                for (int k=0;k<numLoop;k++) {
+                    if ((patterns[j][0] == i && loops[k][0] == i) ||
+                        (patterns[j][1] == i && loops[k][1] == i)) {
+                        int diff1 = patterns[j][0]-patterns[j][1], diff2 = loops[k][0]-loops[k][1];
+                        if (abs(diff1) > abs(diff2)) {
+                            string key1 = "p:"+to_string(patterns[j][0])+","+to_string(patterns[j][1]);
+                            coef[variableIdx[key1]] += 0.5;
+                            string key2 = "l:"+to_string(loops[k][0])+","+to_string(loops[k][1]);
+                            coef[variableIdx[key2]] += 0.5;
+                        }
+                    }
+                }
+            }
+            for (int j=0;j<numLoop;j++) {//Σ(l1+l2)/2 (loop2 is inserted into the middle of loop1)
+                for (int k=0;k<numLoop;k++) {
+                    if ((loops[j][0] == i && loops[k][0] == i) ||
+                        (loops[j][1] == i && loops[k][1] == i)) {
+                        int diff1 = loops[j][0]-loops[j][1], diff2 = loops[k][0]-loops[k][1];
+                        if (abs(diff1) > abs(diff2)) {
+                            string key1 = "l:"+to_string(loops[j][0])+","+to_string(loops[j][1]);
+                            coef[variableIdx[key1]] += 0.5;
+                            string key2 = "l:"+to_string(loops[k][0])+","+to_string(loops[k][1]);
+                            coef[variableIdx[key2]] += 0.5;
+                        }
+                    }
+                }
+            }
+            for(int i=0;i<numElements;i++) {//insert the variables with coefficient>0
+                if (coef[i] > 0.1) {
+                    constrain5.insert(i, coef[i]);
+                    constrain6.insert(i, coef[i]);
+                }
+            }
+            cout<<"Inversion CN: "<<i<<"-"<<juncCN[i][1]<<endl;
+            constrain5.insert(numElements+idx/2, 1);//e_ii
+            constrainLowerBound[idx] = juncCN[i][1];//c_ii
+            constrainUpperBound[idx] = si->getInfinity();
+            idx++;
+            matrix->appendRow(constrain5);
+
+            constrain6.insert(numElements+idx/2, -1);//-e_ii
+            constrainLowerBound[idx] = -si->getInfinity();
+            constrainUpperBound[idx] = juncCN[i][1];//c_ii
+            idx++;
+            matrix->appendRow(constrain6);
+            delete [] coef;
+        }
+        //constrains on errors
+        if(maxError >= 0) {
+            cout<<"Number of error variables: "<<idx/2<<endl;
+            CoinPackedVector errorConstrain;
+            for(int i=2; i<idx/2; i+=3) errorConstrain.insert(numElements+i, 1);
+            constrainLowerBound[idx] = 0;
+            constrainUpperBound[idx] = maxError;
+            idx++;
+            matrix->appendRow(errorConstrain);
+        }
+
+        //inequality formula: constrains on patterns and loops    
+        if(seqMode) {
+            //0<=p(a,b)+p(c,d)<=1 and 0<=p(a,b)+l(c,d)<=1 and 0<=l(a,b)+l(c,d)<=1: constrains on exclusiveness
+            for (int i=0;i<numPat;i++) {         
+                for (int j=i+1;j<numPat;j++) {
+                    if ((patterns[i][0] < patterns[j][0] && patterns[i][1] < patterns[j][1]) ||
+                        (patterns[i][0] > patterns[j][0] && patterns[i][1] > patterns[j][1])) {
+                        CoinPackedVector constrain7, constrain8, constrain9;
+                        string key1 = "p:"+to_string(patterns[i][0])+","+to_string(patterns[i][1]);                               
+                        string key2 = "p:"+to_string(patterns[j][0])+","+to_string(patterns[j][1]);
+                        constrain7.insert(variableIdx[key1], 1);
+                        constrain7.insert(variableIdx[key2], 1);
+                        constrainLowerBound[idx] = 0;
+                        constrainUpperBound[idx] = 1;
+                        idx++;
+                        matrix->appendRow(constrain7);
+
+                        key2 = "l:"+to_string(loops[j][0])+","+to_string(loops[j][1]);
+                        constrain8.insert(variableIdx[key1], 1);
+                        constrain8.insert(variableIdx[key2], 1);
+                        constrainLowerBound[idx] = 0;
+                        constrainUpperBound[idx] = 1;
+                        idx++;
+                        matrix->appendRow(constrain8);  
+
+                        key1 = "l:"+to_string(loops[i][0])+","+to_string(loops[i][1]);
+                        constrain9.insert(variableIdx[key1], 1);
+                        constrain9.insert(variableIdx[key2], 1);
+                        constrainLowerBound[idx] = 0;
+                        constrainUpperBound[idx] = 1;
+                        idx++;
+                        matrix->appendRow(constrain9);       
+                    }
+                }
+            }
+        }
+        else {
+            //0<=p(a,b)+Σp(c,d)<=1: constrains on exclusiveness
+            for (int i=0;i<numPat;i++) {
+                CoinPackedVector constrain7;
+                bool flag = false;
+                for (int j=0;j<numPat;j++) {
+                    if ((patterns[i][0] < patterns[j][0] && patterns[i][1] < patterns[j][1]) ||
+                        (patterns[i][0] > patterns[j][0] && patterns[i][1] > patterns[j][1])) {                
+                        flag = true;          
+                        string key = "p:"+to_string(patterns[j][0])+","+to_string(patterns[j][1]);
+                        constrain7.insert(variableIdx[key], 1);                
+                    }
+                }
+                if (flag) {
+                    string key = "p:"+to_string(patterns[i][0])+","+to_string(patterns[i][1]);
+                    constrain7.insert(variableIdx[key], 1);
+                    constrainLowerBound[idx] = 0;
+                    constrainUpperBound[idx] = 1;
+                    idx++;
+                    matrix->appendRow(constrain7);
+                }
+            }
+        }
+
+        //p(c,d)-Σp(a,b)>=0 where p(a,b) is a sub-pattern of p(c,d)
+        for (int i=0;i<numPat;i++) {
+            CoinPackedVector constrain8;
+            bool flag = false;
+            for (int j=0;j<numPat;j++) {
+                if ((patterns[i][0] == patterns[j][0]) ||
+                    (patterns[i][1] == patterns[j][1])) {
+                    int diff1 = patterns[i][0]-patterns[i][1], diff2 = patterns[j][0]-patterns[j][1];
+                    if (abs(diff1)>abs(diff2)) {
+                        flag = true;
+                        string key = "p:"+to_string(patterns[j][0])+","+to_string(patterns[j][1]);
+                        constrain8.insert(variableIdx[key], -1);
+                    }
+                }
+            }
+            if (flag) {
+                string key = "p:"+to_string(patterns[i][0])+","+to_string(patterns[i][1]);
+                constrain8.insert(variableIdx[key], 1);
+                constrainLowerBound[idx] = 0;
+                constrainUpperBound[idx] = si->getInfinity();
+                idx++;
+                matrix->appendRow(constrain8);
+            }
+        }
+        int scale = 2;
+        //Σp(x1,y1)+Σl(x2,y2)-l(a,b)>=0 where l(a,b) pattern is a sub-pattern of p and l
+        for (int i=0;i<numLoop;i++) {
+            CoinPackedVector constrain9;
+            bool flag = false;
+            for (int j=0;j<numPat;j++) {
+                if ((patterns[j][0] == loops[i][0])||
+                    (patterns[j][1] == loops[i][1])) {
+                    int diff1 = loops[i][0]-loops[i][1], diff2 = patterns[j][0]-patterns[j][1];
+                    if (abs(diff1)<abs(diff2)) {
+                        flag = true;
+                        string key = "p:"+to_string(patterns[j][0])+","+to_string(patterns[j][1]);
+                        constrain9.insert(variableIdx[key], 1);
+                    }
+                }
+            }
+            for (int k=0;k<numLoop;k++) { // l(a,b) can be inserted into the middle of l(x2,y2)
+                if(seqMode) break;
+                if ((loops[k][0] == loops[i][0]) ||
+                    (loops[k][1] == loops[i][1])) {
+                    int diff1 = loops[i][0]-loops[i][1], diff2 = loops[k][0]-loops[k][1];
+                    if (abs(diff1)<abs(diff2)) {
+                        flag = true;
+                        string key = "l:"+to_string(loops[k][0])+","+to_string(loops[k][1]);
+                        constrain9.insert(variableIdx[key], 1);
+                    }
+                }
+            }
+            if (flag) {
+                string key = "l:"+to_string(loops[i][0])+","+to_string(loops[i][1]);
+                constrain9.insert(variableIdx[key], -1);//scaling coefficient
+                constrainLowerBound[idx] = 0;
+                constrainUpperBound[idx] = si->getInfinity();
+                idx++;
+                matrix->appendRow(constrain9);
+            }
+        }   
+
+        cout<<"ILP formula done"<<endl;
+
+        //constrains for variables
+        double maxCN = 0;
+        for (Segment* seg: *this->getGraph()->getSegments()) {
+            maxCN += seg->getWeight()->getCopyNum();
+        }
+        for (int i=0;i<numPat;i++) {//p
+            string key = "p:"+to_string(patterns[i][0])+","+to_string(patterns[i][1]);
+            variableLowerBound[variableIdx[key]] = 0;
+            variableUpperBound[variableIdx[key]] = 1;
+        }
+        //reference pattern
+        // string key = "p:"+to_string(startSegID)+","+to_string(endSegID);
+        // variableLowerBound[variableIdx[key]] = variableUpperBound[variableIdx[key]] = 1;
+        for (int i=0;i<numLoop;i++) {//l
+            string key = "l:"+to_string(loops[i][0])+","+to_string(loops[i][1]);
+            variableLowerBound[variableIdx[key]] = 0;
+            variableUpperBound[variableIdx[key]] = maxCN;
+        }        
+    }
+    for (int i=0;i<numEpsilons;i++) {//ε (or e)
+        variableLowerBound[numElements+i] = 0;
+        variableUpperBound[numElements+i] = si->getInfinity();
+    }
+    cout<<"Variable constrains done"<<endl;
+    //weights for all variables
+    for (int i=0;i<numVariables;i++) {
+        if (i<numElements)
+            objective[i] = 0;
+        else   
+            objective[i] = 1;
+    }
+
+}
 
 //Deal with complex case: concatenation
 void LocalGenomicMap::bfbConcate(Junction *sv, bool edgeA, int pos1, int pos2, vector<vector<int>> bfbPaths, vector<int> &res) {

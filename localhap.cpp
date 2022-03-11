@@ -249,8 +249,22 @@ int main(int argc, char *argv[]) {
         // outString<<bfbRes;
         // outString.close();
 
-
-        Graph *g = new Graph(lhRawFn);
+        //get multiple .lh file names for single cell data
+        vector<Graph*> graphs;
+        vector<LocalGenomicMap*> lgms;
+        // cout<<string(lhRawFn)<<endl;
+        char* lhFn = (char*)lhRawFn;
+        char* token;
+        while (token = strtok_r(lhFn, ",", &lhFn)) {
+            cout<<token<<endl;
+            Graph *g = new Graph(token);
+            graphs.push_back(g);
+            g->calculateHapDepth();
+            g->calculateCopyNum();
+            lgms.push_back(new LocalGenomicMap(g));
+        }
+        // graph data structure for single .lh file
+        Graph *g = graphs[0];
         g->calculateHapDepth();
         g->calculateCopyNum();
         LocalGenomicMap *lgm = new LocalGenomicMap(g);

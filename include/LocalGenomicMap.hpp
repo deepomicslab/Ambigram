@@ -202,6 +202,7 @@ public:
     void printBFB(vector<int> &res);
     void printOriginalBFB(vector<int> &res, unordered_map<int, int> &m);
     void BFB_ILP(const char *lpFn, vector<vector<int>> &patterns, vector<vector<int>> &loops, map<string, int> &variableIdx, double** juncCN, vector<vector<int>> &components, const bool juncsInfo, const double maxError, const bool seqMode);
+    void BFB_ILP_SC(const char *lpFn, vector<vector<int>> &patterns, vector<vector<int>> &loops, map<string, int> &variableIdx, vector<Graph*> graphs, const double maxError, const bool seqMode);
     void bfbConcate(Junction *sv, bool edgeA, int pos1, int pos2, vector<vector<int>> bfbPaths, vector<int> &res);
     void bfbInsertion(vector<Junction *> &SVs, vector<vector<int>> bfbPaths, bool edgeA[], vector<int> &res);
     void readComponents(vector<vector<int>>& res, const char *juncsFn, unordered_map<int,int>& intervals);
