@@ -32,7 +32,8 @@ int main(int argc, char *argv[]) {
             ("help", "Print usage")
             // BFB
             ("junc_info", "Use extra junction information", cxxopts::value<bool>()->default_value("false"))
-            ("max_error", "The maximal acceptable rate", cxxopts::value<double>()->default_value("-1"));
+            ("max_error", "The maximal acceptable rate", cxxopts::value<double>()->default_value("-1"))
+            ("seq_mode", "Resolve a sequential bfb path without nested loops", cxxopts::value<bool>()->default_value("false"));
     auto result = options.parse(argc, argv);
     if (result.count("help")) {
         std::cout << options.help() << std::endl;
@@ -240,6 +241,7 @@ int main(int argc, char *argv[]) {
         const char *juncsFn = result["juncdb"].as<std::string>().c_str();
         const bool juncsInfo = result["junc_info"].as<bool>();//whether add extra junction iformation into ILP constrains
         const double maxError = result["max_error"].as<double>();
+        const bool seqMode = result["seq_mode"].as<bool>();//whether use sequential mode (no small loop inserted in big loop)
 
         // string bfbRes = "\n"+string(lhRawFn)+" "+string(juncsFn)+"\n";
         // ofstream outString;
@@ -385,7 +387,7 @@ int main(int argc, char *argv[]) {
             }
                         
             //construct ILP and generate .lp file for cbc
-            lgm->BFB_ILP(lpFn, patterns, loops, variableIdx, juncCN, validComponents, juncsInfo, maxError);
+            lgm->BFB_ILP(lpFn, patterns, loops, variableIdx, juncCN, validComponents, juncsInfo, maxError, seqMode);
 
             //run cbc under the directory containing test.lp
             string str = "cbc "+string(lpFn) +".lp solve solu "+string(lpFn)+".sol";

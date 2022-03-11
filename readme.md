@@ -136,6 +136,12 @@ With a JUNCS file (extra information from TGS data), try:
 localHap --op bfb --in_lh [path to your .lh file] --juncdb [path to your .juncs file] --junc_info true --lp_prefix [sample name]
 ```
 
+If you have a very complicated sample, e.g. a sample with with high and various copy numbers, try Sequential Mode that will resolve a BFB path with length-decreasing components (without nested loops):
+
+``` 
+localHap --op bfb --in_lh [path to your .lh file] --juncdb [path to your .juncs file] --seq_mode true --lp_prefix [sample name]
+```
+
 To decipher BFB events with translocation, we just need to add one line (shown as following) that includes explicit options into the end of the LH file. Ambigram provides 4 complex cases involved with BFB and translocation. 
 
 1. Insertion before BFB (e.g., segments of virus2 are inserted into chr1)

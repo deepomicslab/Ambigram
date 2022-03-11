@@ -3838,7 +3838,6 @@ void LocalGenomicMap::concatBeforeBFB(Graph*& g, vector<string>& conChr, unorder
                     else sDir = eDir = '+';
                 }
             }
-            juncs.erase(juncs.begin()+i);
             break;
         }
     }
@@ -3893,15 +3892,12 @@ void LocalGenomicMap::concatBeforeBFB(Graph*& g, vector<string>& conChr, unorder
     for(Junction* junc: juncs) {
         int startSegID = junc->getSource()->getId(), targetSegID = junc->getTarget()->getId();
         int id1 = segConversion[startSegID]-1, id2 = segConversion[targetSegID]-1;
-        cout<<startSegID<<"-"<<targetSegID<<" "<<id1+1<<"-"<<id2+1<<endl;
-        if(id1==-1 || id2 == -1) continue;
         char dir1 = junc->getSourceDir(), dir2 = junc->getTargetDir();
-        if(startSegID==sID||startSegID==eID||targetSegID==sID||targetSegID==eID) {
-            if(abs(startSegID-targetSegID)==1) continue;//delete original normal junctions
-            if(abs(id1-id2)==1) {
-                if(id1>id2) swap(id1, id2);
-                dir1 = '+', dir2 = '+';
-            }
+        cout<<startSegID<<dir1<<" - "<<targetSegID<<dir2<<" "<<id1+1<<"-"<<id2+1<<endl;
+        if(id1==-1 || id2 == -1) continue;
+        if((startSegID==sID&&targetSegID==eID)||(startSegID==eID&&targetSegID==sID)) {
+            if(id1>id2) swap(id1, id2);
+            dir1 = '+', dir2 = '+';
         }
         mJuncs.push_back(new Junction(mSegs[id1],mSegs[id2],dir1,dir2,junc->getWeight()->getCoverage(),
             junc->getCredibility(),junc->getWeight()->getCopyNum(),junc->isInferred(),junc->hasLowerBoundLimit(),false));
@@ -4181,8 +4177,8 @@ void LocalGenomicMap::printOriginalBFB(vector<int> &res, unordered_map<int, int>
     bfbPaths.close();
 }
 
-void LocalGenomicMap::BFB_ILP(const char *lpFn, vector<vector<int>> &patterns, vector<vector<int>> &loops, 
-                        map<string, int> &variableIdx, double** juncCN, vector<vector<int>> &components, const bool juncsInfo, const double maxError) {
+void LocalGenomicMap::BFB_ILP(const char *lpFn, vector<vector<int>> &patterns, vector<vector<int>> &loops, map<string, int> &variableIdx, 
+                        double** juncCN, vector<vector<int>> &components, const bool juncsInfo, const double maxError, const bool seqMode) {
     OsiClpSolverInterface *si = new OsiClpSolverInterface();
     int startSegID = patterns.front()[0], endSegID = patterns.back()[1];
     cout<<"start-end: "<<startSegID<<" "<<endSegID<<endl;
@@ -4196,7 +4192,7 @@ void LocalGenomicMap::BFB_ILP(const char *lpFn, vector<vector<int>> &patterns, v
     int numSegments = segs.size();
     int numElements = variableIdx.size(), numEpsilons = numSegments*3;
     int numVariables = numElements+numEpsilons, numPat = patterns.size(), numLoop = loops.size();
-    int numConstrains = numSegments*2*3 + numPat + 2*numPat + 2*numLoop;
+    int numConstrains = (numSegments*2*3 + 3*numLoop)+(seqMode? numPat*numPat*3 : numPat);
 
     double *objective = new double[numVariables];
     double *variableLowerBound = new double[numVariables];
@@ -4351,30 +4347,67 @@ void LocalGenomicMap::BFB_ILP(const char *lpFn, vector<vector<int>> &patterns, v
         matrix->appendRow(errorConstrain);
     }
 
-    //inequality formula: constrains on patterns and loops
-    //0<=p(a,b)+Σp(c,d)<=1: constrains on exclusiveness
-    for (int i=0;i<numPat;i++) {
-        CoinPackedVector constrain7;
-        bool flag = false;
-        for (int j=0;j<numPat;j++) {
-            if ((patterns[i][0] < patterns[j][0] && patterns[i][1] < patterns[j][1]) ||
-                (patterns[i][0] > patterns[j][0] && patterns[i][1] > patterns[j][1])) {                
-                flag = true;          
-                string key = "p:"+to_string(patterns[j][0])+","+to_string(patterns[j][1]);
-                constrain7.insert(variableIdx[key], 1);                
+    //inequality formula: constrains on patterns and loops    
+    if(seqMode) {
+        //0<=p(a,b)+p(c,d)<=1 and 0<=p(a,b)+l(c,d)<=1 and 0<=l(a,b)+l(c,d)<=1: constrains on exclusiveness
+        for (int i=0;i<numPat;i++) {         
+            for (int j=i+1;j<numPat;j++) {
+                if ((patterns[i][0] < patterns[j][0] && patterns[i][1] < patterns[j][1]) ||
+                    (patterns[i][0] > patterns[j][0] && patterns[i][1] > patterns[j][1])) {
+                    CoinPackedVector constrain7, constrain8, constrain9;
+                    string key1 = "p:"+to_string(patterns[i][0])+","+to_string(patterns[i][1]);                               
+                    string key2 = "p:"+to_string(patterns[j][0])+","+to_string(patterns[j][1]);
+                    constrain7.insert(variableIdx[key1], 1);
+                    constrain7.insert(variableIdx[key2], 1);
+                    constrainLowerBound[idx] = 0;
+                    constrainUpperBound[idx] = 1;
+                    idx++;
+                    matrix->appendRow(constrain7);
+
+                    key2 = "l:"+to_string(loops[j][0])+","+to_string(loops[j][1]);
+                    constrain8.insert(variableIdx[key1], 1);
+                    constrain8.insert(variableIdx[key2], 1);
+                    constrainLowerBound[idx] = 0;
+                    constrainUpperBound[idx] = 1;
+                    idx++;
+                    matrix->appendRow(constrain8);  
+
+                    key1 = "l:"+to_string(loops[i][0])+","+to_string(loops[i][1]);
+                    constrain9.insert(variableIdx[key1], 1);
+                    constrain9.insert(variableIdx[key2], 1);
+                    constrainLowerBound[idx] = 0;
+                    constrainUpperBound[idx] = 1;
+                    idx++;
+                    matrix->appendRow(constrain9);       
+                }
             }
         }
-        if (flag) {
-            string key = "p:"+to_string(patterns[i][0])+","+to_string(patterns[i][1]);
-            constrain7.insert(variableIdx[key], 1);
-            constrainLowerBound[idx] = 0;
-            constrainUpperBound[idx] = 1;
-            idx++;
-            matrix->appendRow(constrain7);
+    }
+    else {
+        //0<=p(a,b)+Σp(c,d)<=1: constrains on exclusiveness
+        for (int i=0;i<numPat;i++) {
+            CoinPackedVector constrain7;
+            bool flag = false;
+            for (int j=0;j<numPat;j++) {
+                if ((patterns[i][0] < patterns[j][0] && patterns[i][1] < patterns[j][1]) ||
+                    (patterns[i][0] > patterns[j][0] && patterns[i][1] > patterns[j][1])) {                
+                    flag = true;          
+                    string key = "p:"+to_string(patterns[j][0])+","+to_string(patterns[j][1]);
+                    constrain7.insert(variableIdx[key], 1);                
+                }
+            }
+            if (flag) {
+                string key = "p:"+to_string(patterns[i][0])+","+to_string(patterns[i][1]);
+                constrain7.insert(variableIdx[key], 1);
+                constrainLowerBound[idx] = 0;
+                constrainUpperBound[idx] = 1;
+                idx++;
+                matrix->appendRow(constrain7);
+            }
         }
     }
 
-    //Σp(c,d)-p(a,b)>=0 where p(a,b) is a sub-pattern of p(c,d)
+    //p(c,d)-Σp(a,b)>=0 where p(a,b) is a sub-pattern of p(c,d)
     for (int i=0;i<numPat;i++) {
         CoinPackedVector constrain8;
         bool flag = false;
@@ -4382,16 +4415,16 @@ void LocalGenomicMap::BFB_ILP(const char *lpFn, vector<vector<int>> &patterns, v
             if ((patterns[i][0] == patterns[j][0]) ||
                 (patterns[i][1] == patterns[j][1])) {
                 int diff1 = patterns[i][0]-patterns[i][1], diff2 = patterns[j][0]-patterns[j][1];
-                if (abs(diff1)<abs(diff2)) {
+                if (abs(diff1)>abs(diff2)) {
                     flag = true;
                     string key = "p:"+to_string(patterns[j][0])+","+to_string(patterns[j][1]);
-                    constrain8.insert(variableIdx[key], 1);
+                    constrain8.insert(variableIdx[key], -1);
                 }
             }
         }
         if (flag) {
             string key = "p:"+to_string(patterns[i][0])+","+to_string(patterns[i][1]);
-            constrain8.insert(variableIdx[key], -1);
+            constrain8.insert(variableIdx[key], 1);
             constrainLowerBound[idx] = 0;
             constrainUpperBound[idx] = si->getInfinity();
             idx++;
@@ -4415,6 +4448,7 @@ void LocalGenomicMap::BFB_ILP(const char *lpFn, vector<vector<int>> &patterns, v
             }
         }
         for (int k=0;k<numLoop;k++) { // l(a,b) can be inserted into the middle of l(x2,y2)
+            if(seqMode) break;
             if ((loops[k][0] == loops[i][0]) ||
                 (loops[k][1] == loops[i][1])) {
                 int diff1 = loops[i][0]-loops[i][1], diff2 = loops[k][0]-loops[k][1];
