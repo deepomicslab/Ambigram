@@ -264,6 +264,7 @@ int main(int argc, char *argv[]) {
             lgms.push_back(new LocalGenomicMap(g));
         }
         // graph data structure for single .lh file
+        int numGraphs = graphs.size();
         Graph *g = graphs[0];
         g->calculateHapDepth();
         g->calculateCopyNum();
@@ -338,6 +339,7 @@ int main(int argc, char *argv[]) {
                 variableIdx[key] = i+patterns.size();
                 cout<<variableIdx[key]<<" "<<key<<endl;
             }
+            int numComp = variableIdx.size();
 
             //find copy number for both normal junctions and fold-back inversions
             vector<Junction *> inversions;
@@ -384,8 +386,8 @@ int main(int argc, char *argv[]) {
                 cout<<i<<","<<i+1<<" "<<juncCN[i][0]<<"\t"<<i<<","<<i<<" "<<juncCN[i][1]<<endl;
             }
             //copy number of patterns and loops
-            int* elementCN = new int[variableIdx.size()];
-            memset(elementCN, 0, variableIdx.size()*sizeof(int));
+            int* elementCN = new int[numComp*numGraphs];
+            memset(elementCN, 0, numComp*numGraphs*sizeof(int));
             //pick components in the segment interval
             vector<vector<int>> validComponents;
             for(int i=0; i<components.size(); i++) {
@@ -401,7 +403,11 @@ int main(int argc, char *argv[]) {
             }
                         
             //construct ILP and generate .lp file for cbc
-            lgm->BFB_ILP(lpFn, patterns, loops, variableIdx, juncCN, validComponents, juncsInfo, maxError, seqMode);
+            if (numGraphs == 1) lgm->BFB_ILP(lpFn, patterns, loops, variableIdx, juncCN, validComponents, juncsInfo, maxError, seqMode);
+            else lgm->BFB_ILP_SC(lpFn, patterns, loops, variableIdx, graphs, maxError, seqMode);
+            //reset variableIdx
+            for (auto iter=variableIdx.begin();iter!=variableIdx.end();iter++) 
+                variableIdx[iter->first] = variableIdx[iter->first]%numComp;
 
             //run cbc under the directory containing test.lp
             string str = "cbc "+string(lpFn) +".lp solve solu "+string(lpFn)+".sol";
@@ -414,116 +420,139 @@ int main(int argc, char *argv[]) {
             if (!solFile) {
                 cerr << "Cannot open file " << solDir << endl;
                 exit(1);
-            }            
-            string element, cn;
-            bool infeasible = false;
-            double cn_error = 0;
-            ofstream errorString;
-            errorString.open("./result.txt",std::ios_base::app);
-            while (solFile >> element) {
-                if(element == "Infeasible") {
-                    infeasible = true;
-                    break;
-                }
-                // if(element == "value") {
-                //     solFile >> element;
-                //     errorString<<element<<" ";
-                // }
-                if (element[0] == 'x') {                
-                    int idx = stoi(element.substr(1));
-                    if (idx < variableIdx.size()) {//exclude epsilons
-                        solFile >> cn;
-                        int copynum = stoi(cn);
-                        elementCN[idx] = copynum;
+            }
+            exit(0);            
+            for (int m = 0; m < numGraphs; m++) {
+                string element, cn;
+                bool infeasible = false;
+                double cn_error = 0;
+                ofstream errorString;
+                errorString.open("./result.txt",std::ios_base::app);
+                while (solFile >> element) {
+                    if(element == "Infeasible") {
+                        infeasible = true;
+                        break;
                     }
-                    else {//epsilons (errors)
-                        if((idx-variableIdx.size())%3==0) {
-                            double seg_error;
-                            solFile >> seg_error;
-                            cn_error += seg_error;
+                    // if(element == "value") {
+                    //     solFile >> element;
+                    //     errorString<<element<<" ";
+                    // }
+                    if (element[0] == 'x') {                
+                        int idx = stoi(element.substr(1));
+                        if (numComp*m <= idx < numComp*(m+1)) {//exclude epsilons
+                            solFile >> cn;
+                            int copynum = stoi(cn);
+                            elementCN[idx] = copynum;
+                        }
+                        else {//epsilons (errors)
+                            if((idx-numComp)%3==0) {
+                                double seg_error;
+                                solFile >> seg_error;
+                                cn_error += seg_error;
+                            }
                         }
                     }
                 }
-            }
-            //compute target CN of segments based loop/pattern
-            for (auto iter=variableIdx.begin();iter!=variableIdx.end();iter++) {
-                if(elementCN[iter->second] > 0) {
-                    string key = iter->first;
-                    int idx1 = stoi(key.substr(2, key.find(",")-2)), idx2 = stoi(key.substr(key.find(",")+1));
-                    for(int i=idx1-1; i<idx2; i++) {
-                        if(key[0]=='p') targetCN[i] += elementCN[iter->second];
-                        else targetCN[i] += elementCN[iter->second]*2;
+                if(m > 0) {
+                    for (int i=0; i<patterns.size(); i++) {
+                        string key = "p:"+to_string(patterns[i][0])+","+to_string(patterns[i][1]);
+                        variableIdx[key] += numComp;
+                        key = "l:"+to_string(patterns[i][0])+","+to_string(patterns[i][1]);
+                        variableIdx[key] += numComp;
                     }
                 }
-            }
-
-            // vector<int> segCN(endID, 0);
-            // for (auto iter=variableIdx.begin();iter!=variableIdx.end();iter++) {
-            //     if(elementCN[iter->second] > 0) {
-            //         string key = iter->first;
-            //         int idx1 = stoi(key.substr(2, key.find(",")-2)), idx2 = stoi(key.substr(key.find(",")+1));
-            //         for(int i=idx1-1; i<idx2; i++) {
-            //             if(key[0]=='p') segCN[i-1] += elementCN[iter->second];
-            //             else segCN[i-1] += elementCN[iter->second]*2;
-            //         }
-            //     }
-            // }
-            // int cn_diff = 0;                        
-            // for(int i=startID-1; i<endID; i++) {
-            //     cn_diff += (*g->getSegments())[i]->getWeight()->getCopyNum()-segCN[i];
-            // }
-            
-            // output errors
-            // errorString<<cn_error<<endl;
-            // errorString.close();
-            // exit(0);
-
-            if(infeasible) {
-                for(int i=startID-1; i<endID; i++) targetCN[i] += 2;//compute target CN of segments
-                vector<int> temp({startID, endID, endID, startID});
-                lgm->editInversions(temp, inversions, juncCN, elementCN, variableIdx);
-                bfbPaths.push_back(temp);
-                continue;
-            }
-            //construct BFB DAG and find all topological orders
-            vector<vector<int>> adj, node2pat, node2loop;
-            lgm->constructDAG(adj, node2pat, node2loop, variableIdx, elementCN);
-            int num = adj.size();
-            bool *visited = new bool[num];
-            int *indeg = new int[num];
-            for (int i = 0; i < num; i++) {
-                visited[i] = false;
-                indeg[i] = 0;
-            }
-            //set up indegree
-            int cnt = 0;
-            for (int i = 0; i < num; i++) {
-                for (auto next = adj[i].begin(); next != adj[i].end(); next++) {
-                    indeg[*next]++;                
+                for (int i=0; i<patterns.size(); i++) {
+                    string key = "p:"+to_string(patterns[i][0])+","+to_string(patterns[i][1]);
+                    cout<<variableIdx[key]<<endl;
+                    key = "l:"+to_string(patterns[i][0])+","+to_string(patterns[i][1]);
+                    cout<<variableIdx[key]<<endl;
                 }
-                cout<<i+1<<": ";
-                for (int j=0;j<adj[i].size();j++) {
-                    cout<<adj[i][j]+1<<" ";
+                //compute target CN of segments based loop/pattern
+                for (auto iter=variableIdx.begin();iter!=variableIdx.end();iter++) {
+                    if(elementCN[iter->second] > 0) {
+                        string key = iter->first;
+                        int idx1 = stoi(key.substr(2, key.find(",")-2)), idx2 = stoi(key.substr(key.find(",")+1));
+                        for(int i=idx1-1; i<idx2; i++) {
+                            if(key[0]=='p') targetCN[i] += elementCN[iter->second];
+                            else targetCN[i] += elementCN[iter->second]*2;
+                        }
+                    }
                 }
-                cout<<endl;
+
+                // vector<int> segCN(endID, 0);
+                // for (auto iter=variableIdx.begin();iter!=variableIdx.end();iter++) {
+                //     if(elementCN[iter->second] > 0) {
+                //         string key = iter->first;
+                //         int idx1 = stoi(key.substr(2, key.find(",")-2)), idx2 = stoi(key.substr(key.find(",")+1));
+                //         for(int i=idx1-1; i<idx2; i++) {
+                //             if(key[0]=='p') segCN[i-1] += elementCN[iter->second];
+                //             else segCN[i-1] += elementCN[iter->second]*2;
+                //         }
+                //     }
+                // }
+                // int cn_diff = 0;                        
+                // for(int i=startID-1; i<endID; i++) {
+                //     cn_diff += (*g->getSegments())[i]->getWeight()->getCopyNum()-segCN[i];
+                // }
+                
+                // output errors
+                // errorString<<cn_error<<endl;
+                // errorString.close();
+                // exit(0);
+
+                if(infeasible) {
+                    for(int i=startID-1; i<endID; i++) targetCN[i] += 2;//compute target CN of segments
+                    vector<int> temp({startID, endID, endID, startID});
+                    lgms[m]->editInversions(temp, inversions, juncCN, elementCN, variableIdx);
+                    bfbPaths.push_back(temp);
+                    continue;
+                }
+                //construct BFB DAG and find all topological orders
+                vector<vector<int>> adj, node2pat, node2loop;
+                lgms[m]->constructDAG(adj, node2pat, node2loop, variableIdx, elementCN);
+                cout<<"construct dag"<<endl;
+                int num = adj.size();
+                bool *visited = new bool[num];
+                int *indeg = new int[num];
+                for (int i = 0; i < num; i++) {
+                    visited[i] = false;
+                    indeg[i] = 0;
+                }
+                //set up indegree
+                int cnt = 0;
+                for (int i = 0; i < num; i++) {
+                    for (auto next = adj[i].begin(); next != adj[i].end(); next++) {
+                        indeg[*next]++;                
+                    }
+                    cout<<i+1<<": ";
+                    for (int j=0;j<adj[i].size();j++) {
+                        cout<<adj[i][j]+1<<" ";
+                    }
+                    cout<<endl;
+                }
+                //find all topological orders in BFB DAG
+                vector<int> res;
+                vector<vector<int>> orders;
+                lgms[m]->allTopologicalOrders(res, visited, num, indeg, adj, orders);
+                cout<<"All topological orders: "<<orders.size()<<endl;
+                for (int i = 0; i < orders.size(); i++) {
+                    for (int j=0; j<orders[i].size();j++)
+                        cout<<orders[i][j]+1<<" ";
+                    cout<<endl;
+                }
+                cout<<"Find top orders"<<endl;
+                //get one valid bfb path
+                vector<int> path;
+                lgms[m]->getBFB(orders, node2pat, node2loop, path);//get a valid BFB path        
+                cout<<"Find bfb path"<<endl;    
+                //output the text for visualization
+                if(numGraphs==1) lgms[m]->editInversions(path, inversions, juncCN, elementCN, variableIdx);//edit the imperfect fold-back inversions (with deletion)
+                else lgms[m]->printBFB(path);
+                if(insMode==1 || conMode==1) lgms[m]->printOriginalBFB(path, originalSegs);
+                bfbPaths.push_back(path);
+                delete [] visited;
+                delete [] indeg;
             }
-            //find all topological orders in BFB DAG
-            vector<int> res;
-            vector<vector<int>> orders;
-            lgm->allTopologicalOrders(res, visited, num, indeg, adj, orders);
-            cout<<"All topological orders: "<<endl;
-            for (vector<int> bfb: orders) {
-                for (int i=0;i<bfb.size();i++)
-                    cout<<bfb[i]+1<<" ";
-                cout<<endl;
-            }
-            //get one valid bfb path
-            vector<int> path;
-            lgm->getBFB(orders, node2pat, node2loop, path);//get a valid BFB path            
-            //output the text for visualization
-            lgm->editInversions(path, inversions, juncCN, elementCN, variableIdx);//edit the imperfect fold-back inversions (with deletion)
-            if(insMode==1 || conMode==1) lgm->printOriginalBFB(path, originalSegs);
-            bfbPaths.push_back(path);
         }              
         //output target CN
         ofstream targetCNString;
@@ -536,6 +565,8 @@ int main(int argc, char *argv[]) {
         }
         targetCNString<<string(lhRawFn)<<"\t"<<diffCN<<"\tnumSeg: "<<targetCN.size()<<endl;
         targetCNString.close();
+        
+        if(numGraphs > 1) exit(0);
 
         //Insertion Mode 2: post-BFB insertion     
         if(insMode == 2) lgm->insertAfterBFB(insChr, mainChr, startSegs, bfbPaths);

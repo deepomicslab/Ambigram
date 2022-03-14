@@ -3375,6 +3375,8 @@ void LocalGenomicMap::constructDAG(vector<vector<int>> &adj, vector<vector<int>>
             }
         }
     }
+    cout<<"end"<<endl;
+    cout<<"why not returen"<<endl;
 }
 
 void LocalGenomicMap::allTopologicalOrders(vector<int> &res, bool visited[], int num, int indeg[], vector<vector<int>> &adj, 
@@ -4576,11 +4578,14 @@ void LocalGenomicMap::BFB_ILP_SC(const char *lpFn, vector<vector<int>> &patterns
     int startSegID = patterns.front()[0], endSegID = patterns.back()[1];
     cout<<"start-end: "<<startSegID<<" "<<endSegID<<endl;    
     
-    int numSegments = segs.size();
-    int numElements = variableIdx.size()*numGraphs, numEpsilons = numSegments*3*numGraphs;
+    int numSegments = endSegID-startSegID+1;
+    int numElements = variableIdx.size()*numGraphs, numEpsilons = numSegments*3*numGraphs+(numGraphs*(numGraphs-1))/2*variableIdx.size();
     int numVariables = numElements+numEpsilons, numPat = patterns.size(), numLoop = loops.size();
+    int numComp = numPat+numLoop;
     int numConstrains = (numSegments*2*3 + 3*numLoop)+(seqMode? numPat*numPat*3 : numPat);
+    if (numGraphs > 1) numConstrains += (numGraphs*(numGraphs-1))*variableIdx.size()*2;
     numConstrains *= numGraphs;
+    cout<<"Num of elements: "<<numElements<<" Num of epsilons: "<<numEpsilons<<endl;
 
     double *objective = new double[numVariables];
     double *variableLowerBound = new double[numVariables];
@@ -4593,17 +4598,18 @@ void LocalGenomicMap::BFB_ILP_SC(const char *lpFn, vector<vector<int>> &patterns
     int idx = 0;//number of constrains/inequalities
     for(int n=0; n<numGraphs; n++) {
         vector<Segment *> segs;
-        for (Segment * seg: graphs[n]->getSegments()) {
-            cout<<seg->getId()<<" ";
+        for (Segment * seg: *graphs[n]->getSegments()) {
             if (startSegID<=seg->getId() && seg->getId()<=endSegID)
                 segs.push_back(seg);
         }
         //calculate the loop/pattern index
-        for (int i=0; i<numPat; i++) {
-            string key = "p:"+to_string(patterns[i][0])+","+to_string(patterns[i][1]);
-            variableIdx[key] += n*(numPat+numLoop);
-            key = "l:"+to_string(patterns[i][0])+","+to_string(patterns[i][1]);
-            variableIdx[key] += n*(numPat+numLoop);
+        if(n > 0) {
+            for (int i=0; i<numPat; i++) {
+                string key = "p:"+to_string(patterns[i][0])+","+to_string(patterns[i][1]);
+                variableIdx[key] += numComp;
+                key = "l:"+to_string(patterns[i][0])+","+to_string(patterns[i][1]);
+                variableIdx[key] += numComp;
+            }
         }
         //find copy number for both normal junctions and fold-back inversions
         vector<Junction *> inversions;
@@ -4612,10 +4618,10 @@ void LocalGenomicMap::BFB_ILP_SC(const char *lpFn, vector<vector<int>> &patterns
             juncCN[i] = new double[2];//0: normal junction   1: inversion
             memset(juncCN[i], 0, 2*sizeof(double));
         }
-        for (Junction *junc: *grpahs[n]->getJunctions()) {
+        for (Junction *junc: *graphs[n]->getJunctions()) {
             int sourceID = junc->getSource()->getId(), targetID = junc->getTarget()->getId();
             char sourceDir = junc->getSourceDir(), targetDir = junc->getTargetDir();
-            if (sourceID<startID||sourceID>endSegID||targetID<startID||targetID>endSegID) continue;
+            if (sourceID<startSegID||sourceID>endSegID||targetID<startSegID||targetID>endSegID) continue;
             double copyNum = junc->getWeight()->getCopyNum();
             if (0.5 < copyNum && copyNum < 1)
                 copyNum = 1;//round small CN to 1
@@ -4913,13 +4919,14 @@ void LocalGenomicMap::BFB_ILP_SC(const char *lpFn, vector<vector<int>> &patterns
 
         //constrains for variables
         double maxCN = 0;
-        for (Segment* seg: *this->getGraph()->getSegments()) {
+        for (Segment* seg: segs) {
             maxCN += seg->getWeight()->getCopyNum();
         }
         for (int i=0;i<numPat;i++) {//p
             string key = "p:"+to_string(patterns[i][0])+","+to_string(patterns[i][1]);
             variableLowerBound[variableIdx[key]] = 0;
             variableUpperBound[variableIdx[key]] = 1;
+            cout<<variableIdx[key]<<endl;
         }
         //reference pattern
         // string key = "p:"+to_string(startSegID)+","+to_string(endSegID);
@@ -4928,21 +4935,72 @@ void LocalGenomicMap::BFB_ILP_SC(const char *lpFn, vector<vector<int>> &patterns
             string key = "l:"+to_string(loops[i][0])+","+to_string(loops[i][1]);
             variableLowerBound[variableIdx[key]] = 0;
             variableUpperBound[variableIdx[key]] = maxCN;
+            cout<<variableIdx[key]<<endl;
         }        
     }
+    //constrains on common components
+    cout<<"Number of constrains: "<<idx<<endl;
+    int cnt = (numElements+numSegments*3*numGraphs)*2;//idx for remaining epsilons
+    for(int i=0; i<numGraphs; i++) {
+        for(int j=i+1; j<numGraphs; j++) {
+            for (int k=0;k<numPat;k++) {
+                CoinPackedVector constrain1, constrain2;
+                string key = "p:"+to_string(patterns[k][0])+","+to_string(patterns[k][1]);
+                constrain1.insert(variableIdx[key]-numComp*i, 1);
+                constrain1.insert(variableIdx[key]-numComp*j, -1);
+                constrain1.insert(cnt/2, 1);
+                constrainLowerBound[idx] = 0;
+                constrainUpperBound[idx] = si->getInfinity();
+                idx++, cnt++;
+                matrix->appendRow(constrain1);
+                constrain2.insert(variableIdx[key]-numComp*i, 1);
+                constrain2.insert(variableIdx[key]-numComp*j, -1);
+                constrain2.insert(cnt/2, -1);
+                constrainLowerBound[idx] = -si->getInfinity();
+                constrainUpperBound[idx] = 0;
+                idx++, cnt++;
+                matrix->appendRow(constrain2);
+            }
+            for (int k=0;k<numLoop;k++) {
+                CoinPackedVector constrain1, constrain2;
+                string key = "l:"+to_string(loops[k][0])+","+to_string(loops[k][1]);
+                constrain1.insert(variableIdx[key]-numComp*i, 1);
+                constrain1.insert(variableIdx[key]-numComp*j, -1);
+                constrain1.insert(cnt/2, 1);
+                constrainLowerBound[idx] = 0;
+                constrainUpperBound[idx] = si->getInfinity();
+                idx++, cnt++;
+                matrix->appendRow(constrain1);
+                constrain2.insert(variableIdx[key]-numComp*i, 1);
+                constrain2.insert(variableIdx[key]-numComp*j, -1);
+                constrain2.insert(cnt/2, -1);
+                constrainLowerBound[idx] = -si->getInfinity();
+                constrainUpperBound[idx] = 0;
+                idx++, cnt++;
+                matrix->appendRow(constrain2);
+            }            
+        }
+    }      
     for (int i=0;i<numEpsilons;i++) {//ε (or e)
         variableLowerBound[numElements+i] = 0;
         variableUpperBound[numElements+i] = si->getInfinity();
     }
-    cout<<"Variable constrains done"<<endl;
     //weights for all variables
     for (int i=0;i<numVariables;i++) {
         if (i<numElements)
             objective[i] = 0;
         else   
             objective[i] = 1;
+    }    
+    cout<<"Variable constrains done"<<endl;
+    si->loadProblem(*matrix, variableLowerBound, variableUpperBound, objective, constrainLowerBound,
+                    constrainUpperBound);
+    // set integer for junction variables
+    for (int i = 0; i < numElements; i++) {
+        si->setInteger(i);
     }
-
+    si->writeMps(lpFn);
+    si->writeLp(lpFn);
 }
 
 //Deal with complex case: concatenation
