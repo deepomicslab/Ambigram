@@ -4191,7 +4191,7 @@ void LocalGenomicMap::BFB_ILP(const char *lpFn, vector<vector<int>> &patterns, v
     int numSegments = segs.size();
     int numElements = variableIdx.size(), numEpsilons = numSegments*3;
     int numVariables = numElements+numEpsilons, numPat = patterns.size(), numLoop = loops.size();
-    int numConstrains = (numSegments*2*3 + 3*numLoop)+(seqMode? numPat*numPat*3 : numPat);
+    int numConstrains = (numSegments*2*3 + 3*numLoop)+(seqMode? numPat*numPat*3 : numPat*numPat);
 
     double *objective = new double[numVariables];
     double *variableLowerBound = new double[numVariables];
@@ -4347,22 +4347,22 @@ void LocalGenomicMap::BFB_ILP(const char *lpFn, vector<vector<int>> &patterns, v
     }
 
     //inequality formula: constrains on patterns and loops    
-    if(seqMode) {
-        //0<=p(a,b)+p(c,d)<=1 and 0<=p(a,b)+l(c,d)<=1 and 0<=l(a,b)+l(c,d)<=1: constrains on exclusiveness
-        for (int i=0;i<numPat;i++) {         
-            for (int j=i+1;j<numPat;j++) {
-                if ((patterns[i][0] < patterns[j][0] && patterns[i][1] < patterns[j][1]) ||
-                    (patterns[i][0] > patterns[j][0] && patterns[i][1] > patterns[j][1])) {
-                    CoinPackedVector constrain7, constrain8, constrain9;
-                    string key1 = "p:"+to_string(patterns[i][0])+","+to_string(patterns[i][1]);                               
-                    string key2 = "p:"+to_string(patterns[j][0])+","+to_string(patterns[j][1]);
-                    constrain7.insert(variableIdx[key1], 1);
-                    constrain7.insert(variableIdx[key2], 1);
-                    constrainLowerBound[idx] = 0;
-                    constrainUpperBound[idx] = 1;
-                    idx++;
-                    matrix->appendRow(constrain7);
-
+    
+    //0<=p(a,b)+p(c,d)<=1 and 0<=p(a,b)+l(c,d)<=1 and 0<=l(a,b)+l(c,d)<=1: constrains on exclusiveness
+    for (int i=0;i<numPat;i++) {         
+        for (int j=i+1;j<numPat;j++) {
+            if ((patterns[i][0] < patterns[j][0] && patterns[i][1] < patterns[j][1]) ||
+                (patterns[i][0] > patterns[j][0] && patterns[i][1] > patterns[j][1])) {
+                CoinPackedVector constrain7, constrain8, constrain9;
+                string key1 = "p:"+to_string(patterns[i][0])+","+to_string(patterns[i][1]);                               
+                string key2 = "p:"+to_string(patterns[j][0])+","+to_string(patterns[j][1]);
+                constrain7.insert(variableIdx[key1], 1);
+                constrain7.insert(variableIdx[key2], 1);
+                constrainLowerBound[idx] = 0;
+                constrainUpperBound[idx] = 1;
+                idx++;
+                matrix->appendRow(constrain7);
+                if(seqMode) {
                     key2 = "l:"+to_string(loops[j][0])+","+to_string(loops[j][1]);
                     constrain8.insert(variableIdx[key1], 1);
                     constrain8.insert(variableIdx[key2], 1);
@@ -4377,31 +4377,8 @@ void LocalGenomicMap::BFB_ILP(const char *lpFn, vector<vector<int>> &patterns, v
                     constrainLowerBound[idx] = 0;
                     constrainUpperBound[idx] = 1;
                     idx++;
-                    matrix->appendRow(constrain9);       
-                }
-            }
-        }
-    }
-    else {
-        //0<=p(a,b)+Σp(c,d)<=1: constrains on exclusiveness
-        for (int i=0;i<numPat;i++) {
-            CoinPackedVector constrain7;
-            bool flag = false;
-            for (int j=0;j<numPat;j++) {
-                if ((patterns[i][0] < patterns[j][0] && patterns[i][1] < patterns[j][1]) ||
-                    (patterns[i][0] > patterns[j][0] && patterns[i][1] > patterns[j][1])) {                
-                    flag = true;          
-                    string key = "p:"+to_string(patterns[j][0])+","+to_string(patterns[j][1]);
-                    constrain7.insert(variableIdx[key], 1);                
-                }
-            }
-            if (flag) {
-                string key = "p:"+to_string(patterns[i][0])+","+to_string(patterns[i][1]);
-                constrain7.insert(variableIdx[key], 1);
-                constrainLowerBound[idx] = 0;
-                constrainUpperBound[idx] = 1;
-                idx++;
-                matrix->appendRow(constrain7);
+                    matrix->appendRow(constrain9);
+                } 
             }
         }
     }
