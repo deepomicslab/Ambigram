@@ -130,16 +130,22 @@ Ambigram requires at least a LH file. To decipher BFB paths on each chromosome w
 localHap --op bfb --in_lh [path to your .lh file] --lp_prefix [sample name]
 ```
 
-With a JUNCS file (extra information from TGS data), try:
+With a **JUNCS** file (extra information from TGS data), try:
 
 ``` 
 localHap --op bfb --in_lh [path to your .lh file] --juncdb [path to your .juncs file] --junc_info true --lp_prefix [sample name]
 ```
 
-If you have a very complicated sample, e.g. a sample with with high and various copy numbers, try Sequential Mode that will resolve a BFB path with length-decreasing components (without nested loops):
+If you have a very complicated sample, e.g. a sample with with high and various copy numbers, try **Sequential Mode** that will resolve a BFB path with length-decreasing components (without nested loops):
 
 ``` 
 localHap --op bfb --in_lh [path to your .lh file] --juncdb [path to your .juncs file] --seq_mode true --lp_prefix [sample name]
+```
+
+We also provide an option to solve BFB paths from **single-cell** data. You can input **multiple LH files** that represents different CNV profiles evolving over time:
+
+``` 
+localHap --op bfb --in_lh [paths to your .lh files (seperated by ,), e.g., test1.lh,test2.lh,test3.lh] --lp_prefix [sample name]
 ```
 
 To decipher BFB events with translocation, we just need to add one line (shown as following) that includes explicit options into the end of the LH file. Ambigram provides 4 complex cases involved with BFB and translocation. 

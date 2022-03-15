@@ -421,96 +421,87 @@ int main(int argc, char *argv[]) {
                 cerr << "Cannot open file " << solDir << endl;
                 exit(1);
             }
-            exit(0);            
-            for (int m = 0; m < numGraphs; m++) {
-                string element, cn;
-                bool infeasible = false;
-                double cn_error = 0;
-                ofstream errorString;
-                errorString.open("./result.txt",std::ios_base::app);
-                while (solFile >> element) {
-                    if(element == "Infeasible") {
-                        infeasible = true;
-                        break;
-                    }
-                    // if(element == "value") {
-                    //     solFile >> element;
-                    //     errorString<<element<<" ";
-                    // }
-                    if (element[0] == 'x') {                
-                        int idx = stoi(element.substr(1));
-                        if (numComp*m <= idx < numComp*(m+1)) {//exclude epsilons
-                            solFile >> cn;
-                            int copynum = stoi(cn);
-                            elementCN[idx] = copynum;
-                        }
-                        else {//epsilons (errors)
-                            if((idx-numComp)%3==0) {
-                                double seg_error;
-                                solFile >> seg_error;
-                                cn_error += seg_error;
-                            }
-                        }
-                    }
+            
+            string element, cn;
+            bool infeasible = false;
+            double cn_error = 0;
+            ofstream errorString;
+            errorString.open("./result.txt",std::ios_base::app);
+            while (solFile >> element) {
+                if(element == "Infeasible") {
+                    infeasible = true;
+                    break;
                 }
-                if(m > 0) {
-                    for (int i=0; i<patterns.size(); i++) {
-                        string key = "p:"+to_string(patterns[i][0])+","+to_string(patterns[i][1]);
-                        variableIdx[key] += numComp;
-                        key = "l:"+to_string(patterns[i][0])+","+to_string(patterns[i][1]);
-                        variableIdx[key] += numComp;
-                    }
-                }
-                for (int i=0; i<patterns.size(); i++) {
-                    string key = "p:"+to_string(patterns[i][0])+","+to_string(patterns[i][1]);
-                    cout<<variableIdx[key]<<endl;
-                    key = "l:"+to_string(patterns[i][0])+","+to_string(patterns[i][1]);
-                    cout<<variableIdx[key]<<endl;
-                }
-                //compute target CN of segments based loop/pattern
-                for (auto iter=variableIdx.begin();iter!=variableIdx.end();iter++) {
-                    if(elementCN[iter->second] > 0) {
-                        string key = iter->first;
-                        int idx1 = stoi(key.substr(2, key.find(",")-2)), idx2 = stoi(key.substr(key.find(",")+1));
-                        for(int i=idx1-1; i<idx2; i++) {
-                            if(key[0]=='p') targetCN[i] += elementCN[iter->second];
-                            else targetCN[i] += elementCN[iter->second]*2;
-                        }
-                    }
-                }
-
-                // vector<int> segCN(endID, 0);
-                // for (auto iter=variableIdx.begin();iter!=variableIdx.end();iter++) {
-                //     if(elementCN[iter->second] > 0) {
-                //         string key = iter->first;
-                //         int idx1 = stoi(key.substr(2, key.find(",")-2)), idx2 = stoi(key.substr(key.find(",")+1));
-                //         for(int i=idx1-1; i<idx2; i++) {
-                //             if(key[0]=='p') segCN[i-1] += elementCN[iter->second];
-                //             else segCN[i-1] += elementCN[iter->second]*2;
-                //         }
-                //     }
+                // if(element == "value") {
+                //     solFile >> element;
+                //     errorString<<element<<" ";
                 // }
-                // int cn_diff = 0;                        
-                // for(int i=startID-1; i<endID; i++) {
-                //     cn_diff += (*g->getSegments())[i]->getWeight()->getCopyNum()-segCN[i];
-                // }
-                
-                // output errors
-                // errorString<<cn_error<<endl;
-                // errorString.close();
-                // exit(0);
-
-                if(infeasible) {
-                    for(int i=startID-1; i<endID; i++) targetCN[i] += 2;//compute target CN of segments
-                    vector<int> temp({startID, endID, endID, startID});
-                    lgms[m]->editInversions(temp, inversions, juncCN, elementCN, variableIdx);
-                    bfbPaths.push_back(temp);
-                    continue;
+                if (element[0] == 'x') {                
+                    int x = stoi(element.substr(1));
+                    if (x < numComp*numGraphs) {//exclude epsilons
+                        solFile >> cn;
+                        int copynum = stoi(cn);
+                        elementCN[x] = copynum;
+                    }
+                    else {//epsilons (errors)
+                        if((x-variableIdx.size())%3==0) {
+                            double seg_error;
+                            solFile >> seg_error;
+                            cn_error += seg_error;
+                        }
+                    }
                 }
-                //construct BFB DAG and find all topological orders
+            }
+            if(infeasible) {
+                for(int i=startID-1; i<endID; i++) targetCN[i] += 2;//compute target CN of segments
+                vector<int> temp({startID, endID, endID, startID});
+                lgm->editInversions(temp, inversions, juncCN, elementCN, variableIdx);
+                bfbPaths.push_back(temp);
+                continue;
+            }
+            //compute target CN of segments based loop/pattern
+            for (auto iter=variableIdx.begin();iter!=variableIdx.end();iter++) {
+                if(elementCN[iter->second] > 0) {
+                    string key = iter->first;
+                    int idx1 = stoi(key.substr(2, key.find(",")-2)), idx2 = stoi(key.substr(key.find(",")+1));
+                    for(int i=idx1-1; i<idx2; i++) {
+                        if(key[0]=='p') targetCN[i] += elementCN[iter->second];
+                        else targetCN[i] += elementCN[iter->second]*2;
+                    }
+                }
+            }
+
+            // vector<int> segCN(endID, 0);
+            // for (auto iter=variableIdx.begin();iter!=variableIdx.end();iter++) {
+            //     if(elementCN[iter->second] > 0) {
+            //         string key = iter->first;
+            //         int idx1 = stoi(key.substr(2, key.find(",")-2)), idx2 = stoi(key.substr(key.find(",")+1));
+            //         for(int i=idx1-1; i<idx2; i++) {
+            //             if(key[0]=='p') segCN[i-1] += elementCN[iter->second];
+            //             else segCN[i-1] += elementCN[iter->second]*2;
+            //         }
+            //     }
+            // }
+            // int cn_diff = 0;                        
+            // for(int i=startID-1; i<endID; i++) {
+            //     cn_diff += (*g->getSegments())[i]->getWeight()->getCopyNum()-segCN[i];
+            // }
+            
+            // output errors
+            // errorString<<cn_error<<endl;
+            // errorString.close();
+            // exit(0);
+            
+            //construct BFB DAG and find all topological orders
+            for (int k = 0; k < numGraphs; k++) {                
                 vector<vector<int>> adj, node2pat, node2loop;
-                lgms[m]->constructDAG(adj, node2pat, node2loop, variableIdx, elementCN);
-                cout<<"construct dag"<<endl;
+                for (int i = 0;i < numComp/2; i++) {
+                    string key = "p:"+to_string(patterns[i][0])+","+to_string(patterns[i][1]);
+                    variableIdx[key] = i + k*numComp;
+                    key = "l:"+to_string(patterns[i][0])+","+to_string(patterns[i][1]);
+                    variableIdx[key] = i + numComp/2 + k*numComp;
+                }
+                lgms[k]->constructDAG(adj, node2pat, node2loop, variableIdx, elementCN);
                 int num = adj.size();
                 bool *visited = new bool[num];
                 int *indeg = new int[num];
@@ -533,25 +524,23 @@ int main(int argc, char *argv[]) {
                 //find all topological orders in BFB DAG
                 vector<int> res;
                 vector<vector<int>> orders;
-                lgms[m]->allTopologicalOrders(res, visited, num, indeg, adj, orders);
-                cout<<"All topological orders: "<<orders.size()<<endl;
-                for (int i = 0; i < orders.size(); i++) {
-                    for (int j=0; j<orders[i].size();j++)
-                        cout<<orders[i][j]+1<<" ";
+                lgms[k]->allTopologicalOrders(res, visited, num, indeg, adj, orders);
+                cout<<"All topological orders: "<<endl;
+                for (vector<int> bfb: orders) {
+                    for (int i=0;i<bfb.size();i++)
+                        cout<<bfb[i]+1<<" ";
                     cout<<endl;
                 }
-                cout<<"Find top orders"<<endl;
                 //get one valid bfb path
                 vector<int> path;
-                lgms[m]->getBFB(orders, node2pat, node2loop, path);//get a valid BFB path        
-                cout<<"Find bfb path"<<endl;    
+                lgms[k]->getBFB(orders, node2pat, node2loop, path);//get a valid BFB path          
                 //output the text for visualization
-                if(numGraphs==1) lgms[m]->editInversions(path, inversions, juncCN, elementCN, variableIdx);//edit the imperfect fold-back inversions (with deletion)
-                else lgms[m]->printBFB(path);
-                if(insMode==1 || conMode==1) lgms[m]->printOriginalBFB(path, originalSegs);
+                if(numGraphs==1) { 
+                    lgms[k]->editInversions(path, inversions, juncCN, elementCN, variableIdx);//edit the imperfect fold-back inversions (with deletion)
+                    if(insMode==1 || conMode==1) lgms[k]->printOriginalBFB(path, originalSegs);
+                }
+                else lgms[k]->printBFB(path);                
                 bfbPaths.push_back(path);
-                delete [] visited;
-                delete [] indeg;
             }
         }              
         //output target CN

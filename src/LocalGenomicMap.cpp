@@ -3375,8 +3375,6 @@ void LocalGenomicMap::constructDAG(vector<vector<int>> &adj, vector<vector<int>>
             }
         }
     }
-    cout<<"end"<<endl;
-    cout<<"why not returen"<<endl;
 }
 
 void LocalGenomicMap::allTopologicalOrders(vector<int> &res, bool visited[], int num, int indeg[], vector<vector<int>> &adj, 
@@ -3593,8 +3591,10 @@ void LocalGenomicMap::insertBeforeBFB(Graph*& g, vector<string>& insChr, unorder
     //search for segments and junctions involved in insertion
     int sID, eID;
     vector<int> insertionIDs, deletedChrIDs;
+    vector<Junction *> visited;
     for(int i=1; i<insChr.size(); i++) {
         for(int j=0; j<juncs.size(); j++) {
+            if(find(visited.begin(), visited.end(), juncs[j])!=visited.end()) continue;
             Segment *seg1 = juncs[j]->getSource(), *seg2 = juncs[j]->getTarget();
             string chr1 = seg1->getChrom(), chr2 = seg2->getChrom();
             if((insChr[i-1]==chr1&&insChr[i]==chr2)||
@@ -3608,7 +3608,7 @@ void LocalGenomicMap::insertBeforeBFB(Graph*& g, vector<string>& insChr, unorder
                         for(int i=insertionIDs.back(); i>id1; i--) insertionIDs.push_back(i);
                 }
                 insertionIDs.push_back(id1), insertionIDs.push_back(id2);
-                juncs.erase(juncs.begin()+j);
+                visited.push_back(juncs[j]);
                 break;
             }
         }
@@ -3661,11 +3661,8 @@ void LocalGenomicMap::insertBeforeBFB(Graph*& g, vector<string>& insChr, unorder
         char dir1 = junc->getSourceDir(), dir2 = junc->getTargetDir();
         if(find(insertionIDs.begin(),insertionIDs.end(),startSegID)!=insertionIDs.end() ||
             find(insertionIDs.begin(),insertionIDs.end(),targetSegID)!=insertionIDs.end()) {
-            if(abs(startSegID-targetSegID)==1) continue;//delete original normal junctions
-            if(abs(id1-id2)==1) {
-                if(id1>id2) swap(id1, id2);
-                dir1 = '+', dir2 = '+';
-            }
+            if(id1>id2) swap(id1, id2);
+            dir1 = '+', dir2 = '+';
         }
         cout<<startSegID<<"-"<<targetSegID<<" "<<id1+1<<"-"<<id2+1<<endl;
         mJuncs.push_back(new Junction(mSegs[id1],mSegs[id2],dir1,dir2,junc->getWeight()->getCoverage(),
