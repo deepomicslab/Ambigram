@@ -21,7 +21,8 @@ localHap --op bfb --help
 ```
 
 ### Prerequisites
-
+- [Cbc](https://github.com/coin-or/Cbc) solves integer linear programming.
+- [htslib](https://github.com/samtools/htslib) is used for accessing common file formats, such as SAM, CRAM and VCF, used for high-throughput sequencing data.
 - [SVAS](https://github.com/paprikachan/SVAS) integrates SEG and SV files into a .lh file, which is the standard input file of Ambigram.
 - [SpecHap](https://github.com/deepomicslab/SpecHap) extracts barcodes from 10x data.
 - [hpvpipe](https://github.com/panguangze/hpvpipe) generate JUNCS files by processing PB or ONT data.

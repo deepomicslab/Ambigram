@@ -193,6 +193,7 @@ public:
     void allTopologicalOrders(vector<int> &res, bool visited[], int num, int indeg[], vector<vector<int>> &adj, vector<vector<int>> &orders);
     void getBFB(vector<vector<int>> &orders, vector<vector<int>> &node2pat, vector<vector<int>> &node2loop, vector<int> &res);
     void readBFBProps(string &mainChr, int &insMode, vector<string> &insChr, int &conMode, vector<string> &conChr, int virusInfo[], vector<int> &startSegs, const char *lhRawFn);
+    void getJuncCN(vector<Junction *> &inversions , double** juncCN, Graph &graph, int startSegID, int endSegID);
     void insertBeforeBFB(Graph*& g, vector<string>& insChr, unordered_map<int, int>& originalSegs);
     void insertAfterBFB(vector<string>& insChr, string& mainChr, vector<int>& startSegs, vector<vector<int>>& bfbPaths);
     void concatBeforeBFB(Graph*& g, vector<string>& conChr, unordered_map<int, int>& originalSegs);
@@ -202,7 +203,7 @@ public:
     void printBFB(vector<int> &res);
     void printOriginalBFB(vector<int> &res, unordered_map<int, int> &m);
     void BFB_ILP(const char *lpFn, vector<vector<int>> &patterns, vector<vector<int>> &loops, map<string, int> &variableIdx, double** juncCN, vector<vector<int>> &components, const bool juncsInfo, const double maxError, const bool seqMode);
-    void BFB_ILP_SC(const char *lpFn, vector<vector<int>> &patterns, vector<vector<int>> &loops, map<string, int> &variableIdx, vector<Graph*> graphs, const double maxError, const bool seqMode);
+    void BFB_ILP_SC(const char *lpFn, vector<vector<int>> &patterns, vector<vector<int>> &loops, map<string, int> &variableIdx, vector<Graph*> graphs, const double maxError, vector<vector<int>> &evolution);
     void bfbConcate(Junction *sv, bool edgeA, int pos1, int pos2, vector<vector<int>> bfbPaths, vector<int> &res);
     void bfbInsertion(vector<Junction *> &SVs, vector<vector<int>> bfbPaths, bool edgeA[], vector<int> &res);
     void readComponents(vector<vector<int>>& res, const char *juncsFn, unordered_map<int,int>& intervals);

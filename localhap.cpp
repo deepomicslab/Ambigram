@@ -33,7 +33,8 @@ int main(int argc, char *argv[]) {
             // BFB
             ("junc_info", "Use extra junction information", cxxopts::value<bool>()->default_value("false"))
             ("max_error", "The maximal acceptable rate", cxxopts::value<double>()->default_value("-1"))
-            ("seq_mode", "Resolve a sequential bfb path without nested loops", cxxopts::value<bool>()->default_value("false"));
+            ("seq_mode", "Resolve a sequential bfb path without nested loops", cxxopts::value<bool>()->default_value("false"))
+            ("edges", "Edges that indicate the evolution in single-cell data", cxxopts::value<std::string>()->default_value(""));
     auto result = options.parse(argc, argv);
     if (result.count("help")) {
         std::cout << options.help() << std::endl;
@@ -242,6 +243,7 @@ int main(int argc, char *argv[]) {
         const bool juncsInfo = result["junc_info"].as<bool>();//whether add extra junction iformation into ILP constrains
         const double maxError = result["max_error"].as<double>();
         const bool seqMode = result["seq_mode"].as<bool>();//whether use sequential mode (no small loop inserted in big loop)
+        string edges = result["edges"].as<std::string>();
 
         // string bfbRes = "\n"+string(lhRawFn)+" "+string(juncsFn)+"\n";
         // ofstream outString;
@@ -249,19 +251,45 @@ int main(int argc, char *argv[]) {
         // outString<<bfbRes;
         // outString.close();
 
-        //get multiple .lh file names for single cell data
+        // get multiple .lh file names for single cell data
         vector<Graph*> graphs;
         vector<LocalGenomicMap*> lgms;
+        unordered_map<string, int> graphIdx;
         // cout<<string(lhRawFn)<<endl;
-        char* lhFn = (char*)lhRawFn;
-        char* token;
-        while (token = strtok_r(lhFn, ",", &lhFn)) {
-            cout<<token<<endl;
-            Graph *g = new Graph(token);
+        char* lhNames = (char*)lhRawFn;
+        char* lhFn;
+        while (lhFn = strtok_r(lhNames, ",", &lhNames)) {
+            cout<<lhFn<<endl;            
+            Graph *g = new Graph(lhFn);
+            graphIdx[lhFn] = graphs.size();
             graphs.push_back(g);
             g->calculateHapDepth();
             g->calculateCopyNum();
             lgms.push_back(new LocalGenomicMap(g));
+        }
+        // construct an adjacency list for single-cell evolution
+        vector<vector<int>> evolution(graphs.size(), vector<int>());
+        if(edges.length() > 0) {
+            size_t pos = 0;
+            string token;
+            while ((pos = edges.find(",")) != std::string::npos) {
+                token = edges.substr(0, pos);
+                edges.erase(0, pos + 1);
+                pos = edges.find(":");
+                evolution[graphIdx[token.substr(0, pos)]].push_back(graphIdx[token.substr(pos+1)]);            
+            }
+            pos = edges.find(":");
+            evolution[graphIdx[edges.substr(0, pos)]].push_back(graphIdx[edges.substr(pos+1)]);
+        }
+        else {
+            for(int i=0; i<evolution.size(); i++) {
+                for(int j=i+1; j<evolution.size(); j++) evolution[i].push_back(j);
+            }
+        }
+        for(int i=0; i<evolution.size(); i++) {
+            cout<<i<<": ";
+            for(int j: evolution[i]) cout<<j<<" ";
+            cout<<endl;
         }
         // graph data structure for single .lh file
         int numGraphs = graphs.size();
@@ -344,40 +372,7 @@ int main(int argc, char *argv[]) {
             //find copy number for both normal junctions and fold-back inversions
             vector<Junction *> inversions;
             double** juncCN = new double*[endID+1];
-            for (int i=0; i <= endID; i++) {
-                juncCN[i] = new double[2];//0: normal junction   1: inversion
-                memset(juncCN[i], 0, 2*sizeof(double));
-            }
-            for (Junction *junc: *(g->getJunctions())) {
-                int sourceID = junc->getSource()->getId(), targetID = junc->getTarget()->getId();
-                char sourceDir = junc->getSourceDir(), targetDir = junc->getTargetDir();
-                if (sourceID<startID||sourceID>endID||targetID<startID||targetID>endID) continue;
-                double copyNum = junc->getWeight()->getCopyNum();
-                if (0.5 < copyNum && copyNum < 1)
-                    copyNum = 1;//round small CN to 1
-                if (sourceDir == targetDir) {//ht or th: not consider deletion on the chromosome
-                    if (sourceID+1 == targetID) {//normal edges                
-                        juncCN[sourceID][0] += copyNum;
-                    }
-                    else if (sourceID-1 == targetID) {//normal edges (negative strand)
-                        juncCN[targetID][0] += copyNum;
-                    }
-                }
-                else {//hh or tt (inversion)
-                    if (abs(sourceID-targetID)<=3) {//fold-back inversion (with error of 3 bp)
-                        if(sourceID != targetID)
-                            inversions.push_back(junc);
-                        if (sourceDir == '+') {
-                            int greaterID = sourceID>targetID? sourceID:targetID;
-                            juncCN[greaterID][1] += copyNum;
-                        }
-                        else {
-                            int smallerID = sourceID<targetID? sourceID:targetID;
-                            juncCN[smallerID][1] += copyNum;
-                        }                        
-                    }
-                }            
-            }
+            lgm->getJuncCN(inversions, juncCN, *g, startID, endID);
             //check if there is any fold-back inversion
             cout<<"Junction CN"<<endl;
             double inversionCNSum = 0;
@@ -404,7 +399,7 @@ int main(int argc, char *argv[]) {
                         
             //construct ILP and generate .lp file for cbc
             if (numGraphs == 1) lgm->BFB_ILP(lpFn, patterns, loops, variableIdx, juncCN, validComponents, juncsInfo, maxError, seqMode);
-            else lgm->BFB_ILP_SC(lpFn, patterns, loops, variableIdx, graphs, maxError, seqMode);
+            else lgm->BFB_ILP_SC(lpFn, patterns, loops, variableIdx, graphs, maxError, evolution);
             //reset variableIdx
             for (auto iter=variableIdx.begin();iter!=variableIdx.end();iter++) 
                 variableIdx[iter->first] = variableIdx[iter->first]%numComp;
@@ -539,7 +534,11 @@ int main(int argc, char *argv[]) {
                     lgms[k]->editInversions(path, inversions, juncCN, elementCN, variableIdx);//edit the imperfect fold-back inversions (with deletion)
                     if(insMode==1 || conMode==1) lgms[k]->printOriginalBFB(path, originalSegs);
                 }
-                else lgms[k]->printBFB(path);                
+                else {
+                    lgms[k]->getJuncCN(inversions, juncCN, *graphs[k], startID, endID);
+                    lgms[k]->editInversions(path, inversions, juncCN, elementCN, variableIdx);
+                    // lgms[k]->printBFB(path);
+                }
                 bfbPaths.push_back(path);
             }
         }              

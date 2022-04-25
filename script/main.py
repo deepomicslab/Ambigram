@@ -596,16 +596,77 @@ class MainArgParser:
                             dest='output',
                             required=True,
                             help='A name of output')
+        parser.add_argument('-b', '--barcode_group',
+                            dest='barcode',
+                            required=False,
+                            help='A barcode_group.csv file')
+        parser.add_argument('-g', '--group',
+                            dest='group',
+                            required=False,
+                            help='A group_meta.csv file')
         args = parser.parse_args(sys.argv[2:])
         vcf = open(args.vcf, "r")
-        res = "chrom_5p\tbkpos_5p\tstrand_5p\tchrom_3p\tbkpos_3p\tstrand_3p\tavg_cn\n"
-        for line in vcf.readlines():
-            entry = line.split("\t")
-            res += entry[0]+"\t"+entry[1]+"\t"+entry[2]+"\t"
-            res += entry[3]+"\t"+entry[4]+"\t"+entry[5]+"\t"
-            res += entry[8]+"\n"
-        outFile = open(args.output, "w")
-        outFile.write(res)
+        if args.barcode == None:            
+            res = "chrom_5p\tbkpos_5p\tstrand_5p\tchrom_3p\tbkpos_3p\tstrand_3p\tavg_cn\n"
+            for line in vcf.readlines():            
+                entry = line.split("\t")            
+                depth = entry[8] # entry[13].split(' ')[2].split(':')[1]
+                res += entry[0]+"\t"+entry[1]+"\t"+entry[2]+"\t"
+                res += entry[3]+"\t"+entry[4]+"\t"+entry[5]+"\t"
+                res += depth+"\n"
+            outFile = open(args.output, "w")
+            outFile.write(res)
+        else:
+            barcode, sv = [], []
+            for line in vcf.readlines():            
+                entry = line.split("\t")
+                # if entry[0]!='chr1' or entry[3]!='chr1':
+                #     continue
+                if entry[0]==entry[3] and entry[2]==entry[5]:
+                    continue
+                codes = []
+                for code in entry[13].split(' ')[0].split(';')[0].split(','):
+                    if len(codes) == 0:
+                        codes.append(code[3:-2])
+                    else:
+                        codes.append(code[:-2])
+                barcode.append(codes)
+                sv_str = entry[0]+"\t"+entry[1]+"\t"+entry[2]+"\t"
+                sv_str += entry[3]+"\t"+entry[4]+"\t"+entry[5]+"\t"
+                sv_str += entry[13].split(' ')[2].split(':')[1]
+                sv.append(sv_str)
+            # read barcode file
+            barcode2group = {}
+            for line in open(args.barcode, "r").readlines():
+                if line[0] == ',':
+                    continue
+                info = line.strip('\n').split(',')
+                barcode2group[info[1]] = info[2]
+            # read group file
+            group2subclone = {}
+            for line in open(args.group, 'r').readlines():
+                info = line.strip('\n').split(',')
+                if info[0] == 'label':
+                    continue
+                group2subclone[info[1]] = info[0]
+            # construct subclone
+            subclone = {}
+            for i in range(len(barcode)):
+                for code in barcode[i]:
+                    if code not in barcode2group.keys():
+                        continue
+                    k = group2subclone[barcode2group[code]]
+                    if k not in subclone.keys():
+                        subclone[k] = []
+                    subclone[k].append(i)
+            # output subclone sv
+            for key, val in subclone.items():
+                res = 'chrom_5p\tbkpos_5p\tstrand_5p\tchrom_3p\tbkpos_3p\tstrand_3p\tavg_cn\n'
+                for i in list(set(val)):
+                    res += sv[i]+'\n'
+                outFile = open('{}_{}_sv.txt'.format(args.output, key), "w")
+                outFile.write(res)
+        
 
     def seg2fasta(self):
         import pybedtools
