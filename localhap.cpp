@@ -237,25 +237,18 @@ int main(int argc, char *argv[]) {
             //     return 1 ;
         }
     }else if (strcmp(result["op"].as<std::string>().c_str(), "bfb") == 0) {
-        const char *lhRawFn = result["in_lh"].as<std::string>().c_str();
-        const char *lpFn = result["lp_prefix"].as<std::string>().c_str();
-        const char *juncsFn = result["juncdb"].as<std::string>().c_str();
-        const bool juncsInfo = result["junc_info"].as<bool>();//whether add extra junction iformation into ILP constrains
-        const double maxError = result["max_error"].as<double>();
-        const bool seqMode = result["seq_mode"].as<bool>();//whether use sequential mode (no small loop inserted in big loop)
-        string edges = result["edges"].as<std::string>();
+        const char *lhRawFn = result["in_lh"].as<std::string>().c_str();// path to .lh file
+        const char *lpFn = result["lp_prefix"].as<std::string>().c_str();// sample name
+        const char *juncsFn = result["juncdb"].as<std::string>().c_str();// extra junction information from TGS data
+        const bool juncsInfo = result["junc_info"].as<bool>();// indicate whether add extra junction iformation into ILP constrains
+        const double maxError = result["max_error"].as<double>();// upper boundary of ILP error
+        const bool seqMode = result["seq_mode"].as<bool>();// indicate whether use sequential mode (no small loop inserted in big loop)
+        string edges = result["edges"].as<std::string>();// relationship among sub-clones in single-cell data e.g. 1:2,1:3
 
-        // string bfbRes = "\n"+string(lhRawFn)+" "+string(juncsFn)+"\n";
-        // ofstream outString;
-        // outString.open("bfbPaths.txt",std::ios_base::app);
-        // outString<<bfbRes;
-        // outString.close();
-
-        // get multiple .lh file names for single cell data
+        /* get multiple .lh file names for single-cell data */
         vector<Graph*> graphs;
         vector<LocalGenomicMap*> lgms;
         unordered_map<string, int> graphIdx;
-        // cout<<string(lhRawFn)<<endl;
         char* lhNames = (char*)lhRawFn;
         char* lhFn;
         while (lhFn = strtok_r(lhNames, ",", &lhNames)) {
@@ -267,6 +260,7 @@ int main(int argc, char *argv[]) {
             g->calculateCopyNum();
             lgms.push_back(new LocalGenomicMap(g));
         }
+
         // construct an adjacency list for single-cell evolution
         vector<vector<int>> evolution(graphs.size(), vector<int>());
         if(edges.length() > 0) {
@@ -281,30 +275,26 @@ int main(int argc, char *argv[]) {
             pos = edges.find(":");
             evolution[graphIdx[edges.substr(0, pos)]].push_back(graphIdx[edges.substr(pos+1)]);
         }
-        else {
+        else {// default: each pair of sub-clones share some similar patterns
             for(int i=0; i<evolution.size(); i++) {
                 for(int j=i+1; j<evolution.size(); j++) evolution[i].push_back(j);
             }
         }
-        for(int i=0; i<evolution.size(); i++) {
-            cout<<i<<": ";
-            for(int j: evolution[i]) cout<<j<<" ";
-            cout<<endl;
-        }
-        // graph data structure for single .lh file
+
+        /*graph data structure for single .lh file */
         int numGraphs = graphs.size();
         Graph *g = graphs[0];
         g->calculateHapDepth();
         g->calculateCopyNum();
         LocalGenomicMap *lgm = new LocalGenomicMap(g);
-        //read options from input
+
+        // read options from input
         string mainChr;
-        int insMode = 0, conMode = 0;//0: pre-BFB insertion/concatenation, 1: post-BFB insertion/concatenation
+        int insMode = 0, conMode = 0;// 0: pre-BFB insertion/concatenation, 1: post-BFB insertion/concatenation
         vector<string> insChr, conChr;
-        vector<int> startSegs;//starting segments for insertions
-        int virusInfo[3] = {0};
-        lgm->readBFBProps(mainChr, insMode, insChr, conMode, conChr, virusInfo, startSegs, lhRawFn);//read properties
-        unordered_map<int, int> originalSegs;
+        vector<int> startSegs;// starting segments for insertions
+        lgm->readBFBProps(mainChr, insMode, insChr, conMode, conChr, startSegs, lhRawFn);//read properties
+        unordered_map<int, int> originalSegs;// mapping rearranged segments into original ones
         //Insertion Mode 1: pre-BFB insertion        
         if(insMode == 1) {
             lgm->insertBeforeBFB(g, insChr, originalSegs);
@@ -320,25 +310,17 @@ int main(int argc, char *argv[]) {
 
         vector<Segment *> sources = *g->getMSources();
         vector<Segment *> sinks = *g->getMSinks();
-
-        //construct segment intervals
-        unordered_map<int,int> intervals;
+        vector<Segment *> segs = *g->getSegments();
+        // set segment partitions
         for(int i=0; i<sources.size(); i++) {
             for(int j=sources[i]->getId(); j<=sinks[i]->getId(); j++) {
-                cout<<j<<"-"<<i<<endl;
-                intervals.insert(pair<int,int>(j,i));
+                segs[j-1]->setPartition(i);
             }
         }
 
-        //get information of third-generation data
+        // get information of third-generation data
         vector<vector<int>> components;
-        lgm->readComponents(components, juncsFn, intervals);//third-generation data information
-        for(int i=0; i<components.size(); i++) {
-            for(int j=0; j<components[i].size(); j++) {
-                cout<<components[i][j]<<" ";
-            }
-            cout<<endl;
-        }
+        lgm->readComponents(components, juncsFn);//third-generation data information
         
         //record target CN of segments
         vector<int> targetCN(g->getSegments()->size(),0);
@@ -386,7 +368,8 @@ int main(int argc, char *argv[]) {
             //pick components in the segment interval
             vector<vector<int>> validComponents;
             for(int i=0; i<components.size(); i++) {
-                if(intervals[components[i][0]]==n) validComponents.push_back(components[i]);
+                if(g->getSegmentById(components[i][0])->getPartition() == n) 
+                    validComponents.push_back(components[i]);
             }
 
             if (abs(inversionCNSum)<0.000001&&validComponents.size()==0) {//no fold-back inversion
@@ -560,34 +543,6 @@ int main(int argc, char *argv[]) {
         if(insMode == 2) lgm->insertAfterBFB(insChr, mainChr, startSegs, bfbPaths);
         //Concatenation Mode 2: post-BFB Concatenation 
         if(conMode == 2) lgm->concatAfterBFB(conChr, bfbPaths);
-        
-        //deal with insertion of virus
-        if(virusInfo[0] != 0) {
-            for(vector<int> path: bfbPaths) {
-                cout<<"bfb path with virus: "<<endl;
-                for(int i = 1; i<path.size(); i+=2) {
-                    cout<<i<<": "<<virusInfo[0]<<" "<<virusInfo[1]<<" "<<virusInfo[2]<<endl;
-                    if(path[i-1]<=virusInfo[1]&&virusInfo[2]<=path[i]) {
-                        path.insert(path.begin()+i, {virusInfo[1],-1,-1,virusInfo[0],virusInfo[0],-1,-1,virusInfo[2]});
-                        i += 8;
-                    }
-                    else if(path[i]<=virusInfo[1]&&virusInfo[2]<=path[i-1]) {
-                        path.insert(path.begin()+i, {virusInfo[2],-1,-1,virusInfo[0],virusInfo[0],-1,-1,virusInfo[1]});
-                        i += 8;
-                    }
-                    if(i<path.size()-1&& (path[i]==virusInfo[2]&&path[i+1]==virusInfo[1] 
-                        || path[i]==virusInfo[1]&&path[i+1]==virusInfo[2])) {
-                        path.insert(path.begin()+i+1, {-1,-1,virusInfo[0],virusInfo[0],-1,-1});
-                        i += 6;
-                    }                
-                }    
-                lgm->printBFB(path);
-            }
-        }
-
-        //print the result
-        // for (int i=0;i<bfbPaths.size();i++)
-        //     lgm->printBFB(bfbPaths[i]);
 
     } else if (strcmp(result["op"].as<std::string>().c_str(), "bpm") == 0) {
         const char *lhRawFn = result["in_lh"].as<std::string>().c_str();

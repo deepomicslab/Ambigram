@@ -3516,7 +3516,7 @@ void LocalGenomicMap::getBFB(vector<vector<int>> &orders, vector<vector<int>> &n
     }
 }
 
-void LocalGenomicMap::readBFBProps(string &mainChr, int &insMode, vector<string> &insChr, int &conMode, vector<string> &conChr, int virusInfo[],
+void LocalGenomicMap::readBFBProps(string &mainChr, int &insMode, vector<string> &insChr, int &conMode, vector<string> &conChr, 
                                     vector<int> &startSegs, const char *lhRawFn) {
     ifstream lhFile(lhRawFn);
     string line, prop;
@@ -3525,11 +3525,11 @@ void LocalGenomicMap::readBFBProps(string &mainChr, int &insMode, vector<string>
         ss>>prop;
         if (prop == "PROP") {
             while (ss>>prop) {
-                int pos = 2, lastPos = 2;//ignore the first two chars e.g. "I:chr3:chr5"
+                int pos = 2, lastPos = 2;// ignore the first two chars e.g. "I:chr3:chr5"
                 if (prop[0] == 'M')
                     mainChr = prop.substr(2);
                 else if (prop[0] == 'I') {
-                    if(prop[1]!=':') {
+                    if(prop[1]!=':') {// identify which mode (pre-BFB or post-BFB)
                         insMode = prop[1]-'0';
                         lastPos = 3;
                     }
@@ -3556,13 +3556,6 @@ void LocalGenomicMap::readBFBProps(string &mainChr, int &insMode, vector<string>
                     while (pos != string::npos) {
                         pos = prop.find(":", lastPos);
                         startSegs.push_back(stoi(prop.substr(lastPos, pos-lastPos)));
-                        lastPos = pos+1;
-                    }
-                }
-                else if (prop[0] == 'V') {
-                    for (int i = 0; i<3; i++) {
-                        pos = prop.find(":", lastPos);
-                        virusInfo[i] = stoi(prop.substr(lastPos, pos-lastPos));
                         lastPos = pos+1;
                     }
                 }
@@ -4329,10 +4322,13 @@ void LocalGenomicMap::BFB_ILP(const char *lpFn, vector<vector<int>> &patterns, v
             for (int k=0;k<numLoop;k++) {
                 if ((patterns[j][0] == i && loops[k][0] == i) ||
                     (patterns[j][1] == i && loops[k][1] == i)) {
-                    string key1 = "p:"+to_string(patterns[j][0])+","+to_string(patterns[j][1]);
-                    coef[variableIdx[key1]] += 0.5;
-                    string key2 = "l:"+to_string(loops[k][0])+","+to_string(loops[k][1]);
-                    coef[variableIdx[key2]] += 0.5;
+                    int diff1 = patterns[j][0]-patterns[j][1], diff2 = loops[k][0]-loops[k][1];
+                    if (abs(diff1) > abs(diff2)) {
+                        string key1 = "p:"+to_string(patterns[j][0])+","+to_string(patterns[j][1]);
+                        coef[variableIdx[key1]] += 0.5;
+                        string key2 = "l:"+to_string(loops[k][0])+","+to_string(loops[k][1]);
+                        coef[variableIdx[key2]] += 0.5;
+                    }
                 }
             }
         }
@@ -4381,8 +4377,8 @@ void LocalGenomicMap::BFB_ILP(const char *lpFn, vector<vector<int>> &patterns, v
         matrix->appendRow(errorConstrain);
     }
 
-    //inequality formula: constrains on patterns and loops    
-    
+    //inequality formula: constrains on patterns and loops
+
     //0<=p(a,b)+p(c,d)<=1 and 0<=p(a,b)+l(c,d)<=1 and 0<=l(a,b)+l(c,d)<=1: constrains on exclusiveness
     for (int i=0;i<numPat;i++) {         
         for (int j=i+1;j<numPat;j++) {
@@ -4418,7 +4414,7 @@ void LocalGenomicMap::BFB_ILP(const char *lpFn, vector<vector<int>> &patterns, v
         }
     }
 
-    //p(c,d)-Σp(a,b)>=0 where p(a,b) is a sub-pattern of p(c,d)
+    //Σp(a,b)-p(c,d)>=0 where p(a,b) is a parent pattern of p(c,d)
     for (int i=0;i<numPat;i++) {
         CoinPackedVector constrain8;
         bool flag = false;
@@ -4426,16 +4422,16 @@ void LocalGenomicMap::BFB_ILP(const char *lpFn, vector<vector<int>> &patterns, v
             if ((patterns[i][0] == patterns[j][0]) ||
                 (patterns[i][1] == patterns[j][1])) {
                 int diff1 = patterns[i][0]-patterns[i][1], diff2 = patterns[j][0]-patterns[j][1];
-                if (abs(diff1)>abs(diff2)) {
+                if (abs(diff1)<abs(diff2)) {
                     flag = true;
                     string key = "p:"+to_string(patterns[j][0])+","+to_string(patterns[j][1]);
-                    constrain8.insert(variableIdx[key], -1);
+                    constrain8.insert(variableIdx[key], 1);
                 }
             }
         }
         if (flag) {
             string key = "p:"+to_string(patterns[i][0])+","+to_string(patterns[i][1]);
-            constrain8.insert(variableIdx[key], 1);
+            constrain8.insert(variableIdx[key], -1);
             constrainLowerBound[idx] = 0;
             constrainUpperBound[idx] = si->getInfinity();
             idx++;
@@ -4466,7 +4462,7 @@ void LocalGenomicMap::BFB_ILP(const char *lpFn, vector<vector<int>> &patterns, v
                 if (abs(diff1)<abs(diff2)) {
                     flag = true;
                     string key = "l:"+to_string(loops[k][0])+","+to_string(loops[k][1]);
-                    constrain9.insert(variableIdx[key], 1);
+                    constrain9.insert(variableIdx[key], scale);// scaling for copy number of small loop 
                 }
             }
         }
@@ -4580,6 +4576,7 @@ void LocalGenomicMap::BFB_ILP(const char *lpFn, vector<vector<int>> &patterns, v
     si->writeLp(lpFn);
 
 }
+
 void LocalGenomicMap::BFB_ILP_SC(const char *lpFn, vector<vector<int>> &patterns, vector<vector<int>> &loops, map<string, int> &variableIdx, 
                         vector<Graph*> graphs, const double maxError, vector<vector<int>> &evolution) {
     int numGraphs = graphs.size();
@@ -4993,7 +4990,7 @@ void LocalGenomicMap::bfbInsertion(vector<Junction *> &SVs, vector<vector<int>> 
     }    
 }
 
-void LocalGenomicMap::readComponents(vector<vector<int>>& res, const char *juncsFn, unordered_map<int,int>& intervals) {
+void LocalGenomicMap::readComponents(vector<vector<int>>& res, const char *juncsFn) {
     ifstream inFile(juncsFn);
     string line;
     Graph* g = this->getGraph();
@@ -5007,19 +5004,19 @@ void LocalGenomicMap::readComponents(vector<vector<int>>& res, const char *juncs
             segs.push_back(stoi(temp.substr(0,temp.length())));
             sign.push_back(temp.back());
         }
-        //process inversion, translocation, and component
+        // process inversion, translocation, and component
         int lastIdx = 0;
         for(int i=1; i<segs.size(); i++) {
-            if(intervals[segs[lastIdx]] != intervals[segs[i]] ||
-                sign[i-1] != sign[i]) {//break points                        
-                //add component
+            if(g->getSegmentById(segs[lastIdx])->getPartition() != g->getSegmentById(segs[i])->getPartition() ||
+                sign[i-1] != sign[i]) {// breakpoints                        
+                // add component
                 if(i-lastIdx>=2) {
                     vector<int> subset;
                     subset.assign(segs.begin()+lastIdx, segs.begin()+i);
                     sort(subset.begin(), subset.end());
                     res.push_back(subset);
                 }
-                //add junction (inversion or translocation)
+                // add junction (inversion or translocation)
                 int sourceId = segs[i-1], targetId = segs[i];
                 char sourceDir = sign[i-1], targetDir = sign[i];
                 cout<<sourceId<<sourceDir<<" -> "<<targetId<<targetDir<<endl;

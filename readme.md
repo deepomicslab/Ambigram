@@ -90,13 +90,13 @@ JUNC H:5:+ H:6:+ 75.0 5.0 U B
 To generate the SEG file from a SV file and the corresponding BAM file, run the following command:
 
 ```
-python localhaptgs/script/generate_seg.py --sv_file=[path to SV file] --bam_file=[path to bam file] --wgs_depth=[whole genome average depth (default: 100)] --tumor_purity=[sample tumor purity (default: 1)]
+python Ambigram/script/bfb_scripts.py generate_seg --sv_file=[path to SV file] --bam_file=[path to bam file] --wgs_depth=[whole genome average depth (default: 100)] --tumor_purity=[sample tumor purity (default: 1)]
 ```
 
 To convert the SEG and SV files into a LH file, run the following command:
 
 ```
-python SVAS/scripts/csv_sv.py call --sv_fn=[path to SV file] --seg_fn=[path to SEG file] --sample=[output sample name] --seg_only=1 --bfb_sv=1
+python Ambigram/script/bfb_scripts.py generate_lh --sv_fn=[path to SV file] --seg_fn=[path to SEG file] --sample=[output sample name]
 ```
 
 Besides, we can input a JUNCS file that contains extra information from TGS data (10x, PB, and ONT), which may help Ambigram resolve more accurate BFB paths. A JUNCS file that comprises groups of segments, which are probably connected in order as patterns or loops on BFB paths. On the one hand, we can use BarcodeExtractor in SpecHap to get barcodes from 10x data and run the script (process_barcode.py) to generate the JUNCS file. On the other hand, we can use another script (hpvpipe/main.py process_tgs) to directly get the JUNCS file from PB or ONT data. Here is a sample JUNCS file:
@@ -109,14 +109,14 @@ Besides, we can input a JUNCS file that contains extra information from TGS data
 6+ 6- 5- 4- 3-
 ```
 
-To generate a JUNCS file for 10x data:
+To generate a JUNCS file for 10x data ([SpecHap](https://github.com/deepomicslab/SpecHap) should be installed):
 
 ``` 
 BarcodeExtract [path to 10x .bam file] [output path of .bed file]
-python process_barcode --segDir=[path to SEG file] --bedDir=[path to .bed file] --juncsDir=[output path of .juncs file]
+python Ambigram/script/process_barcode --seg_file=[path to SEG file] --bed_file=[path to .bed file] --sample_name=[prefix of the output .juncs file]
 ```
 
-To generate a JUNCS file for PB or ONT data:
+To generate a JUNCS file for PB or ONT data ([hpvpipe](https://github.com/panguangze/hpvpipe) should be installed):
 
 ```
 samtools bam2fq [path to PB/ONT .bam file] | seqtk seq -A > [output path of .fasta file]
@@ -172,7 +172,7 @@ PROP C1:chr7:virus3
 4. Concatenation after BFB (e.g., segments of chr3 are concatenated with segments of chr6)
 
 ``` 
-PROP C:chr3:chr6
+PROP C2:chr3:chr6
 ```
 
 ## Author
