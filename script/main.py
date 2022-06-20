@@ -1,4 +1,5 @@
 import argparse
+from cProfile import label
 
 import os
 from re import S
@@ -607,13 +608,16 @@ class MainArgParser:
         args = parser.parse_args(sys.argv[2:])
         vcf = open(args.vcf, "r")
         if args.barcode == None:            
-            res = "chrom_5p\tbkpos_5p\tstrand_5p\tchrom_3p\tbkpos_3p\tstrand_3p\tavg_cn\n"
+            sv = []
             for line in vcf.readlines():            
-                entry = line.split("\t")            
-                depth = entry[8] # entry[13].split(' ')[2].split(':')[1]
-                res += entry[0]+"\t"+entry[1]+"\t"+entry[2]+"\t"
-                res += entry[3]+"\t"+entry[4]+"\t"+entry[5]+"\t"
-                res += depth+"\n"
+                entry = line.split("\t")
+                if entry[0]!='BOR' or entry[3]!='BOR' or entry[2]==entry[5]:
+                    continue
+                sv.append([entry[0], entry[1], entry[2], entry[3], entry[4], entry[5], entry[8]])
+            sv = sorted(sv, key=lambda d: int(d[1]))
+            res = "chrom_5p\tbkpos_5p\tstrand_5p\tchrom_3p\tbkpos_3p\tstrand_3p\tavg_cn\n"
+            for d in sv:
+                res += '\t'.join(d)+'\n'
             outFile = open(args.output, "w")
             outFile.write(res)
         else:
