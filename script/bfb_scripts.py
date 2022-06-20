@@ -96,8 +96,8 @@ class MainArgParser:
         parser.add_argument('-sv', '--sv_file', dest='svPath', required=True, help='Path to SV file')
         parser.add_argument('-bam', '--bam_file', dest='bamPath', required=False, help='Path to BAM file')
         parser.add_argument('-s', '--sample_name', dest='sampleName', required=False, default = 'sample', help='Sample name for output file')
-        parser.add_argument('-d', '--wgs_depth', dest='wgsDepth', required=False, type=int, default = 100, help='The whole genome average depth (default: 100)')
-        parser.add_argument('-p', '--tumor_purity', dest='purity', required=False, type=int, default = 1, help='Sample tumor purity (default: 1)')
+        parser.add_argument('-d', '--wgs_depth', dest='wgsDepth', required=False, type=int, default = 0, help='The whole genome average depth (default: 100)')
+        parser.add_argument('-p', '--tumor_purity', dest='purity', required=False, type=int, default = 0, help='Sample tumor purity (default: 1)')
         args = parser.parse_args(sys.argv[2:])
         # find all breakpoints on each chromosome
         sv, pos = [], {}
@@ -140,9 +140,10 @@ class MainArgParser:
                     name = key+':'+str(arr[n-1])+'-'+str(arr[n])
                     segDepth[name] = sum(posDepth)/len(posDepth) # average on read depth of all positions
         # output seg.txt file
-        for key, value in segDepth.items():
-            segDepth[key] = self.depth2cn(value, args.wgsDepth, args.purity)
-            print(key, segDepth[key])
+        if args.wgsDepth!=0 and args.purity!=0:
+            for key, value in segDepth.items():
+                segDepth[key] = self.depth2cn(value, args.wgsDepth, args.purity)
+                print(key, segDepth[key])
         resStr = ''
         for key, value in segDepth.items():
             resStr += key+'\t'+str(value)+'\n'
@@ -181,7 +182,7 @@ class MainArgParser:
         idx = 2 # left breakpoint
         if (isStart == True and bkp[2] == '+') or (isStart == False and bkp[2] == '-'):
             idx = 3 # right breakpoint
-        segID = 1
+        segID = len(segs)
         for seg in segs:
             if bkp[0] == seg[1]:
                 if idx == 2 and int(bkp[1]) < int(seg[idx]):
@@ -196,6 +197,8 @@ class MainArgParser:
         parser = argparse.ArgumentParser(description='Generate .lh file by integrating sv.txt and seg.txt.')
         parser.add_argument('-sv', '--sv_file', dest='svPath', required=True, help='Path to SV file')
         parser.add_argument('-seg', '--seg_file', dest='segPath', required=True, help='Path to SEG file')
+        parser.add_argument('-d1', '--is_seg_depth', dest='isSegDepth', required=False, default = False, help='Indicate either segment coverage depth or copy number is provided')
+        parser.add_argument('-d2', '--is_sv_depth', dest='isSVDepth', required=False, default = False, help='Indicate either SV coverage depth or copy number is provided')
         parser.add_argument('-s', '--sample_name', dest='sampleName', required=False, default = 'sample', help='Sample name for output file')
 
         args = parser.parse_args(sys.argv[2:])
@@ -237,13 +240,25 @@ PLOIDY 2m1
 VIRUS_START 7
 SOURCE {}
 SINK {}
-'''.format(','.join(str(e) for e in sourceSegs), ','.join(str(e) for e in sinkSegs))   
-        for seg in segs:
-            res += 'SEG H:{}:{}:{}:{} {} {}\n'.format(seg[0], seg[1], seg[2], seg[3], float(seg[4])*15, seg[4])
-        for junc in sv:
-            res += 'JUNC H:{}:{} H:{}:{} {} {} U B\n'.format(junc[0], junc[1], junc[2], junc[3], float(junc[4])*15, junc[4])
-        for junc in normal:
-            res += 'JUNC H:{}:{} H:{}:{} {} {} U B\n'.format(junc[0], junc[1], junc[2], junc[3], float(junc[4])*15, junc[4])
+'''.format(','.join(str(e) for e in sourceSegs), ','.join(str(e) for e in sinkSegs))
+        if args.isSegDepth == False:# segment
+            for seg in segs:
+                res += 'SEG H:{}:{}:{}:{} {} {}\n'.format(seg[0], seg[1], seg[2], seg[3], float(seg[4])*15, seg[4])
+        else:
+            for seg in segs:
+                res += 'SEG H:{}:{}:{}:{} {} {}\n'.format(seg[0], seg[1], seg[2], seg[3], seg[4], -1)
+        if args.isSVDepth == False:# SV junction
+            for junc in sv:
+                res += 'JUNC H:{}:{} H:{}:{} {} {} U B\n'.format(junc[0], junc[1], junc[2], junc[3], float(junc[4])*15, junc[4])
+        else:
+            for junc in sv:
+                res += 'JUNC H:{}:{} H:{}:{} {} {} U B\n'.format(junc[0], junc[1], junc[2], junc[3], junc[4], -1)
+        if args.isSegDepth == False:# normal junction
+            for junc in normal:
+                res += 'JUNC H:{}:{} H:{}:{} {} {} U B\n'.format(junc[0], junc[1], junc[2], junc[3], float(junc[4])*15, junc[4])
+        else:
+            for junc in normal:
+                res += 'JUNC H:{}:{} H:{}:{} {} {} U B\n'.format(junc[0], junc[1], junc[2], junc[3], junc[4], -1)
         lhFile = open('{}.lh'.format(args.sampleName), 'w')
         lhFile.write(res)
         lhFile.close()
