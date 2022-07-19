@@ -178,13 +178,3 @@ PROP C2:chr3:chr6
 ## Author
 
 Ambigram is developed by DeepOmics lab under the supervision of Dr. Li Shuaicheng, City University of Hong Kong, Hong Kong, China.
-
-xxx
-
-## Built with
-
-xxx
-
-## License
-
-xxx
