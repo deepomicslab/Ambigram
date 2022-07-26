@@ -151,25 +151,25 @@ localHap --op bfb --in_lh [paths to your .lh files (seperated by ,), e.g., test1
 
 To decipher BFB events with translocation, we just need to add one line (shown as following) that includes explicit options at the end of the LH file. Ambigram supports 4 complex cases involved with BFB and translocation. 
 
-1. Insertion before BFB (e.g., segments of virus2 are inserted into chr1)
+1. Insertion before BFB (TRX-BFB) (e.g., segments of virus2 are inserted into chr1)
 
 ``` 
 PROP I1:chr1:virus2:chr1
 ```
 
-2. Insertion after BFB (e.g., segments of chr10 and chr12 are inserted into chr3, and insertion starts at Segment 3 or Segment 4 on chr3)
+2. Insertion after BFB (BFB-TRX) (e.g., segments of chr10 and chr12 are inserted into chr3, and insertion starts at Segment 3 or Segment 4 on chr3)
 
 ``` 
 PROP I2:chr3:chr10:chr12 M:chr3 S:3:4
 ```
 
-3. Concatenation before BFB (e.g., segments of chr7 are linked to virus3 by translocation)
+3. Concatenation before BFB (TRX-BFB) (e.g., segments of chr7 are linked to virus3 by translocation)
 
 ``` 
 PROP C1:chr7:virus3
 ```
 
-4. Concatenation after BFB (e.g., segments of chr3 are concatenated with segments of chr6)
+4. Concatenation after BFB (BFB-TRX) (e.g., segments of chr3 are concatenated with segments of chr6)
 
 ``` 
 PROP C2:chr3:chr6

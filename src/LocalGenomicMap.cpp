@@ -3409,8 +3409,9 @@ void LocalGenomicMap::allTopologicalOrders(vector<int> &res, bool visited[], int
 }
 
 void LocalGenomicMap::getBFB(vector<vector<int>> &orders, vector<vector<int>> &node2pat, 
-                            vector<vector<int>> &node2loop, vector<int> &res) {
-    bool forwardDir = true;                                
+                            vector<vector<int>> &node2loop, vector<int> &res, const bool isReversed) {
+    bool forwardDir = !isReversed;
+    cout<<"bfb strand: "<<forwardDir<<endl;                                
     for (int n=0; n<orders.size(); n++) {
         vector<int> bfb = orders[n];
         int i;
@@ -3508,10 +3509,10 @@ void LocalGenomicMap::getBFB(vector<vector<int>> &orders, vector<vector<int>> &n
             cout<<"Quit: "<<i<<" "<<bfb.size()<<endl;
             break;
         }
-        else if (n == orders.size()-1 && forwardDir) {
+        else if (n == orders.size()-1 && forwardDir != isReversed) {
             cout<<"Reverse\n";
             n = -1;
-            forwardDir = false;
+            forwardDir = isReversed;
         }
     }
 }
@@ -4044,14 +4045,40 @@ void LocalGenomicMap::editBFB(vector<vector<int>> bfbPaths, vector<int> &posInfo
 }
 
 void LocalGenomicMap::editInversions(vector<int> &res, vector<Junction *> &inversions,
-                            double** juncCN, int* elementCN, map<string, int> &variableIdx) {
-    //text output for visualization
-    string bfbRes = "";
+                            double** juncCN, int* elementCN, map<string, int> &variableIdx) {    
+    string bfbRes = "";//text output for visualization
     vector<Segment*> segs = *this->getGraph()->getSegments();
-    bool isPositive = true;
-    if(res[1]<res[0]) isPositive = false;
+    bool isPositive = res[0] < res[1];
+    int len = res.size();
+    //find symmetric intervals
+    vector<int> start(len, 0), end(len, len/2);
+    for(int j = 1; j < len; j += 2) {
+        if(j > 1 && start[j-2] <= j && j <= end[j-2]) {// inside a symmetric interval
+            start[j-1] = start[j] = start[j-2];
+            end[j-1] = end[j] = end[j-2];
+            // cout<<"Component "<<(j+1)/2<<" "<<start[j]<<"-"<<end[j]<<endl;
+        }
+        else {// search for the reverse component
+            for(int k = len-1; k > 0; k -= 2) {
+                bool isSymmetric = true;
+                for(int a = j, b = k; a < b; a+=2, b-=2) {
+                    if(res[a] != res[b-1] || res[a-1] != res[b]) {
+                        isSymmetric = false;
+                        break;
+                    }
+                }
+                if(isSymmetric) {
+                    start[j-1] = start[j] = j;
+                    end[j-1] = end[j] = k;
+                    // cout<<"Component "<<(j+1)/2<<" "<<start[j]<<"-"<<end[j]<<endl;
+                    break;
+                }
+            }
+        }
+    }
     //deal with imperfect inversions
-    for (int j=1;j<res.size()-1;j+=2) {
+    int i = 0; // junction index
+    for (int j=1;j<len-1;j+=2) {
         if (res[j] == -1)
             continue;        
         if (abs(res[j]-res[j-1])==abs(res[j+2]-res[j+1])) {
@@ -4060,50 +4087,42 @@ void LocalGenomicMap::editInversions(vector<int> &res, vector<Junction *> &inver
         }
         else
             bfbRes += "1:";
-        for (Junction* junc: inversions) {
+        for (int k = 0; k < inversions.size(); k++) {
+            Junction *junc = inversions[(i+k)%inversions.size()];
             int sourceSegID = junc->getSource()->getId(),
                 targetSegID = junc->getTarget()->getId();
             char sourceDir = junc->getSourceDir();                        
             if ((sourceSegID==res[j] || res[j]==targetSegID) ||
                 (targetSegID==res[j+1] || res[j+1]==sourceSegID)) {
-                //check the copy number of junctions
-                int segID = sourceSegID;
-                if (sourceDir == '+') 
-                    segID = sourceSegID>targetSegID? sourceSegID:targetSegID;
-                else
-                    segID = sourceSegID<targetSegID? sourceSegID:targetSegID;
-                // if (juncCN[segID][1] > 0)
-                //     juncCN[segID][1]--;
-                // else
-                //     continue;
                 //edit the fold-back inversion
-                if (sourceDir == '+') {
+                if (j < (start[j]+end[j])/2 || j == end[j]) {
                     if (res[j]>res[j-1]) {
-                        res[j] = sourceSegID;
-                        res[j+1] = targetSegID;
+                        res[j] = min(sourceSegID, targetSegID);
+                        res[j+1] = max(sourceSegID, targetSegID);
                     }
                     else {
-                        res[j] = targetSegID;
-                        res[j+1] = sourceSegID;
+                        res[j] = max(sourceSegID, targetSegID);
+                        res[j+1] = min(sourceSegID, targetSegID);
                     }
                 }
                 else {
                     if (res[j]>res[j-1]) {
-                        res[j] = targetSegID;
-                        res[j+1] = sourceSegID;
+                        res[j] = max(sourceSegID, targetSegID);
+                        res[j+1] = min(sourceSegID, targetSegID);
                     }
                     else {
-                        res[j] = sourceSegID;
-                        res[j+1] = targetSegID;
+                        res[j] = min(sourceSegID, targetSegID);
+                        res[j+1] = max(sourceSegID, targetSegID);
                     }
                 }
+                i = (i+k+1)%inversions.size();
                 break;
             }
         }
         char strand_5p = isPositive? '+':'-',
             strand_3p = isPositive? '-':'+';
         bfbRes += to_string(res[j])+":"+strand_5p+":"+to_string(res[j+1])+":"+strand_3p;
-        if(j<res.size()-3) bfbRes += "\t";
+        if(j<len-3) bfbRes += "\t";
         isPositive = !isPositive;
     }
     bfbRes += "\n";    
@@ -4494,15 +4513,16 @@ void LocalGenomicMap::BFB_ILP(const char *lpFn, vector<vector<int>> &patterns, v
                 idx++;
                 matrix->appendRow(constrain7);
                 if(seqMode) {
-                    key2 = "l:"+to_string(loops[j][0])+","+to_string(loops[j][1]);
-                    constrain8.insert(variableIdx[key1], 1);
-                    constrain8.insert(variableIdx[key2], 1);
-                    constrainLowerBound[idx] = 0;
-                    constrainUpperBound[idx] = 1;
-                    idx++;
-                    matrix->appendRow(constrain8);  
+                    // key2 = "l:"+to_string(loops[j][0])+","+to_string(loops[j][1]);
+                    // constrain8.insert(variableIdx[key1], 1);
+                    // constrain8.insert(variableIdx[key2], 1);
+                    // constrainLowerBound[idx] = 0;
+                    // constrainUpperBound[idx] = 1;
+                    // idx++;
+                    // matrix->appendRow(constrain8);  
 
                     key1 = "l:"+to_string(loops[i][0])+","+to_string(loops[i][1]);
+                    key2 = "l:"+to_string(loops[j][0])+","+to_string(loops[j][1]);
                     constrain9.insert(variableIdx[key1], 1);
                     constrain9.insert(variableIdx[key2], 1);
                     constrainLowerBound[idx] = 0;
@@ -4593,43 +4613,6 @@ void LocalGenomicMap::BFB_ILP(const char *lpFn, vector<vector<int>> &patterns, v
         constrainUpperBound[idx] = 5;
         idx++;
         matrix->appendRow(constrain10);
-        //p(a,d)+l(a,d)-Σp(a,b)-Σl(c,d)>=0: constrains on exclusiveness
-        for (int i=0;i<numPat;i++) {
-            CoinPackedVector constrain7, constrain8;
-            bool flag = false;
-            for (int j=0;j<numPat;j++) {
-                if (patterns[i][0] == patterns[j][0] && patterns[i][1] > patterns[j][1]) {                
-                    flag = true;          
-                    string key = "p:"+to_string(patterns[j][0])+","+to_string(patterns[j][1]);
-                    constrain7.insert(variableIdx[key], -1);
-                    key = "l:"+to_string(loops[j][0])+","+to_string(loops[j][1]);
-                    constrain8.insert(variableIdx[key], -1);
-                }
-                if (patterns[i][0] < patterns[j][0] && patterns[i][1] == patterns[j][1]) {
-                    flag = true;          
-                    string key = "p:"+to_string(patterns[j][0])+","+to_string(patterns[j][1]);
-                    constrain8.insert(variableIdx[key], -1);
-                    key = "l:"+to_string(loops[j][0])+","+to_string(loops[j][1]);
-                    constrain7.insert(variableIdx[key], -1);
-                }
-            }
-            if (flag) {
-                string key = "p:"+to_string(patterns[i][0])+","+to_string(patterns[i][1]);
-                constrain7.insert(variableIdx[key], 1);
-                constrain8.insert(variableIdx[key], 1);
-                key = "l:"+to_string(loops[i][0])+","+to_string(loops[i][1]);
-                constrain7.insert(variableIdx[key], 1);
-                constrain8.insert(variableIdx[key], 1);
-                constrainLowerBound[idx] = 0;
-                constrainUpperBound[idx] = si->getInfinity();
-                idx++;
-                matrix->appendRow(constrain7);
-                constrainLowerBound[idx] = 0;
-                constrainUpperBound[idx] = si->getInfinity();
-                idx++;
-                matrix->appendRow(constrain8);
-            }
-        }
     }    
 
     cout<<"ILP formula done"<<endl;
@@ -5128,7 +5111,7 @@ void LocalGenomicMap::readComponents(vector<vector<int>>& res, const char *juncs
                     g->addJunction(sourceId, sourceDir, targetId, targetDir, junCoverage, 1, 1, false, true, false);
                 }
                 else {
-                    junc2->getWeight()->setCopyNum(1);
+                    if(junc2->getWeight()->getCopyNum() < 2) junc2->getWeight()->setCopyNum(2);
                 }
                 lastIdx = i;
             }

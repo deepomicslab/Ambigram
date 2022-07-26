@@ -179,16 +179,16 @@ class MainArgParser:
     
     """ Generate .lh file by integrating sv.txt and seg.txt """
     def findSegment(self, segs, bkp, isStart): # bkp = [chr, pos, strand]
-        idx = 2 # left breakpoint
+        isLeft = True # left breakpoint
         if (isStart == True and bkp[2] == '+') or (isStart == False and bkp[2] == '-'):
-            idx = 3 # right breakpoint
+            isLeft = False # right breakpoint
         segID = len(segs)
         for seg in segs:
             if bkp[0] == seg[1]:
-                if idx == 2 and int(bkp[1]) < int(seg[idx]):
-                    segID = seg[0]-1
+                if isLeft==True and int(seg[2])<=int(bkp[1]) and int(bkp[1])<int(seg[3]):
+                    segID = seg[0]
                     break
-                if idx == 3 and int(bkp[1]) <= int(seg[idx]):
+                elif isLeft==False and int(seg[2])<int(bkp[1]) and int(bkp[1])<=int(seg[3]):
                     segID = seg[0]
                     break
         return segID
@@ -197,9 +197,11 @@ class MainArgParser:
         parser = argparse.ArgumentParser(description='Generate .lh file by integrating sv.txt and seg.txt.')
         parser.add_argument('-sv', '--sv_file', dest='svPath', required=True, help='Path to SV file')
         parser.add_argument('-seg', '--seg_file', dest='segPath', required=True, help='Path to SEG file')
+        parser.add_argument('-d', '--is_depth', dest='isDepth', required=False, default = False, help='Indicate either coverage depth or copy number is provided')
         parser.add_argument('-d1', '--is_seg_depth', dest='isSegDepth', required=False, default = False, help='Indicate either segment coverage depth or copy number is provided')
         parser.add_argument('-d2', '--is_sv_depth', dest='isSVDepth', required=False, default = False, help='Indicate either SV coverage depth or copy number is provided')
         parser.add_argument('-s', '--sample_name', dest='sampleName', required=False, default = 'sample', help='Sample name for output file')
+        parser.add_argument('-a', '--is_average', dest='isAverage', required=False, default = True, help='Indicate normal junction CNs are either average or minmimum of two segment CNs')
 
         args = parser.parse_args(sys.argv[2:])
         # read segments and construct normal junctions
@@ -210,11 +212,15 @@ class MainArgParser:
             info = line.strip('\n').split('\t')
             [chrName, interval] = info[0].split(':')
             segs.append([cnt, chrName, interval.split('-')[0], interval.split('-')[1], info[1]])
+            print('seg{} length:{} mid:{}'.format(cnt, int(segs[-1][3])-int(segs[-1][2]), (int(segs[-1][3])+int(segs[-1][2]))/2))
             if chrName != segs[sourceSegs[-1]-1][1]:
                 sinkSegs.append(cnt-1)
                 sourceSegs.append(cnt)
             elif cnt > 1:
-                cn = (float(segs[cnt-2][-1])+float(segs[cnt-1][-1]))/2
+                if args.isAverage == True:
+                    cn = (float(segs[cnt-2][-1])+float(segs[cnt-1][-1]))/2
+                else:
+                    cn = min(float(segs[cnt-2][-1]),float(segs[cnt-1][-1]))
                 normal.append([cnt-1, '+', cnt, '+', str(cn)])
             cnt += 1
         sinkSegs.append(cnt-1)
@@ -241,19 +247,19 @@ VIRUS_START 7
 SOURCE {}
 SINK {}
 '''.format(','.join(str(e) for e in sourceSegs), ','.join(str(e) for e in sinkSegs))
-        if args.isSegDepth == False:# segment
+        if args.isSegDepth == False and args.isDepth == False:# segment
             for seg in segs:
                 res += 'SEG H:{}:{}:{}:{} {} {}\n'.format(seg[0], seg[1], seg[2], seg[3], float(seg[4])*15, seg[4])
         else:
             for seg in segs:
                 res += 'SEG H:{}:{}:{}:{} {} {}\n'.format(seg[0], seg[1], seg[2], seg[3], seg[4], -1)
-        if args.isSVDepth == False:# SV junction
+        if args.isSVDepth == False and args.isDepth == False:# SV junction
             for junc in sv:
                 res += 'JUNC H:{}:{} H:{}:{} {} {} U B\n'.format(junc[0], junc[1], junc[2], junc[3], float(junc[4])*15, junc[4])
         else:
             for junc in sv:
                 res += 'JUNC H:{}:{} H:{}:{} {} {} U B\n'.format(junc[0], junc[1], junc[2], junc[3], junc[4], -1)
-        if args.isSegDepth == False:# normal junction
+        if args.isSegDepth == False and args.isDepth == False:# normal junction
             for junc in normal:
                 res += 'JUNC H:{}:{} H:{}:{} {} {} U B\n'.format(junc[0], junc[1], junc[2], junc[3], float(junc[4])*15, junc[4])
         else:

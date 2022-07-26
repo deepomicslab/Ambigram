@@ -32,6 +32,7 @@ int main(int argc, char *argv[]) {
             ("help", "Print usage")
             // BFB
             ("junc_info", "Use extra junction information", cxxopts::value<bool>()->default_value("false"))
+            ("reversed", "Use extra junction information", cxxopts::value<bool>()->default_value("false"))
             ("max_error", "The maximal acceptable rate", cxxopts::value<double>()->default_value("-1"))
             ("seq_mode", "Resolve a sequential bfb path without nested loops", cxxopts::value<bool>()->default_value("false"))
             ("edges", "Edges that indicate the evolution in single-cell data", cxxopts::value<std::string>()->default_value(""));
@@ -241,10 +242,15 @@ int main(int argc, char *argv[]) {
         const char *lpFn = result["lp_prefix"].as<std::string>().c_str();// sample name
         const char *juncsFn = result["juncdb"].as<std::string>().c_str();// extra junction information from TGS data
         const bool juncsInfo = result["junc_info"].as<bool>();// indicate whether add extra junction iformation into ILP constrains
+        const bool isReversed = result["reversed"].as<bool>();// the reference strand: true - forward; flase - backward
         const double maxError = result["max_error"].as<double>();// upper boundary of ILP error
         const bool seqMode = result["seq_mode"].as<bool>();// indicate whether use sequential mode (no small loop inserted in big loop)
         string edges = result["edges"].as<std::string>();// relationship among sub-clones in single-cell data e.g. 1:2,1:3
 
+        ofstream bfbFile;
+        bfbFile.open("bfbPaths.txt",std::ios_base::app);
+        bfbFile<<lhRawFn<<" "<<juncsFn<<endl;
+        bfbFile.close();
         /* get multiple .lh file names for single-cell data */
         vector<Graph*> graphs;
         vector<LocalGenomicMap*> lgms;
@@ -326,6 +332,8 @@ int main(int argc, char *argv[]) {
         lgm->readComponents(components, juncsFn);// third-generation data information
 
         vector<vector<int>> bfbPaths;
+        //record target CN of segments
+        vector<int> targetCN(g->getSegments()->size(),0);
         // construct bfb path on each chromosome
         for (int n=0; n<g->getMSources()->size(); n++) {
             // enumerate all the patterns and loops
@@ -374,6 +382,7 @@ int main(int argc, char *argv[]) {
             }
 
             if (abs(inversionCNSum)<0.000001&&validComponents.size()==0) {// no fold-back inversion
+                for(int i = startID-1; i < endID; i++) targetCN[i] += 2;
                 vector<int> temp({startID, endID, endID, startID});
                 lgm->editInversions(temp, inversions, juncCN, elementCN, variableIdx);
                 bfbPaths.push_back(temp);
@@ -420,10 +429,22 @@ int main(int argc, char *argv[]) {
                 }
             }
             if(infeasible) {
+                for(int i = startID-1; i < endID; i++) targetCN[i] += 2;
                 vector<int> temp({startID, endID, endID, startID});
                 lgm->editInversions(temp, inversions, juncCN, elementCN, variableIdx);
                 bfbPaths.push_back(temp);
                 continue;
+            }
+            //compute target CN of segments based loop/pattern
+            for (auto iter=variableIdx.begin();iter!=variableIdx.end();iter++) {
+                if(elementCN[iter->second] > 0) {
+                    string key = iter->first;
+                    int idx1 = stoi(key.substr(2, key.find(",")-2)), idx2 = stoi(key.substr(key.find(",")+1));
+                    for(int i=idx1-1; i<idx2; i++) {
+                        if(key[0]=='p') targetCN[i] += elementCN[iter->second];
+                        else targetCN[i] += elementCN[iter->second]*2;
+                    }
+                }
             }
             
             // construct BFB DAG and find all topological orders
@@ -467,7 +488,7 @@ int main(int argc, char *argv[]) {
                 }
                 // get one valid bfb path
                 vector<int> path;
-                lgms[k]->getBFB(orders, node2pat, node2loop, path);//get a valid BFB path          
+                lgms[k]->getBFB(orders, node2pat, node2loop, path, isReversed);//get a valid BFB path          
                 // output the text for visualization
                 if(numGraphs==1) { 
                     lgms[k]->editInversions(path, inversions, juncCN, elementCN, variableIdx);//edit the imperfect fold-back inversions (with deletion)
@@ -481,7 +502,13 @@ int main(int argc, char *argv[]) {
                 bfbPaths.push_back(path);
             }
         }
-        
+        //output target CN
+        ofstream targetCNString;
+        targetCNString.open("./target_cn.txt",std::ios_base::app);
+        for(int i = 0; i < targetCN.size(); i++)
+            targetCNString<<segs[i]->getChrom()<<":"<<segs[i]->getStart()<<"-"<<segs[i]->getEnd()<<"\t"<<segs[i]->getWeight()->getCoverage()
+                <<"\t"<<segs[i]->getWeight()->getCopyNum()<<"\t"<<targetCN[i]<<"\tNone\n";
+        targetCNString.close();
         if(numGraphs > 1) exit(0);
 
         // Insertion Mode 2: post-BFB insertion     
