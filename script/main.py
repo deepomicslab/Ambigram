@@ -607,33 +607,57 @@ class MainArgParser:
         args = parser.parse_args(sys.argv[2:])
         vcf = open(args.vcf, "r")
         if args.barcode == None:            
-            res = "chrom_5p\tbkpos_5p\tstrand_5p\tchrom_3p\tbkpos_3p\tstrand_3p\tavg_cn\n"
+            sv, arr = [], []
             for line in vcf.readlines():            
-                entry = line.split("\t")            
-                depth = entry[8] # entry[13].split(' ')[2].split(':')[1]
-                res += entry[0]+"\t"+entry[1]+"\t"+entry[2]+"\t"
-                res += entry[3]+"\t"+entry[4]+"\t"+entry[5]+"\t"
-                res += depth+"\n"
-            outFile = open(args.output, "w")
+                entry = line.split("\t")
+                # if entry[0]==entry[3] and (entry[2]==entry[5] or abs(int(entry[1])-int(entry[4])) > 100000):
+                #     continue
+                # if int(entry[7])+int(entry[8])<20 or int(entry[8])<6:
+                #     continue                
+                depth = entry[13].split('DP:')[1].split(' ')[0]
+                arr.append([entry[0], entry[1], entry[2], entry[3], entry[4], entry[5], depth])
+            # filter noisy SV
+            if arr[1][0] == arr[1][3] and arr[1][2] != arr[1][5]:
+                sv.append(arr[0])
+            for i in range(1, len(arr)-1):
+                if arr[i][0] != arr[i][3] or arr[i][2] != arr[i][5]:
+                    sv.append(arr[i])
+                else:
+                    if arr[i-1][0] == arr[i-1][3] and arr[i-1][2] != arr[i-1][5] or \
+                        arr[i+1][0] == arr[i+1][3] and arr[i+1][2] != arr[i+1][5]:
+                        sv.append(arr[i])
+            if arr[-2][0] == arr[-2][3] and arr[-2][2] != arr[-2][5]:
+                sv.append(arr[-1])
+            # sv = sorted(sv, key=lambda d: int(d[1]))
+            res = "chrom_5p\tbkpos_5p\tstrand_5p\tchrom_3p\tbkpos_3p\tstrand_3p\tavg_cn\n"
+            for d in sv:
+                res += '\t'.join(d)+'\n'
+            outFile = open('{}_sv.txt'.format(args.output), "w")
             outFile.write(res)
         else:
             barcode, sv = [], []
             for line in vcf.readlines():            
                 entry = line.split("\t")
-                # if entry[0]!='chr1' or entry[3]!='chr1':
+                # if entry[2]==entry[5] or float(entry[10]) < 20:
                 #     continue
-                if entry[0]==entry[3] and entry[2]==entry[5]:
-                    continue
+                # if entry[0]==entry[3] and entry[2]==entry[5]:
+                #     continue
                 codes = []
-                for code in entry[13].split(' ')[0].split(';')[0].split(','):
+                for code in entry[13].split(';')[0].split(','):
                     if len(codes) == 0:
                         codes.append(code[3:-2])
                     else:
                         codes.append(code[:-2])
                 barcode.append(codes)
+                str1, str2 = 'h', 't'
+                if entry[2] == '-':
+                    str1 = 't'
+                if entry[5] == '-':
+                    str2 = 'h'
+                depth = entry[13].split('DP:')[1].split(' ')[0]
                 sv_str = entry[0]+"\t"+entry[1]+"\t"+entry[2]+"\t"
                 sv_str += entry[3]+"\t"+entry[4]+"\t"+entry[5]+"\t"
-                sv_str += entry[13].split(' ')[2].split(':')[1]
+                sv_str += depth #+"\t"+(str1+str2)+'\tNone\tNone\t'
                 sv.append(sv_str)
             # read barcode file
             barcode2group = {}
@@ -641,29 +665,42 @@ class MainArgParser:
                 if line[0] == ',':
                     continue
                 info = line.strip('\n').split(',')
-                barcode2group[info[1]] = info[2]
+                if args.group == None:
+                    barcode2group[info[0]] = info[1]
+                else:
+                    barcode2group[info[1]] = info[2]
             # read group file
             group2subclone = {}
-            for line in open(args.group, 'r').readlines():
-                info = line.strip('\n').split(',')
-                if info[0] == 'label':
-                    continue
-                group2subclone[info[1]] = info[0]
+            if args.group != None:
+                for line in open(args.group, 'r').readlines():
+                    info = line.strip('\n').split(',')
+                    if info[0] == 'label':
+                        continue
+                    group2subclone[info[1]] = info[0]
             # construct subclone
-            subclone = {}
+            subclone, cloneCount = {}, [{} for i in range(len(barcode))]
             for i in range(len(barcode)):
                 for code in barcode[i]:
                     if code not in barcode2group.keys():
                         continue
-                    k = group2subclone[barcode2group[code]]
+                    if args.group == None:
+                        k = barcode2group[code]
+                    else:
+                        k = group2subclone[barcode2group[code]]
                     if k not in subclone.keys():
                         subclone[k] = []
                     subclone[k].append(i)
+                    if k not in cloneCount[i].keys():
+                        cloneCount[i][k] = 0
+                    cloneCount[i][k] += 1
             # output subclone sv
             for key, val in subclone.items():
                 res = 'chrom_5p\tbkpos_5p\tstrand_5p\tchrom_3p\tbkpos_3p\tstrand_3p\tavg_cn\n'
                 for i in list(set(val)):
-                    res += sv[i]+'\n'
+                    clone = ''
+                    for k, v in cloneCount[i].items():
+                        clone += k+'='+str(v)+','
+                    res += sv[i]+'\n'#+clone[:-1]+'\n'
                 outFile = open('{}_{}_sv.txt'.format(args.output, key), "w")
                 outFile.write(res)
         

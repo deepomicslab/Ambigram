@@ -1,5 +1,6 @@
 import argparse
 from cmath import inf
+from random import sample
 import sys
 
 class MainArgParser:
@@ -40,7 +41,7 @@ class MainArgParser:
         import functools
         parser = argparse.ArgumentParser(description='Cluster complex SV based on breakpoint distance.')
         parser.add_argument('-sv', '--sv_file', dest='svPath', required=True, help='Path to SV file')
-        parser.add_argument('-d', '--max_dis', dest='maxDis', required=False, default=1000000, help='Maximum distance of two SVs in a cluster')
+        parser.add_argument('-d', '--max_dis', dest='maxDis', required=False, type=int, default=1000000, help='Maximum distance of two SVs in a cluster')
         parser.add_argument('-s', '--sample_name', dest='sampleName', required=False, default = 'sample', help='Sample name for output file')
         args = parser.parse_args(sys.argv[2:])
         # read all SVs
@@ -60,22 +61,45 @@ class MainArgParser:
         cluster = []
         svIdx = list(range(0, len(juncs))) # sv index for selection
         while len(svIdx) > 0:
+            # if args.sampleName.split('/')[-1] == 'SRR5114981' and len(svIdx) < 10:
+            #     print(svIdx)
             subcluster = [svIdx[0]] # index of sv_info
+            all_chr = set((juncs[svIdx[0]][0], juncs[svIdx[0]][3]))
+            hasFBI = False
+            if juncs[svIdx[0]][0] == juncs[svIdx[0]][3] and juncs[svIdx[0]][2] != juncs[svIdx[0]][5]:
+                hasFBI = True
             queue = [svIdx[0]]
-            svIdx.pop(0)
+            svIdx.pop(0)            
             while len(queue) > 0:
                 idx = queue[0]
                 queue.pop(0)
                 for i in svIdx:
-                    if self.min_dis(juncs[idx], juncs[i]) > args.maxDis:
+                    isValid, allInf = True, True
+                    for j in subcluster:
+                        minDis = self.min_dis(juncs[i], juncs[j])
+                        if minDis!=inf:
+                            allInf = False
+                            if minDis>args.maxDis:
+                                isValid = False
+                                break
+                    if isValid == False or allInf == True:
                         continue
+                    all_chr.add(juncs[i][0])
+                    all_chr.add(juncs[i][3])
+                    # if len(all_chr) > 4:
+                    #     continue
+                    # if self.min_dis(juncs[idx], juncs[i]) > args.maxDis:
+                    #     continue
+                    if juncs[i][0] == juncs[i][3] and juncs[i][2] != juncs[i][5]:
+                        hasFBI = True
                     queue.append(i)
                     subcluster.append(i)
                     svIdx.remove(i)
-            cluster.append(subcluster)
+            if hasFBI == True and len(subcluster) < 10:
+                cluster.append(subcluster)
         # output a set of sv.txt files
         for i in range(len(cluster)):
-            svFile = open('{}{}_sv.txt'.format(args.sampleName, i+1), "w")
+            svFile = open('{}_{}_sv.txt'.format(args.sampleName, i+1), "w")
             res = 'chrom_5p\tbkpos_5p\tstrand_5p\tchrom_3p\tbkpos_3p\tstrand_3p\tavg_cn\n'
             for idx in cluster[i]:                
                 res += '\t'.join(juncs[idx])+'\n'
@@ -96,8 +120,8 @@ class MainArgParser:
         parser.add_argument('-sv', '--sv_file', dest='svPath', required=True, help='Path to SV file')
         parser.add_argument('-bam', '--bam_file', dest='bamPath', required=False, help='Path to BAM file')
         parser.add_argument('-s', '--sample_name', dest='sampleName', required=False, default = 'sample', help='Sample name for output file')
-        parser.add_argument('-d', '--wgs_depth', dest='wgsDepth', required=False, type=int, default = 0, help='The whole genome average depth (default: 100)')
-        parser.add_argument('-p', '--tumor_purity', dest='purity', required=False, type=int, default = 0, help='Sample tumor purity (default: 1)')
+        parser.add_argument('-d', '--wgs_depth', dest='wgsDepth', required=False, type=int, default = 0, help='The whole genome average depth')
+        parser.add_argument('-p', '--tumor_purity', dest='purity', required=False, type=int, default = 0, help='Sample tumor purity')
         args = parser.parse_args(sys.argv[2:])
         # find all breakpoints on each chromosome
         sv, pos = [], {}
@@ -116,7 +140,7 @@ class MainArgParser:
         for key, arr in pos.items():
             pos[key] = list(set(arr))
             pos[key].sort()
-            pos[key].insert(0, pos[key][0]-1000)
+            pos[key].insert(0, max(1, pos[key][0]-1000))
             pos[key].append(pos[key][-1]+1000)
 
         # call coverage depth of segments from BAM
@@ -183,23 +207,23 @@ class MainArgParser:
         if (isStart == True and bkp[2] == '+') or (isStart == False and bkp[2] == '-'):
             idx = 3 # right breakpoint
         segID = len(segs)
+        minDis = float('inf')
         for seg in segs:
             if bkp[0] == seg[1]:
-                if idx == 2 and int(bkp[1]) < int(seg[idx]):
-                    segID = seg[0]-1
-                    break
-                if idx == 3 and int(bkp[1]) <= int(seg[idx]):
+                if abs(int(bkp[1])-int(seg[idx])) < minDis:
+                    minDis = abs(int(bkp[1])-int(seg[idx]))
                     segID = seg[0]
-                    break
         return segID
 
     def generate_lh(self):
         parser = argparse.ArgumentParser(description='Generate .lh file by integrating sv.txt and seg.txt.')
         parser.add_argument('-sv', '--sv_file', dest='svPath', required=True, help='Path to SV file')
         parser.add_argument('-seg', '--seg_file', dest='segPath', required=True, help='Path to SEG file')
+        parser.add_argument('-d', '--is_depth', dest='isDepth', required=False, default = False, help='Indicate either coverage depth or copy number is provided')
         parser.add_argument('-d1', '--is_seg_depth', dest='isSegDepth', required=False, default = False, help='Indicate either segment coverage depth or copy number is provided')
         parser.add_argument('-d2', '--is_sv_depth', dest='isSVDepth', required=False, default = False, help='Indicate either SV coverage depth or copy number is provided')
         parser.add_argument('-s', '--sample_name', dest='sampleName', required=False, default = 'sample', help='Sample name for output file')
+        parser.add_argument('-a', '--is_average', dest='isAverage', required=False, default = True, help='Indicate normal junction CNs are either average or minmimum of two segment CNs')
 
         args = parser.parse_args(sys.argv[2:])
         # read segments and construct normal junctions
@@ -210,11 +234,15 @@ class MainArgParser:
             info = line.strip('\n').split('\t')
             [chrName, interval] = info[0].split(':')
             segs.append([cnt, chrName, interval.split('-')[0], interval.split('-')[1], info[1]])
+            print('seg{} length:{} mid:{}'.format(cnt, int(segs[-1][3])-int(segs[-1][2]), (int(segs[-1][3])+int(segs[-1][2]))/2))
             if chrName != segs[sourceSegs[-1]-1][1]:
                 sinkSegs.append(cnt-1)
                 sourceSegs.append(cnt)
             elif cnt > 1:
-                cn = (float(segs[cnt-2][-1])+float(segs[cnt-1][-1]))/2
+                if args.isAverage == True:
+                    cn = (float(segs[cnt-2][-1])+float(segs[cnt-1][-1]))/2
+                else:
+                    cn = min(float(segs[cnt-2][-1]),float(segs[cnt-1][-1]))
                 normal.append([cnt-1, '+', cnt, '+', str(cn)])
             cnt += 1
         sinkSegs.append(cnt-1)
@@ -222,11 +250,12 @@ class MainArgParser:
         sv = []
         for line in open(args.svPath, 'r').readlines()[1:]:
             info = line.strip('\n').split('\t')
-            if info[0] == info[3] and info[2] == info[5]:
-                continue
+            # if info[0] == info[3] and info[2] == info[5]:
+            #     continue
             seg1, seg2 = self.findSegment(segs, info[:3], True), self.findSegment(segs, info[3:6], False)
-            if info[0] == info[3] and abs(seg1-seg2) > 2:
-                continue
+            print(seg1, seg2)
+            # if info[0] == info[3] and abs(seg1-seg2) > 2:
+            #     continue
             sv.append([seg1, info[2], seg2, info[5], info[6]])
             
         # output .lh file
@@ -241,19 +270,19 @@ VIRUS_START 7
 SOURCE {}
 SINK {}
 '''.format(','.join(str(e) for e in sourceSegs), ','.join(str(e) for e in sinkSegs))
-        if args.isSegDepth == False:# segment
+        if args.isSegDepth == False and args.isDepth == False:# segment
             for seg in segs:
                 res += 'SEG H:{}:{}:{}:{} {} {}\n'.format(seg[0], seg[1], seg[2], seg[3], float(seg[4])*15, seg[4])
         else:
             for seg in segs:
                 res += 'SEG H:{}:{}:{}:{} {} {}\n'.format(seg[0], seg[1], seg[2], seg[3], seg[4], -1)
-        if args.isSVDepth == False:# SV junction
+        if args.isSVDepth == False and args.isDepth == False:# SV junction
             for junc in sv:
                 res += 'JUNC H:{}:{} H:{}:{} {} {} U B\n'.format(junc[0], junc[1], junc[2], junc[3], float(junc[4])*15, junc[4])
         else:
             for junc in sv:
                 res += 'JUNC H:{}:{} H:{}:{} {} {} U B\n'.format(junc[0], junc[1], junc[2], junc[3], junc[4], -1)
-        if args.isSegDepth == False:# normal junction
+        if args.isSegDepth == False and args.isDepth == False:# normal junction
             for junc in normal:
                 res += 'JUNC H:{}:{} H:{}:{} {} {} U B\n'.format(junc[0], junc[1], junc[2], junc[3], float(junc[4])*15, junc[4])
         else:
