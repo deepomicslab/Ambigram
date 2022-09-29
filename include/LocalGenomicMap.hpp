@@ -194,14 +194,14 @@ public:
     void getBFB(vector<vector<int>> &orders, vector<vector<int>> &node2pat, vector<vector<int>> &node2loop, vector<int> &res);
     void readBFBProps(string &mainChr, int &insMode, vector<string> &insChr, int &conMode, vector<string> &conChr, vector<int> &startSegs, const char *lhRawFn);
     void getJuncCN(vector<Junction *> &inversions , double** juncCN, Graph &graph, int startSegID, int endSegID);
-    void insertBeforeBFB(Graph*& g, vector<string>& insChr, unordered_map<int, int>& originalSegs);
+    void insertBeforeBFB(Graph*& g, vector<string>& insChr, unordered_map<int, int>& originalSegs, vector<Junction *>& unusedSV);
     void insertAfterBFB(vector<string>& insChr, string& mainChr, vector<int>& startSegs, vector<vector<int>>& bfbPaths);
-    void concatBeforeBFB(Graph*& g, vector<string>& conChr, unordered_map<int, int>& originalSegs);
+    void concatBeforeBFB(Graph*& g, vector<string>& conChr, unordered_map<int, int>& originalSegs, vector<Junction *>& unusedSV);
     void concatAfterBFB(vector<string>& conChr, vector<vector<int>>& bfbPaths);
     void editBFB(vector<vector<int>> bfbPaths, vector<int> &posInfo, vector<int> &output);
     void editInversions(vector<int> &res, vector<Junction *> &inversions, double** juncCN, int* elementCN, map<string, int> &variableIdx);
     void printBFB(vector<int> &res);
-    void printOriginalBFB(vector<int> &res, unordered_map<int, int> &m);
+    void printOriginalBFB(vector<int> &res, unordered_map<int, int> &m, vector<Junction *> &unusedSV);
     void BFB_ILP(const char *lpFn, vector<vector<int>> &patterns, vector<vector<int>> &loops, map<string, int> &variableIdx, double** juncCN, vector<vector<int>> &components, const bool juncsInfo, const double maxError, const bool seqMode);
     void BFB_ILP_SC(const char *lpFn, vector<vector<int>> &patterns, vector<vector<int>> &loops, map<string, int> &variableIdx, vector<Graph*> graphs, const double maxError, vector<vector<int>> &evolution);
     void bfbConcate(Junction *sv, bool edgeA, int pos1, int pos2, vector<vector<int>> bfbPaths, vector<int> &res);

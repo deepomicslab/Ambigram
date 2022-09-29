@@ -6,7 +6,7 @@ import sys
 class MainArgParser:
     def __init__(self):
         parser = argparse.ArgumentParser(prog='preBFB')
-        parser.add_argument(dest='subfunc', help='Available sub-functions: generate_seg')
+        parser.add_argument(dest='subfunc', help='Available sub-functions: cluster_sv, generate_seg, call_depth, generate_lh')
         args = parser.parse_args(sys.argv[1:2])
         getattr(self, args.subfunc)()
 
@@ -197,7 +197,7 @@ class MainArgParser:
         for line in open(args.segPath).readlines():
             line = line.strip('\n').split('\t')[0]
             ref, bkp = line.split(':')[0], line.split(':')[1].split('-')        
-            cnt = bam.count_coverage(ref, int(bkp[0]), int(bkp[1]), quality_threshold = 0)
+            cnt = bam.count_coverage(ref, int(bkp[0]), int(bkp[1])+1, quality_threshold = 0)
             pos = int(bkp[0])
             for i in range(len(cnt[0])):
                 temp = 0
