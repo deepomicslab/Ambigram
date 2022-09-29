@@ -36,12 +36,37 @@ class MainArgParser:
         if sv1[3] != sv2[3]:
             diff4 = inf
         return min(diff1,diff2,diff3,diff4)
+    
+    def setRange(self, chr_range, sv):
+        if sv[0] in chr_range.keys():
+            chr_range[sv[0]][0] = min(chr_range[sv[0]][0], int(sv[1]))
+            chr_range[sv[0]][1] = max(chr_range[sv[0]][1], int(sv[1]))
+        else:
+            chr_range[sv[0]] = [int(sv[1]), int(sv[1])]
+        if sv[3] in chr_range.keys():
+            chr_range[sv[3]][0] = min(chr_range[sv[3]][0], int(sv[4]))
+            chr_range[sv[3]][1] = max(chr_range[sv[3]][1], int(sv[4]))
+        else:
+            chr_range[sv[3]] = [int(sv[4]), int(sv[4])]
+        return chr_range
+    
+    def check_range(self, chr_range, max_range):
+        for val in chr_range.values():
+            if val[1]-val[0] > max_range:
+                return False
+        return True
+
+    def hasFBI(self, sv_id, sv):
+        for i in sv_id:
+            if sv[i][0] == sv[i][3] and sv[i][2] != sv[i][5]:
+                return True
+        return False
 
     def cluster_sv(self):
-        import functools
         parser = argparse.ArgumentParser(description='Cluster complex SV based on breakpoint distance.')
         parser.add_argument('-sv', '--sv_file', dest='svPath', required=True, help='Path to SV file')
-        parser.add_argument('-d', '--max_dis', dest='maxDis', required=False, type=int, default=1000000, help='Maximum distance of two SVs in a cluster')
+        parser.add_argument('-d', '--max_dis', dest='maxDis', required=False, type=int, default=1000000, help='Maximum distance of two SVs grouped in a cluster')
+        parser.add_argument('-r', '--max_range', dest='maxRange', required=False, type=int, default=10000000, help='Maximum range of a cluster')
         parser.add_argument('-s', '--sample_name', dest='sampleName', required=False, default = 'sample', help='Sample name for output file')
         args = parser.parse_args(sys.argv[2:])
         # read all SVs
@@ -61,41 +86,24 @@ class MainArgParser:
         cluster = []
         svIdx = list(range(0, len(juncs))) # sv index for selection
         while len(svIdx) > 0:
-            # if args.sampleName.split('/')[-1] == 'SRR5114981' and len(svIdx) < 10:
-            #     print(svIdx)
-            subcluster = [svIdx[0]] # index of sv_info
-            all_chr = set((juncs[svIdx[0]][0], juncs[svIdx[0]][3]))
-            hasFBI = False
-            if juncs[svIdx[0]][0] == juncs[svIdx[0]][3] and juncs[svIdx[0]][2] != juncs[svIdx[0]][5]:
-                hasFBI = True
-            queue = [svIdx[0]]
-            svIdx.pop(0)            
+            subcluster, queue = [svIdx[0]], [svIdx[0]] # index of sv_info
+            sv, chr_range = juncs[svIdx[0]], {}
+            self.setRange(chr_range, sv)
+            svIdx.pop(0)
             while len(queue) > 0:
                 idx = queue[0]
                 queue.pop(0)
                 for i in svIdx:
-                    isValid, allInf = True, True
-                    for j in subcluster:
-                        minDis = self.min_dis(juncs[i], juncs[j])
-                        if minDis!=inf:
-                            allInf = False
-                            if minDis>args.maxDis:
-                                isValid = False
-                                break
-                    if isValid == False or allInf == True:
-                        continue
-                    all_chr.add(juncs[i][0])
-                    all_chr.add(juncs[i][3])
-                    # if len(all_chr) > 4:
-                    #     continue
-                    # if self.min_dis(juncs[idx], juncs[i]) > args.maxDis:
-                    #     continue
-                    if juncs[i][0] == juncs[i][3] and juncs[i][2] != juncs[i][5]:
-                        hasFBI = True
-                    queue.append(i)
-                    subcluster.append(i)
-                    svIdx.remove(i)
-            if hasFBI == True and len(subcluster) < 10:
+                    if self.min_dis(juncs[i], juncs[idx]) < args.maxDis:
+                        temp_range = chr_range.copy()
+                        self.setRange(temp_range, juncs[i])
+                        if self.check_range(temp_range, args.maxRange):
+                            self.setRange(chr_range, juncs[i])
+                            queue.append(i)
+                            subcluster.append(i)
+                            svIdx.remove(i)
+                            print(subcluster)
+            if self.hasFBI(subcluster, juncs) == True:
                 cluster.append(subcluster)
         # output a set of sv.txt files
         for i in range(len(cluster)):
