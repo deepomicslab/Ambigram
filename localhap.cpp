@@ -35,6 +35,7 @@ int main(int argc, char *argv[]) {
             ("reversed", "Use extra junction information", cxxopts::value<bool>()->default_value("false"))
             ("max_error", "The maximal acceptable rate", cxxopts::value<double>()->default_value("-1"))
             ("seq_mode", "Resolve a sequential bfb path without nested loops", cxxopts::value<bool>()->default_value("false"))
+            ("FBI_span", "The maximal breakpoint distance of a FBI", cxxopts::value<int>()->default_value("-1"))
             ("edges", "Edges that indicate the evolution in single-cell data", cxxopts::value<std::string>()->default_value(""));
     auto result = options.parse(argc, argv);
     if (result.count("help")) {
@@ -245,6 +246,7 @@ int main(int argc, char *argv[]) {
         const bool isReversed = result["reversed"].as<bool>();// the reference strand: true - forward; flase - backward
         const double maxError = result["max_error"].as<double>();// upper boundary of ILP error
         const bool seqMode = result["seq_mode"].as<bool>();// indicate whether use sequential mode (no small loop inserted in big loop)
+        const int FBISpan = result["FBI_span"].as<int>();// upper limit of FBI breakpoint distance
         string edges = result["edges"].as<std::string>();// relationship among sub-clones in single-cell data e.g. 1:2,1:3
 
         ofstream bfbFile;
@@ -330,6 +332,8 @@ int main(int argc, char *argv[]) {
         // get information of third-generation data
         vector<vector<int>> components;
         lgm->readComponents(components, juncsFn);// third-generation data information
+        // set FBI span
+        lgm->setFBISpan(FBISpan);
 
         vector<vector<int>> bfbPaths;
         //record target CN of segments
@@ -360,7 +364,7 @@ int main(int argc, char *argv[]) {
             int numComp = variableIdx.size();
 
             // find copy number for both normal junctions and fold-back inversions
-            vector<Junction *> inversions;
+            unordered_map<int, Junction*> inversions;
             double** juncCN = new double*[endID+1];
             lgm->getJuncCN(inversions, juncCN, *g, startID, endID);
             
@@ -448,7 +452,8 @@ int main(int argc, char *argv[]) {
             }
             
             // construct BFB DAG and find all topological orders
-            for (int k = 0; k < numGraphs; k++) {                
+            for (int k = 0; k < numGraphs; k++) {   
+                lgms[k]->setFBISpan(FBISpan);
                 vector<vector<int>> adj, node2pat, node2loop;
                 for (int i = 0;i < numComp/2; i++) {
                     string key = "p:"+to_string(patterns[i][0])+","+to_string(patterns[i][1]);
@@ -488,18 +493,23 @@ int main(int argc, char *argv[]) {
                 }
                 // get one valid bfb path
                 vector<int> path;
-                lgms[k]->getBFB(orders, node2pat, node2loop, path, isReversed);//get a valid BFB path          
+                lgms[k]->getBFB(orders, node2pat, node2loop, path, isReversed);//get a valid BFB path
+                // deal with intra-chromosomal deletion and insertion
+
                 // output the text for visualization
                 if(numGraphs==1) { 
                     lgms[k]->editInversions(path, inversions, juncCN, elementCN, variableIdx);//edit the imperfect fold-back inversions (with deletion)
                     if(insMode==1 || conMode==1) lgms[k]->printOriginalBFB(path, originalSegs, unusedSV);
                 }
                 else {
-                    lgms[k]->getJuncCN(inversions, juncCN, *graphs[k], startID, endID);
-                    lgms[k]->editInversions(path, inversions, juncCN, elementCN, variableIdx);
+                    unordered_map<int, Junction*> invs;
+                    lgms[k]->getJuncCN(invs, juncCN, *graphs[k], startID, endID);
+                    lgms[k]->editInversions(path, invs, juncCN, elementCN, variableIdx);
                     // lgms[k]->printBFB(path);
                 }
                 bfbPaths.push_back(path);
+                vector<bool> dir{path[0]<path[1]};
+                lgms[k]->indelBFB(path, dir);
             }
         }
         //output target CN

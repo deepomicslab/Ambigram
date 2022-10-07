@@ -3464,6 +3464,7 @@ void LocalGenomicMap::getBFB(vector<vector<int>> &orders, vector<vector<int>> &n
                 while(cn--&&flag){
                     int idx = path.size()-1;
                     while(idx>=0) {//find a insertion position
+                        cout<<"idx: "<<idx<<"\tseg: "<<path[idx]<<"loop: "<<node2loop[bfb[i]][1]<<endl;
                         if(path[idx]==node2loop[bfb[i]][0]&&path[idx]-path[idx-1]<0) {
                             if(idx == path.size()-1) break;
                             else if(path[idx-1]==path[idx+2]) break;
@@ -3514,6 +3515,142 @@ void LocalGenomicMap::getBFB(vector<vector<int>> &orders, vector<vector<int>> &n
             n = -1;
             forwardDir = isReversed;
         }
+    }
+}
+
+void LocalGenomicMap::indelBFB(vector<int> &bfb, vector<bool> &dir) {
+    Graph* g = this->getGraph();
+    int left = 0, right = 0, n = 0;
+    // deal with insertion and deletion in local regions
+    while(right < bfb.size()) {
+        while(right < bfb.size() && bfb[right] != -1) right++;
+        vector<int> path(bfb.begin()+left, bfb.begin()+right);
+        right += 2;
+        left = right;
+        // construct a complete BFB path
+        vector<vector<int>> bfbPath;
+        bool isPositive = dir[n++];
+        for(int i = 0; i < path.size(); i += 2) {
+            vector<int> fragment;
+            if(isPositive) {
+                for(int j = path[i]; j <= path[i+1]; j++) fragment.push_back(j);
+            }
+            else {
+                for(int j = path[i]; j >= path[i+1]; j--) fragment.push_back(-j);
+            }
+            bfbPath.push_back(fragment);
+            isPositive = !isPositive;
+        }
+
+        // find intra-chromosomal SV (except FBI)
+        vector<Junction*> sv;
+        int pid = (*g->getSegmentById(path[0])).getPartition();
+        int startSegID = (*g->getMSources())[pid]->getId(), endSegID = (*g->getMSinks())[pid]->getId();
+        for(Junction *junc: *g->getJunctions()) {
+            if(junc->getSource()->getChrId() != junc->getTarget()->getChrId()) continue; // translocation
+            int sourceID = junc->getSource()->getId(), targetID = junc->getTarget()->getId();
+            char sourceDir = junc->getSourceDir(), targetDir = junc->getTargetDir();
+            if(sourceID<startSegID||sourceID>endSegID||targetID<startSegID||targetID>endSegID) continue;// out of interval
+            if(sourceDir != targetDir && abs(sourceID-targetID) <= 2) {// FBI
+                if(this->FBISpan != -1) {
+                    int pos1 = sourceDir=='+'? junc->getSource()->getEnd() : junc->getSource()->getStart(),
+                        pos2 = targetDir=='+'? junc->getTarget()->getStart() : junc->getTarget()->getEnd();
+                    if(this->FBISpan >= abs(pos1-pos2)) continue;
+                }
+                else continue;
+            }
+            if(sourceDir == targetDir && abs(sourceID-targetID) == 1) continue; // normal junction
+            sv.push_back(junc);
+        }
+        // find deletion and insertion
+        vector<vector<int>> groups;
+        while(!sv.empty()) {
+            vector<int> group;
+            for(int i = 0; i < sv.size(); i++) {
+                int sourceID = sv[i]->getSource()->getId(), targetID = sv[i]->getTarget()->getId();
+                char sourceDir = sv[i]->getSourceDir(), targetDir = sv[i]->getTargetDir();
+                if(sourceDir == '-') sourceID = -sourceID;
+                if(targetDir == '-') targetID = -targetID;
+                if(group.empty()) group.push_back(sourceID), group.push_back(targetID);
+                else {
+                    if(targetID == group.front()) group.insert(group.begin(), sourceID);
+                    else if(sourceID == -group.front()) group.insert(group.begin(), -targetID);
+                    else if(group.back() == sourceID) group.push_back(targetID);
+                    else if(group.back() == -targetID) group.push_back(-sourceID);
+                    else continue;
+                }
+                sv.erase(sv.begin()+i);
+                i--;
+            }
+            groups.push_back(group);
+        }
+
+        // revise the BFB path
+        for(vector<int> group: groups) {
+            // for(int k: group) cout<<k<<" ";
+            // cout<<endl;
+            int startSeg = group.front(), endSeg = group.back();
+            if(startSeg*endSeg < 0) { // compromise FBI
+                for(int j = 1; j < bfbPath.size(); j++) {
+                    if(find(bfbPath[j-1].begin(), bfbPath[j-1].end(), startSeg)!=bfbPath[j-1].end() &&
+                        find(bfbPath[j].begin(), bfbPath[j].end(), endSeg)!=bfbPath[j].end()) {
+                        while(bfbPath[j-1].back() != startSeg) bfbPath[j-1].pop_back();
+                        while(bfbPath[j].front() != endSeg) bfbPath[j].erase(bfbPath[j].begin());
+                        break;
+                    }
+                    else if(find(bfbPath[j-1].begin(), bfbPath[j-1].end(), -endSeg)!=bfbPath[j-1].end() &&
+                        find(bfbPath[j].begin(), bfbPath[j].end(), -startSeg)!=bfbPath[j].end()) {
+                        while(bfbPath[j-1].back() != -endSeg) bfbPath[j-1].pop_back();
+                        while(bfbPath[j].front() != -startSeg) bfbPath[j].erase(bfbPath[j].begin());
+                        break;
+                    }
+                }
+                continue;
+            }
+            for(int i = 0; i < bfbPath.size(); i++) {
+                if(bfbPath[i][0]*startSeg < 0) continue;
+                vector<int> newFragment;
+                if(group.size() == 2) {
+                    int a = find(bfbPath[i].begin(), bfbPath[i].end(), startSeg)-bfbPath[i].begin(),
+                        b = find(bfbPath[i].begin(), bfbPath[i].end(), endSeg)-bfbPath[i].begin();
+                    if(a == bfbPath[i].size() || b == bfbPath[i].size()) continue;
+                    if(a < b) { // deletion
+                        for(int j = 0; j < bfbPath[i].size(); j++) {
+                            if(j <= a || j >= b) newFragment.push_back(bfbPath[i][j]);
+                        }
+                    }
+                    else { // duplication
+                        newFragment = bfbPath[i];
+                        newFragment.insert(newFragment.begin()+b, bfbPath[i].begin()+b, bfbPath[i].begin()+a+1);
+                    }
+                }
+                // insertion
+                else {
+                    for(int j = 0; j < bfbPath[i].size(); j++) {
+                        if(bfbPath[i][j] == startSeg) {
+                            for(int seg: group) newFragment.push_back(seg);
+                            j = find(bfbPath[i].begin(), bfbPath[i].end(), endSeg)-bfbPath[i].begin();
+                        }
+                        else if(bfbPath[i][j] == endSeg) {
+                            for(int k = group.size()-1; k >= 0; k--) newFragment.push_back(group[k]);
+                            j = find(bfbPath[i].begin(), bfbPath[i].end(), startSeg)-bfbPath[i].begin();
+                        }
+                        else newFragment.push_back(bfbPath[i][j]);
+                    }
+                }
+                bfbPath[i] = newFragment;
+                break;
+            }
+        }
+        for(int i = 0; i < bfbPath.size(); i++) {
+            for(int seg: bfbPath[i]) {
+                cout<<abs(seg);
+                cout<<(seg>0?"+":"-")<<":";
+            }
+            if(i < bfbPath.size()-1) cout<<"|";
+        }
+        if(right < bfb.size()) cout<<"->";
+        else cout<<endl;
     }
 }
 
@@ -3575,13 +3712,13 @@ void LocalGenomicMap::readBFBProps(string &mainChr, int &insMode, vector<string>
         cout<<seg<<endl;
 }
 
-void LocalGenomicMap::getJuncCN(vector<Junction *> &inversions , double** juncCN, Graph &graph,  int startSegID, int endSegID) {
+void LocalGenomicMap::getJuncCN(unordered_map<int, Junction*> &inversions, double** juncCN, Graph &graph, int startSegID, int endSegID) {
     // find copy number for both normal junctions and fold-back inversions
-    inversions.clear();
     for (int i=0; i <= endSegID; i++) {
         juncCN[i] = new double[2];//0: normal junction   1: inversion
         memset(juncCN[i], 0, 2*sizeof(double));
     }
+    vector<Junction *> inv;
     for (Junction *junc: *graph.getJunctions()) {
         int sourceID = junc->getSource()->getId(), targetID = junc->getTarget()->getId();
         char sourceDir = junc->getSourceDir(), targetDir = junc->getTargetDir();
@@ -3598,19 +3735,31 @@ void LocalGenomicMap::getJuncCN(vector<Junction *> &inversions , double** juncCN
             }
         }
         else {//hh or tt (inversion)
-            if (abs(sourceID-targetID)<=3) {// fold-back inversion (with error of 3 bp)
-                if(sourceID != targetID)
-                    inversions.push_back(junc);
-                if (sourceDir == '+') {
-                    int greaterID = sourceID>targetID? sourceID:targetID;
-                    juncCN[greaterID][1] += copyNum;
+            if (abs(sourceID-targetID)<=2) {// fold-back inversion (with error of 2 segments)
+                if(this->FBISpan != -1) {
+                    int pos1 = sourceDir=='+'? junc->getSource()->getEnd() : junc->getSource()->getStart(),
+                        pos2 = targetDir=='+'? junc->getTarget()->getStart() : junc->getTarget()->getEnd();
+                    if(this->FBISpan < abs(pos1-pos2)) continue; // intra-chromosomal inversion
                 }
-                else {
-                    int smallerID = sourceID<targetID? sourceID:targetID;
-                    juncCN[smallerID][1] += copyNum;
-                }                        
+                inv.push_back(junc);
+                if(inversions.find(sourceID) == inversions.end()) {
+                    inversions[sourceID] = junc;
+                    juncCN[sourceID][1] += copyNum;
+                }
+                else if(inversions.find(targetID) == inversions.end()) {
+                    inversions[targetID] = junc;
+                    juncCN[targetID][1] += copyNum;
+                }
             }
-        }            
+        }
+    }
+    // deal with unrecorded inversion segment
+    for(Junction *junc: inv) {
+        int sourceID = junc->getSource()->getId(), targetID = junc->getTarget()->getId();
+        if(inversions.find(sourceID) == inversions.end()) 
+            inversions[sourceID] = junc;
+        else if(inversions.find(targetID) == inversions.end())
+            inversions[targetID] = junc;
     }
 }
 
@@ -3772,7 +3921,7 @@ void LocalGenomicMap::insertAfterBFB(vector<string>& insChr, string& mainChr, ve
     }
     cout<<"sv for insertion: "<<endl;
     for (Junction *junc: insertionSV) {
-        cout<<junc->getSource()->getId()<<" "<<junc->getTarget()->getId()<<endl;
+        cout<<junc->getInfo()[0]<<endl;
     }
     
     //construct bfb paths with insertion        
@@ -3818,13 +3967,23 @@ void LocalGenomicMap::insertAfterBFB(vector<string>& insChr, string& mainChr, ve
         //construct the bool array for SV directions
         bool *edgeA = new bool[segs.size()];
         memset(edgeA, true, segs.size()*sizeof(bool));
-        vector<Junction *> svPath;
+        vector<Junction *> svPath, usedSV;
         //find valid SVs in sequence
         int cnt = 0;
         for (int i=0; i<segs.size()-1; i+=1) {
             if(connections[segs[i]][segs[i+1]] == -1)
                 break;
-            Junction *sv = insertionSV[connections[segs[i]][segs[i+1]]];
+            Junction *sv;
+            for(Junction *junc: insertionSV) {
+                if((segs[i]==junc->getSource()->getId() && segs[i+1]==junc->getTarget()->getId()) ||
+                    (segs[i]==junc->getTarget()->getId() && segs[i+1]==junc->getSource()->getId())) {
+                    if(find(usedSV.begin(), usedSV.end(), junc) == usedSV.end()) {
+                        sv = junc;
+                        usedSV.push_back(junc);
+                        break;
+                    }
+                }
+            }
             Edge *e = sv->getEdgeA();
             int chr1 = sv->getSource()->getChrId(), chr2 = sv->getTarget()->getChrId();
             //cout<<chr1<<" "<<chr2<<" "<<endl;
@@ -3978,6 +4137,7 @@ void LocalGenomicMap::concatAfterBFB(vector<string>& conChr, vector<vector<int>>
         int start = bfbPaths[chrID].size()-4<0? 0 : bfbPaths[chrID].size()-4;
         vector<int> res;
         this->bfbConcate(concatenationSV[i], true, start, 0, bfbPaths, res);//start from position 2 of the main chromosome
+        if(res.empty()) this->bfbConcate(concatenationSV[i], false, start, 0, bfbPaths, res);
         if (!res.empty()) {
             vector<int> output;
             this->editBFB(bfbPaths, res, output);
@@ -3988,12 +4148,15 @@ void LocalGenomicMap::concatAfterBFB(vector<string>& conChr, vector<vector<int>>
 
 void LocalGenomicMap::editBFB(vector<vector<int>> bfbPaths, vector<int> &posInfo, vector<int> &output) {
     int chr = posInfo[0], pos = posInfo[1], segID = posInfo[2];
+    vector<bool> dir;
+    dir.push_back(bfbPaths[chr][0]<bfbPaths[chr][1]);
     output.insert(output.end(), bfbPaths[chr].begin(), bfbPaths[chr].begin()+pos+1);
     output.push_back(segID);
     for (int i=6; i<=posInfo.size()-4; i+=6) {
         int chr1 = posInfo[i-3], pos1 = posInfo[i-2], sourceID = posInfo[i-1],
             chr2 = posInfo[i], pos2 = posInfo[i+1], targetID = posInfo[i+2];
         //cout<<chr1<<" "<<pos1<<" "<<sourceID<<" "<<chr2<<" "<<pos2<<" "<<targetID<<endl;
+        dir.push_back(bfbPaths[chr1][pos1]<bfbPaths[chr1][pos1+1]);
         output.push_back(-1), output.push_back(-1);//sign for translocation
         output.push_back(sourceID);
         if (pos1 != pos2)
@@ -4003,6 +4166,7 @@ void LocalGenomicMap::editBFB(vector<vector<int>> bfbPaths, vector<int> &posInfo
     }
     output.push_back(-1), output.push_back(-1);
     chr = posInfo[posInfo.size()-3], pos = posInfo[posInfo.size()-2], segID = posInfo[posInfo.size()-1];
+    dir.push_back(bfbPaths[chr][pos]<bfbPaths[chr][pos+1]);
     output.push_back(segID);
     output.insert(output.end(), bfbPaths[chr].begin()+pos+1, bfbPaths[chr].end());
     //text output for visualization
@@ -4041,10 +4205,15 @@ void LocalGenomicMap::editBFB(vector<vector<int>> bfbPaths, vector<int> &posInfo
     bfbFile.open("bfbPaths.txt",std::ios_base::app);
     bfbFile<<bfbRes;
     bfbFile.close();
-    printBFB(output);
+    // printBFB(output);
+    for(int i: output) cout<<i<<" ";
+    cout<<endl;
+    for(bool b: dir) cout<<b<<" ";
+    cout<<endl;
+    indelBFB(output, dir);
 }
 
-void LocalGenomicMap::editInversions(vector<int> &res, vector<Junction *> &inversions,
+void LocalGenomicMap::editInversions(vector<int> &res, unordered_map<int, Junction*> &inversions,
                             double** juncCN, int* elementCN, map<string, int> &variableIdx) {    
     string bfbRes = "";//text output for visualization
     vector<Segment*> segs = *this->getGraph()->getSegments();
@@ -4087,16 +4256,13 @@ void LocalGenomicMap::editInversions(vector<int> &res, vector<Junction *> &inver
         }
         else
             bfbRes += "1:";
-        for (int k = 0; k < inversions.size(); k++) {
-            Junction *junc = inversions[(i+k)%inversions.size()];
+        if(inversions.find(res[j]) != inversions.end()) {
+            Junction *junc = inversions[res[j]];
             int sourceSegID = junc->getSource()->getId(),
                 targetSegID = junc->getTarget()->getId();
-            char sourceDir = junc->getSourceDir();                        
-            if ((sourceSegID==res[j] || res[j]==targetSegID) ||
-                (targetSegID==res[j+1] || res[j+1]==sourceSegID)) {
-                //edit the fold-back inversion
+            if(sourceSegID != targetSegID) {
                 if (j < (start[j]+end[j])/2 || j == end[j]) {
-                    if (res[j]>res[j-1]) {
+                    if (isPositive) {
                         res[j] = min(sourceSegID, targetSegID);
                         res[j+1] = max(sourceSegID, targetSegID);
                     }
@@ -4106,7 +4272,7 @@ void LocalGenomicMap::editInversions(vector<int> &res, vector<Junction *> &inver
                     }
                 }
                 else {
-                    if (res[j]>res[j-1]) {
+                    if (isPositive) {
                         res[j] = max(sourceSegID, targetSegID);
                         res[j+1] = min(sourceSegID, targetSegID);
                     }
@@ -4115,8 +4281,6 @@ void LocalGenomicMap::editInversions(vector<int> &res, vector<Junction *> &inver
                         res[j+1] = max(sourceSegID, targetSegID);
                     }
                 }
-                i = (i+k+1)%inversions.size();
-                break;
             }
         }
         char strand_5p = isPositive? '+':'-',
@@ -4489,7 +4653,7 @@ void LocalGenomicMap::BFB_ILP(const char *lpFn, vector<vector<int>> &patterns, v
     if(maxError >= 0) {
         cout<<"Number of error variables: "<<idx/2<<endl;
         CoinPackedVector errorConstrain;
-        for(int i=2; i<idx/2; i+=3) errorConstrain.insert(numElements+i, 1);
+        for(int i=0; i<idx/2; i+=3) errorConstrain.insert(numElements+i, 1);
         constrainLowerBound[idx] = 0;
         constrainUpperBound[idx] = maxError;
         idx++;
@@ -4702,7 +4866,7 @@ void LocalGenomicMap::BFB_ILP_SC(const char *lpFn, vector<vector<int>> &patterns
             }
         }
         //find copy number for both normal junctions and fold-back inversions
-        vector<Junction *> inversions;
+        unordered_map<int, Junction*> inversions;
         double** juncCN = new double*[endSegID+1];
         this->getJuncCN(inversions, juncCN, *graphs[n], startSegID, endSegID);
         //inequality formula: constrains on segment and junction CNs
@@ -5062,6 +5226,7 @@ void LocalGenomicMap::bfbConcate(Junction *sv, bool edgeA, int pos1, int pos2, v
 void LocalGenomicMap::bfbInsertion(vector<Junction *> &SVs, vector<vector<int>> bfbPaths, bool edgeA[], vector<int> &res) {
     int pos1 = 0, pos2 = 0;
     for (int i=0; i<SVs.size(); i++) {
+        cout<<SVs[i]->getInfo()[0]<<endl;
         vector<int> copy = res;
         this->bfbConcate(SVs[i], edgeA[i], pos1, pos2, bfbPaths, res);
         int n = res.size();
@@ -5127,6 +5292,13 @@ void LocalGenomicMap::readComponents(vector<vector<int>>& res, const char *juncs
     // remove duplicates
     sort(res.begin(), res.end());
     res.erase(unique(res.begin(), res.end()), res.end());
+}
+
+void LocalGenomicMap::setFBISpan(const int span) {
+    this->FBISpan = span;
+}
+int LocalGenomicMap::getFBISpan() {
+    return this->FBISpan;
 }
 
 /*

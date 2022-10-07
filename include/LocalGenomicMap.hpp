@@ -40,6 +40,8 @@ protected:
 
     double **hicMatrix;
     double **decreaseMatrix;
+
+    int FBISpan;
 public:
     LocalGenomicMap(Graph *aGraph);
 
@@ -192,14 +194,15 @@ public:
     void constructDAG(vector<vector<int>> &adj, vector<vector<int>> &node2pat, vector<vector<int>> &node2loop, map<string, int> &variableIdx, int *elementCN);
     void allTopologicalOrders(vector<int> &res, bool visited[], int num, int indeg[], vector<vector<int>> &adj, vector<vector<int>> &orders);
     void getBFB(vector<vector<int>> &orders, vector<vector<int>> &node2pat, vector<vector<int>> &node2loop, vector<int> &res, const bool isReversed);
+    void indelBFB(vector<int> &bfb, vector<bool> &dir);
     void readBFBProps(string &mainChr, int &insMode, vector<string> &insChr, int &conMode, vector<string> &conChr, vector<int> &startSegs, const char *lhRawFn);
-    void getJuncCN(vector<Junction *> &inversions , double** juncCN, Graph &graph, int startSegID, int endSegID);
+    void getJuncCN(unordered_map<int, Junction*> &inversions, double** juncCN, Graph &graph, int startSegID, int endSegID);
     void insertBeforeBFB(Graph*& g, vector<string>& insChr, unordered_map<int, int>& originalSegs, vector<Junction *>& unusedSV);
     void insertAfterBFB(vector<string>& insChr, string& mainChr, vector<int>& startSegs, vector<vector<int>>& bfbPaths);
     void concatBeforeBFB(Graph*& g, vector<string>& conChr, unordered_map<int, int>& originalSegs, vector<Junction *>& unusedSV);
     void concatAfterBFB(vector<string>& conChr, vector<vector<int>>& bfbPaths);
     void editBFB(vector<vector<int>> bfbPaths, vector<int> &posInfo, vector<int> &output);
-    void editInversions(vector<int> &res, vector<Junction *> &inversions, double** juncCN, int* elementCN, map<string, int> &variableIdx);
+    void editInversions(vector<int> &res, unordered_map<int, Junction*> &inversions, double** juncCN, int* elementCN, map<string, int> &variableIdx);
     void printBFB(vector<int> &res);
     void printOriginalBFB(vector<int> &res, unordered_map<int, int> &m, vector<Junction *> &unusedSV);
     void BFB_ILP(const char *lpFn, vector<vector<int>> &patterns, vector<vector<int>> &loops, map<string, int> &variableIdx, double** juncCN, vector<vector<int>> &components, const bool juncsInfo, const double maxError, const bool seqMode);
@@ -207,6 +210,8 @@ public:
     void bfbConcate(Junction *sv, bool edgeA, int pos1, int pos2, vector<vector<int>> bfbPaths, vector<int> &res);
     void bfbInsertion(vector<Junction *> &SVs, vector<vector<int>> bfbPaths, bool edgeA[], vector<int> &res);
     void readComponents(vector<vector<int>>& res, const char *juncsFn);
+    void setFBISpan(const int span);
+    int getFBISpan();
     /*old version*/
     VertexPath* findBFB(VertexPath* currPath, int n, set<Edge *>* visited, int error);
     bool checkBFB(VertexPath* currPath, Vertex* v);
