@@ -1,5 +1,6 @@
 import argparse
 from cmath import inf
+from random import sample
 import sys
 
 class MainArgParser:
@@ -35,12 +36,37 @@ class MainArgParser:
         if sv1[3] != sv2[3]:
             diff4 = inf
         return min(diff1,diff2,diff3,diff4)
+    
+    def setRange(self, chr_range, sv):
+        if sv[0] in chr_range.keys():
+            chr_range[sv[0]][0] = min(chr_range[sv[0]][0], int(sv[1]))
+            chr_range[sv[0]][1] = max(chr_range[sv[0]][1], int(sv[1]))
+        else:
+            chr_range[sv[0]] = [int(sv[1]), int(sv[1])]
+        if sv[3] in chr_range.keys():
+            chr_range[sv[3]][0] = min(chr_range[sv[3]][0], int(sv[4]))
+            chr_range[sv[3]][1] = max(chr_range[sv[3]][1], int(sv[4]))
+        else:
+            chr_range[sv[3]] = [int(sv[4]), int(sv[4])]
+        return chr_range
+    
+    def check_range(self, chr_range, max_range):
+        for val in chr_range.values():
+            if val[1]-val[0] > max_range:
+                return False
+        return True
+
+    def hasFBI(self, sv_id, sv):
+        for i in sv_id:
+            if sv[i][0] == sv[i][3] and sv[i][2] != sv[i][5]:
+                return True
+        return False
 
     def cluster_sv(self):
-        import functools
         parser = argparse.ArgumentParser(description='Cluster complex SV based on breakpoint distance.')
         parser.add_argument('-sv', '--sv_file', dest='svPath', required=True, help='Path to SV file')
-        parser.add_argument('-d', '--max_dis', dest='maxDis', required=False, default=1000000, help='Maximum distance of two SVs in a cluster')
+        parser.add_argument('-d', '--max_dis', dest='maxDis', required=False, type=int, default=1000000, help='Maximum distance of two SVs grouped in a cluster')
+        parser.add_argument('-r', '--max_range', dest='maxRange', required=False, type=int, default=10000000, help='Maximum range of a cluster')
         parser.add_argument('-s', '--sample_name', dest='sampleName', required=False, default = 'sample', help='Sample name for output file')
         args = parser.parse_args(sys.argv[2:])
         # read all SVs
@@ -60,22 +86,28 @@ class MainArgParser:
         cluster = []
         svIdx = list(range(0, len(juncs))) # sv index for selection
         while len(svIdx) > 0:
-            subcluster = [svIdx[0]] # index of sv_info
-            queue = [svIdx[0]]
+            subcluster, queue = [svIdx[0]], [svIdx[0]] # index of sv_info
+            sv, chr_range = juncs[svIdx[0]], {}
+            self.setRange(chr_range, sv)
             svIdx.pop(0)
             while len(queue) > 0:
                 idx = queue[0]
                 queue.pop(0)
                 for i in svIdx:
-                    if self.min_dis(juncs[idx], juncs[i]) > int(args.maxDis):
-                        continue
-                    queue.append(i)
-                    subcluster.append(i)
-                    svIdx.remove(i)
-            cluster.append(subcluster)
+                    if self.min_dis(juncs[i], juncs[idx]) < args.maxDis:
+                        temp_range = chr_range.copy()
+                        self.setRange(temp_range, juncs[i])
+                        if self.check_range(temp_range, args.maxRange):
+                            self.setRange(chr_range, juncs[i])
+                            queue.append(i)
+                            subcluster.append(i)
+                            svIdx.remove(i)
+                            print(subcluster)
+            if self.hasFBI(subcluster, juncs) == True:
+                cluster.append(subcluster)
         # output a set of sv.txt files
         for i in range(len(cluster)):
-            svFile = open('{}{}_sv.txt'.format(args.sampleName, i+1), "w")
+            svFile = open('{}_{}_sv.txt'.format(args.sampleName, i+1), "w")
             res = 'chrom_5p\tbkpos_5p\tstrand_5p\tchrom_3p\tbkpos_3p\tstrand_3p\tavg_cn\n'
             for idx in cluster[i]:                
                 res += '\t'.join(juncs[idx])+'\n'
@@ -96,8 +128,8 @@ class MainArgParser:
         parser.add_argument('-sv', '--sv_file', dest='svPath', required=True, help='Path to SV file')
         parser.add_argument('-bam', '--bam_file', dest='bamPath', required=False, help='Path to BAM file')
         parser.add_argument('-s', '--sample_name', dest='sampleName', required=False, default = 'sample', help='Sample name for output file')
-        parser.add_argument('-d', '--wgs_depth', dest='wgsDepth', required=False, type=int, default = 0, help='The whole genome average depth (default: 100)')
-        parser.add_argument('-p', '--tumor_purity', dest='purity', required=False, type=int, default = 0, help='Sample tumor purity (default: 1)')
+        parser.add_argument('-d', '--wgs_depth', dest='wgsDepth', required=False, type=int, default = 0, help='The whole genome average depth')
+        parser.add_argument('-p', '--tumor_purity', dest='purity', required=False, type=int, default = 0, help='Sample tumor purity')
         args = parser.parse_args(sys.argv[2:])
         # find all breakpoints on each chromosome
         sv, pos = [], {}
@@ -116,7 +148,7 @@ class MainArgParser:
         for key, arr in pos.items():
             pos[key] = list(set(arr))
             pos[key].sort()
-            pos[key].insert(0, pos[key][0]-1000)
+            pos[key].insert(0, max(1, pos[key][0]-1000))
             pos[key].append(pos[key][-1]+1000)
 
         # call coverage depth of segments from BAM
@@ -183,6 +215,7 @@ class MainArgParser:
         if (isStart == True and bkp[2] == '+') or (isStart == False and bkp[2] == '-'):
             isLeft = False # right breakpoint
         segID = len(segs)
+        minDis = float('inf')
         for seg in segs:
             if bkp[0] == seg[1]:
                 if isLeft==True and int(seg[2])<=int(bkp[1]) and int(bkp[1])<int(seg[3]):
@@ -190,7 +223,6 @@ class MainArgParser:
                     break
                 elif isLeft==False and int(seg[2])<int(bkp[1]) and int(bkp[1])<=int(seg[3]):
                     segID = seg[0]
-                    break
         return segID
 
     def generate_lh(self):
@@ -228,11 +260,12 @@ class MainArgParser:
         sv = []
         for line in open(args.svPath, 'r').readlines()[1:]:
             info = line.strip('\n').split('\t')
-            if info[0] == info[3] and info[2] == info[5]:
-                continue
+            # if info[0] == info[3] and info[2] == info[5]:
+            #     continue
             seg1, seg2 = self.findSegment(segs, info[:3], True), self.findSegment(segs, info[3:6], False)
-            if info[0] == info[3] and abs(seg1-seg2) > 2:
-                continue
+            print(seg1, seg2)
+            # if info[0] == info[3] and abs(seg1-seg2) > 2:
+            #     continue
             sv.append([seg1, info[2], seg2, info[5], info[6]])
             
         # output .lh file
