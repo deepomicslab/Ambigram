@@ -331,7 +331,7 @@ void Graph::calculateHapDepth() {
         }
     } else {
         if (mAvgTumorPloidy >= 0) {
-            cout << "WARN: both AVG_PLOIDY and AVG_TUMOR_PLOIDY are provided, ";
+            // cout << "WARN: both AVG_PLOIDY and AVG_TUMOR_PLOIDY are provided, ";
 
             if (mPurity < 0) {
                 cout << "WARN: no purity information provided, use the given AVG_PLOIDY" << endl;
@@ -340,14 +340,14 @@ void Graph::calculateHapDepth() {
                 double avgPloidy = mPurity * mAvgTumorPloidy + (1 - mPurity) * 2;
                 mRatio = ratio;
                 if (abs(mAvgPloidy - avgPloidy) <= 0.1) {
-                    cout
-                            << "calculated AVG_PLOIDY using AVG_TUMOR_PLOIDY is close enough to the given AVG_PLOIDY, use the given AVG_PLOIDY"
-                            << endl;
+                    // cout
+                    //         << "calculated AVG_PLOIDY using AVG_TUMOR_PLOIDY is close enough to the given AVG_PLOIDY, use the given AVG_PLOIDY"
+                    //         << endl;
                 } else {
                     mAvgPloidy = avgPloidy;
-                    cout
-                            << "calculated AVG_PLOIDY using AVG_TUMOR_PLOIDY is distinguishable from the given AVG_PLOIDY, use the calculated AVG_PLOIDY"
-                            << endl;
+                    // cout
+                    //         << "calculated AVG_PLOIDY using AVG_TUMOR_PLOIDY is distinguishable from the given AVG_PLOIDY, use the calculated AVG_PLOIDY"
+                    //         << endl;
                 }
             }
         } else {
@@ -359,8 +359,8 @@ void Graph::calculateHapDepth() {
     // mHaploidDepthJunc = mAvgCoverageRawJunc / mAvgPloidy;
     mHaploidDepth = mAvgCoverageRaw * mPurity / mAvgPloidy;
     mHaploidDepthJunc = mHaploidDepth;
-    cout << "Average ploidy: " << mAvgPloidy << endl
-         << "Haploid depth: " << mHaploidDepth << endl;
+    // cout << "Average ploidy: " << mAvgPloidy << endl
+    //      << "Haploid depth: " << mHaploidDepth << endl;
     mAvgCoverage = mAvgPloidy * mHaploidDepth;
     mAvgCoverageJunc = mAvgPloidy * mHaploidDepthJunc;
 
