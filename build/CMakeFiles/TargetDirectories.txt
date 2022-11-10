@@ -1,7 +1,0 @@
-/home/eric/BFB/Ambigram/build/CMakeFiles/install/strip.dir
-/home/eric/BFB/Ambigram/build/CMakeFiles/install/local.dir
-/home/eric/BFB/Ambigram/build/CMakeFiles/install.dir
-/home/eric/BFB/Ambigram/build/CMakeFiles/list_install_components.dir
-/home/eric/BFB/Ambigram/build/CMakeFiles/rebuild_cache.dir
-/home/eric/BFB/Ambigram/build/CMakeFiles/edit_cache.dir
-/home/eric/BFB/Ambigram/build/CMakeFiles/localHap.dir
