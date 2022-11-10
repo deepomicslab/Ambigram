@@ -14,20 +14,29 @@ Ambigram is a graph-based algorithm to reconstruct the BFB local haplotype durin
 
 ## Installation
 
-To install Ambigram, run the following command:
+1. Clone the repository and enter the directory:
 
 ```
-cd /path/to/Ambigram/
+git clone https://github.com/deepomicslab/Ambigram
+cd ./Ambigram/
+```
+2. Create a conda environment with all dependencies and enter the environment:
+```
+conda env create --prefix=./Ambigram_env -f environment.yml
+conda activate ./Ambigram_env
+```
+3. Create a build directory and compile Amibgram under it (use **sudo**, if required):
+
+```
 mkdir build
 cd build
 cmake ..
 make && make install
 ```
-
-To see the option Ambigram supports, run the following command:
+4. To see the option Ambigram supports, run the following command:
 
 ```
-localHap --op bfb --help
+Ambigram --op bfb --help
 ```
 
 ## Using Ambigram
@@ -99,15 +108,69 @@ JUNC H:4:+ H:5:+ 105.0 7.0 U B
 JUNC H:5:+ H:6:+ 75.0 5.0 U B
 ```
 
-### Run Ambigram
+The input file has three parts: header, segment, and junction. The header spans from the first line to the line starting with "VIRUS_START", which contain some default properties, e.g., "SAMPLE" refers to the sample name, and users do not need to change them.
 
-Ambigram requires at least an LH file as input. To decipher BFB paths without inter-chromosomal rearrangements, run the following command:
+The segment part spans from all the lines starting with "SOURCE", "SINK", and "SEG". They contains all the segment information, where "SOURCE" and "SINK" indicate the first and last segment indices, respectively. For each "SEG" line, the information, following "H:" and split by colons, represents segment index, chromosome name, start breakpoint, and end breakpoint. The two trailing numbers are segment depth and copy number. If the copy number is -1, Ambigram will automatically calculate the copy number by the segment depth.
+
+The junction part consists of all the lines starting with "JUNC", containing all the junction information. For each "JUNC" line, the second and third columns represent two segments connected by the junction. The sign '+' indicates the forward strand of the segment, while '-' refers to the reverse strand. The following two columns are junction depth and copy number. If the copy number is -1, Ambigram will automatically calculate the copy number by the junction depth. The last two columns are defualt value, indicating the junction is not inferred by the program. 
+
+### Run Ambigram
+Ambigram requires only one input file (**.lh**) that contains CN profile and SV information of local regions invovled with complex BFB. To decipher BFB paths, run the following command:
 
 ``` 
-localHap --op bfb --in_lh [path to your .lh file] --lp_prefix [sample name]
+Ambigram --op bfb --in_lh [path to your .lh file] --lp_prefix [sample name]
+```
+The output will be shown in the console as following. It is a sequence of segments, i.e., a haplotype cased by BFB. Each number is the segment index which is followed by a sign that indicates the strand. It is noted that the vertical bar '|' represents a fold-back inversion.
+```
+6-5-4-3-2-1-|1+2+3+4+5+6+|6-5-4-3-2-|2+3+4+|4-3-2-|2+3+4+5+6+|6-5-4-3-|3+4+5+6+
+```
+### Extra options
+To decipher BFB events with translocation, we just need to add one line (shown as following) to the end of the LH file. Ambigram supports 4 complex cases involved with BFB and translocation. 
+
+1. Insertion before BFB (TRX-BFB) (e.g., segments of 101T-V1 are inserted into chr1) - [test data](https://github.com/deepomicslab/Ambigram_paper/blob/master/simulation/TRX_BFB_demo.txt)
+
+``` 
+PROP I1:chr1:101T-V1:chr1
+```
+* Expected output
+```
+4:5:2:7:8:|8:7:|5:2:7:8:|8:7:2:5:4:
 ```
 
-Besides, we can input a JUNCS file (e.g. test.juncs) that contains extra information from TGS data (10x, PB, and ONT), which may help Ambigram resolve more accurate BFB paths. A JUNCS file that comprises groups of segments, which are possible fragments on BFB paths. 
+2. Insertion after BFB (BFB-TRX) (e.g., segments of chr6 and chr13 are inserted into chr2, and insertion starts at Segment 3 on chr2) - [test data](https://github.com/deepomicslab/Ambigram_paper/blob/master/simulation/test3.lh)
+
+``` 
+PROP I2:chr2:chr6:chr13 M:chr2 S:3
+```
+* Expected output (double vertical bars "||" represent translocation)
+```
+1+2+3+||5+6+7+|7-6-||8+9+||4-3-2-|2+3+4+|4-3-2-1-
+```
+
+3. Concatenation before BFB (TRX-BFB) (e.g., segments of chr7 are linked to 260T-HBV_C3-RC by translocation) - [test data](https://github.com/deepomicslab/Ambigram_paper/blob/master/oncovirus/HBV/260T_chr1.lh)
+
+``` 
+PROP C1:chr1:260T-HBV_C3-RC
+```
+* Expected output
+```
+Find a BFB path with integration first
+8-5|7-8|8-7|5-8|
+8:2:3:4:5:|7:6:5:4:3:2:8:|8:2:3:4:5:6:7:|5:4:3:2:8:
+BFB path after the second integration:
+10:4:5:|7:6:5:4:3:2:8:|8:2:3:4:5:6:7:|5:4:3:2:8:
+```
+
+4. Concatenation after BFB (BFB-TRX) (e.g., segments of chr2 are concatenated with segments of chr6) - [test data](https://github.com/deepomicslab/Ambigram_paper/blob/master/simulation/test4.lh)
+
+``` 
+PROP C2:chr2:chr6
+```
+* Expected output
+```
+1+2+3+||5+6+7+|7-6-||8+9+||4-3-2-|2+3+4+|4-3-2-1-
+```
+Besides, we can input a JUNCS file (e.g. test.juncs) that contains extra information from long or linked reads (10x, PB, and ONT), which may help Ambigram resolve more accurate BFB paths. A JUNCS file that comprises groups of segments, which are possible fragments on BFB paths. 
 
 * **test.juncs**
 
@@ -116,7 +179,6 @@ Besides, we can input a JUNCS file (e.g. test.juncs) that contains extra informa
 2- 2+ 3+ 4+ 5+ 6+ 6-
 6+ 6- 5- 4- 3-
 ```
-
 On the one hand, we can use BarcodeExtractor in SpecHap to get barcodes from 10x data and run the script (process_barcode.py) to generate the JUNCS file. To generate a JUNCS file for 10x data ([SpecHap](https://github.com/deepomicslab/SpecHap) should be installed):
 
 ``` 
@@ -131,50 +193,23 @@ samtools bam2fq [path to PB/ONT .bam file] | seqtk seq -A > [output path of .fas
 python hpvpipe/main.py process_tgs -r [path to the reference genome] -l [path to .lh file] -t [path to .fasta file] -o [output path of .juncs file]
 ```
 
-With a **JUNCS** file (extra information from TGS data), we can decipher BFB paths by running the following command:
+With a **JUNCS** file, we can decipher BFB paths by running the following command: ([test data with JUNCS files](https://github.com/deepomicslab/Ambigram_paper/tree/master/simulation/tumor%20purity))
 
 ``` 
-localHap --op bfb --in_lh [path to your .lh file] --juncdb [path to your .juncs file] --junc_info true --lp_prefix [sample name]
+Ambigram --op bfb --in_lh [path to your .lh file] --juncdb [path to your .juncs file] --junc_info true --lp_prefix [sample name]
 ```
 
 If you have a very complicated sample, e.g. a sample with high and various copy numbers, try **Sequential Mode** that will resolve a BFB path with length-decreasing components (without nested loops):
 
 ``` 
-localHap --op bfb --in_lh [path to your .lh file] --juncdb [path to your .juncs file] --seq_mode true --lp_prefix [sample name]
+Ambigram --op bfb --in_lh [path to your .lh file] --juncdb [path to your .juncs file] --seq_mode true --lp_prefix [sample name]
 ```
 
-We also provide an option to solve BFB paths for **single-cell** data, which can reconstruct BFB paths with similar components. You can input **multiple LH files** that represents different subclones with distinct SV and CNV profiles:
+We also provide an option to solve BFB paths for **single-cell** data, which can reconstruct BFB paths with similar components. You can input **multiple LH files** that represents different subclones with distinct SV and CNV profiles: ([test data of single-cell mode](https://github.com/deepomicslab/Ambigram_paper/tree/master/single_cell/simulation))
 
 ``` 
-localHap --op bfb --in_lh [paths to your .lh files (seperated by ,), e.g., test1.lh,test2.lh,test3.lh] --lp_prefix [sample name]
+Ambigram --op bfb --in_lh [paths to your .lh files (seperated by ,), e.g., test1.lh,test2.lh,test3.lh] --lp_prefix [sample name]
 ```
-
-To decipher BFB events with translocation, we just need to add one line (shown as following) that includes explicit options at the end of the LH file. Ambigram supports 4 complex cases involved with BFB and translocation. 
-
-1. Insertion before BFB (TRX-BFB) (e.g., segments of virus2 are inserted into chr1)
-
-``` 
-PROP I1:chr1:virus2:chr1
-```
-
-2. Insertion after BFB (BFB-TRX) (e.g., segments of chr10 and chr12 are inserted into chr3, and insertion starts at Segment 3 or Segment 4 on chr3)
-
-``` 
-PROP I2:chr3:chr10:chr12 M:chr3 S:3:4
-```
-
-3. Concatenation before BFB (TRX-BFB) (e.g., segments of chr7 are linked to virus3 by translocation)
-
-``` 
-PROP C1:chr7:virus3
-```
-
-4. Concatenation after BFB (BFB-TRX) (e.g., segments of chr3 are concatenated with segments of chr6)
-
-``` 
-PROP C2:chr3:chr6
-```
-
 ## Author
 
 Ambigram is developed by DeepOmics lab under the supervision of Dr. Li Shuaicheng, City University of Hong Kong, Hong Kong, China.
