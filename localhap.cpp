@@ -18,25 +18,26 @@ int main(int argc, char *argv[]) {
     cxxopts::Options options("localhap", "Local Haplotype constructer");
 
     options.add_options()
-            ("op", "operate: check or solve", cxxopts::value<std::string>())
-            ("juncdb", "Junction database", cxxopts::value<std::string>()->default_value(""))
-            ("in_lh", "Input lh file", cxxopts::value<std::string>())
-            ("out_lh", "Checked local hap input file, lh format", cxxopts::value<std::string>())
-            ("lp_prefix", "ILP out file prefix, only for check", cxxopts::value<std::string>())
-            ("verbose", "Verbose output", cxxopts::value<bool>()->default_value("false"))
-            ("hic_matrix", "Segment Hic matrix file, only for solve", cxxopts::value<std::string>())
-            ("tgs_order", "Segment tgs local order file, only for solve", cxxopts::value<std::string>())
-            ("hap", "Haplotype out file, only for solve", cxxopts::value<std::string>())
-            ("traversed", "traversed path out file, only for solve", cxxopts::value<std::string>())
-            ("circuits", "Circuits out file, only for solve", cxxopts::value<std::string>())
-            ("help", "Print usage")
+            ("op", "Operate: bfb", cxxopts::value<std::string>())
+            // ("out_lh", "Checked local hap input file, lh format", cxxopts::value<std::string>())
+            // ("verbose", "Verbose output", cxxopts::value<bool>()->default_value("false"))
+            // ("hic_matrix", "Segment Hic matrix file, only for solve", cxxopts::value<std::string>())
+            // ("tgs_order", "Segment tgs local order file, only for solve", cxxopts::value<std::string>())
+            // ("hap", "Haplotype out file, only for solve", cxxopts::value<std::string>())
+            // ("traversed", "traversed path out file, only for solve", cxxopts::value<std::string>())
+            // ("circuits", "Circuits out file, only for solve", cxxopts::value<std::string>())
+            
             // BFB
-            ("junc_info", "Use extra junction information", cxxopts::value<bool>()->default_value("false"))
-            ("reversed", "Use extra junction information", cxxopts::value<bool>()->default_value("false"))
-            ("max_error", "The maximal acceptable rate", cxxopts::value<double>()->default_value("-1"))
-            ("seq_mode", "Resolve a sequential bfb path without nested loops", cxxopts::value<bool>()->default_value("false"))
-            ("FBI_span", "The maximal breakpoint distance of a FBI", cxxopts::value<int>()->default_value("-1"))
-            ("edges", "Edges that indicate the evolution in single-cell data", cxxopts::value<std::string>()->default_value(""));
+            ("in_lh", "Input .lh file (required)", cxxopts::value<std::string>())
+            ("lp_prefix", "ILP output file prefix", cxxopts::value<std::string>())
+            ("juncdb", "Input .junc file with linkage information from linked/long reads", cxxopts::value<std::string>()->default_value(""))
+            ("junc_info", "Whether use linked/long reads information in ILP (Default: false)", cxxopts::value<bool>()->default_value("false"))
+            ("reversed", "Find BFB paths starting from the negative strand (Default: false)", cxxopts::value<bool>()->default_value("false"))
+            ("max_error", "The maximal acceptable error rate (real number)", cxxopts::value<double>()->default_value("-1"))
+            ("seq_mode", "Resolve a sequential BFB path without nested loops (Default: false)", cxxopts::value<bool>()->default_value("false"))
+            ("FBI_span", "The maximal nuumber of segments spanned by a FBI (integer number)", cxxopts::value<int>()->default_value("-1"))
+            // ("edges", "Edges that indicate the evolution of single-cell data", cxxopts::value<std::string>()->default_value(""))
+            ("help", "Print usage");
     auto result = options.parse(argc, argv);
     if (result.count("help")) {
         std::cout << options.help() << std::endl;
@@ -247,7 +248,8 @@ int main(int argc, char *argv[]) {
         const double maxError = result["max_error"].as<double>();// upper boundary of ILP error
         const bool seqMode = result["seq_mode"].as<bool>();// indicate whether use sequential mode (no small loop inserted in big loop)
         const int FBISpan = result["FBI_span"].as<int>();// upper limit of FBI breakpoint distance
-        string edges = result["edges"].as<std::string>();// relationship among sub-clones in single-cell data e.g. 1:2,1:3
+        // string edges = result["edges"].as<std::string>();// relationship among sub-clones in single-cell data e.g. 1:2,1:3
+        string edges = "";
        
         /* get multiple .lh file names for single-cell data */
         vector<Graph*> graphs;

@@ -213,3 +213,7 @@ Ambigram --op bfb --in_lh [paths to your .lh files (seperated by ,), e.g., test1
 ## Author
 
 Ambigram is developed by DeepOmics lab under the supervision of Dr. Li Shuaicheng, City University of Hong Kong, Hong Kong, China.
+Should you have any queries, please feel free to contact us by <chaohuili3-c@my.cityu.edu.hk>.
+
+## License
+This project is licensed under the MIT License - see the [LICENSE.txt](./LICENSE.txt) file for details
