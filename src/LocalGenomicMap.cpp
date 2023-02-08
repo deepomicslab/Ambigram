@@ -3409,21 +3409,115 @@ void LocalGenomicMap::allTopologicalOrders(vector<int> &res, bool visited[], int
 }
 
 void LocalGenomicMap::printBFB(VertexPath *path) {
+    // ofstream bfbFile;
+    // bfbFile.open("bfbPaths.txt", std::ios_base::app);
     for(int i = 1; i < path->size(); i++) {
         cout<<path->at(i-1)->getInfo();
-        if(path->at(i-1)->getSegment()->getChrId() != path->at(i)->getSegment()->getChrId()) cout<<"||"; // translocation
-        else if(path->at(i-1)->getDir() != path->at(i)->getDir()) cout<<"|"; // FBI
+        // bfbFile<<path->at(i-1)->getInfo();
+        if(path->at(i-1)->getSegment()->getChrId() != path->at(i)->getSegment()->getChrId()) {
+            cout<<"||"; // translocation
+            // bfbFile<<"||";
+        }
+        else if(path->at(i-1)->getDir() != path->at(i)->getDir()) {
+            cout<<"|"; // FBI
+            // bfbFile<<"|";
+        }
     }
     cout<<path->back()->getInfo()<<endl;
+    // bfbFile<<path->back()->getInfo()<<endl;
+    // bfbFile.close();
+}
+
+void LocalGenomicMap::imperfectFBI(VertexPath *bkpPath, unordered_map<int, Junction*> &inversions) {
+    // cout<<"inversions on segment: ";
+    // for(auto iter: inversions) cout<<iter.first<<" ";
+    // cout<<endl;
+    VertexPath::iterator pos = bkpPath->begin();
+    while(pos < bkpPath->end()) {
+        // this->printBFB(bkpPath);
+        // cout<<"pos: "<<pos-bkpPath->begin();
+        VertexPath::iterator r = find(pos+3, bkpPath->end(), (*pos)->getComplementVertex());
+        VertexPath::iterator l = r-1;
+        // cout<<" left: "<<l-bkpPath->begin()<<" right: "<<r-bkpPath->begin()<<endl;
+        if(r == bkpPath->end() || *l != (*(pos+1))->getComplementVertex()) {
+            int id = (*(pos+1))->getId();
+            if(inversions.find(id) != inversions.end()) {
+                if((*(pos+1))->getDir() == '+') {
+                    if(inversions[id]->getSource()->getId() < inversions[id]->getTarget()->getId()) // smaller segment id
+                        *(pos+1) = inversions[id]->getSource()->getPositiveVertex();
+                    else
+                        *(pos+1) = inversions[id]->getTarget()->getPositiveVertex();
+                }
+                else {
+                    if(inversions[id]->getSource()->getId() < inversions[id]->getTarget()->getId()) // larger segment id
+                        *(pos+1) = inversions[id]->getTarget()->getNegativeVertex();
+                    else
+                        *(pos+1) = inversions[id]->getSource()->getNegativeVertex();
+                }
+            }
+            if(pos > bkpPath->begin()) {
+                id = (*pos)->getId();
+                if(inversions.find(id) != inversions.end() && (*(pos-1))->getId() == id) {
+                    if(inversions[id]->getSource()->getId() == id) {
+                        *pos = (*pos)->getDir()=='+'? inversions[id]->getTarget()->getPositiveVertex():inversions[id]->getTarget()->getNegativeVertex();
+                    }
+                    else {
+                        *pos = (*pos)->getDir()=='+'? inversions[id]->getSource()->getPositiveVertex():inversions[id]->getSource()->getNegativeVertex();
+                    }
+                }
+            }
+            if((*pos)->getDir() == '+' && (*pos)->getId() > (*(pos+1))->getId()) *(pos+1) = *pos; // adjustment
+            if((*pos)->getDir() == '-' && (*pos)->getId() < (*(pos+1))->getId()) *(pos+1) = *pos;
+            pos += 2;
+        }
+        else {
+            VertexPath::iterator p1 = pos+((l-pos)/2), p2 = p1 + 1;
+            // cout<<p1-bkpPath->begin()<<" "<<p2-bkpPath->begin()<<endl;
+            while(p1 >= pos-1 && p1 > bkpPath->begin()) {
+                int id = (*p1)->getId();
+                // cout<<id<<endl;
+                if(inversions.find(id) != inversions.end()) {
+                    if((*p1)->getDir() == '+') {
+                        if(inversions[id]->getSource()->getId() < inversions[id]->getTarget()->getId()) {
+                            *p1 = inversions[id]->getSource()->getPositiveVertex();
+                            *(p1+1) = inversions[id]->getTarget()->getNegativeVertex();
+                        }
+                        else {
+                            *p1 = inversions[id]->getTarget()->getPositiveVertex();
+                            *(p1+1) = inversions[id]->getSource()->getNegativeVertex();
+                        }
+                    }
+                    else {
+                        if(inversions[id]->getSource()->getId() < inversions[id]->getTarget()->getId()) {
+                            *p1 = inversions[id]->getTarget()->getNegativeVertex();
+                            *(p1+1) = inversions[id]->getSource()->getPositiveVertex();
+                        }
+                        else {
+                            *p1 = inversions[id]->getSource()->getNegativeVertex();
+                            *(p1+1) = inversions[id]->getTarget()->getPositiveVertex();
+                        }
+                    }
+                    if(p2 != p1+1) {
+                        if(p1 > pos-1) *p2 = (*p1)->getComplementVertex();
+                        *(p2-1) = (*(p1+1))->getComplementVertex();
+                    }
+                }
+                p1 -= 2;
+                p2 += 2;
+            }
+            pos = r + 1;
+        }
+        // this->printBFB(bkpPath);
+    }
 }
 
 void LocalGenomicMap::getBFB(vector<vector<int>> &orders, vector<vector<int>> &node2pat, vector<vector<int>> &node2loop, 
-                            VertexPath *path, unordered_map<int, Junction*> &inversions, const bool isReversed) {
+                            VertexPath *path, unordered_map<int, Junction*> &inversions, bool isReversed, bool printAll) {
     bool forwardDir = !isReversed;
     Graph *g = this->getGraph();
     VertexPath *bkpPath = new VertexPath();
     for (int n=0; n<orders.size(); n++) {
-        cout<<"Order "<<n+1<<endl;
+        // cout<<"Order "<<n+1<<endl;
         bkpPath->clear();
         vector<int> bfb = orders[n];
         int start, end;
@@ -3435,22 +3529,13 @@ void LocalGenomicMap::getBFB(vector<vector<int>> &orders, vector<vector<int>> &n
                 bkpPath->push_back(g->getSegmentById(end)->getPositiveVertex());
             }
             else {
-                int minS = start, maxS = start, minE = end, maxE = end;
-                if(inversions.find(start) != inversions.end()) {
-                    minS = min(inversions[start]->getSource()->getId(), inversions[start]->getTarget()->getId()),
-                    maxS = max(inversions[start]->getSource()->getId(), inversions[start]->getTarget()->getId());
-                }
-                if(inversions.find(end) != inversions.end()) {
-                    minE = min(inversions[end]->getSource()->getId(), inversions[end]->getTarget()->getId()),
-                    maxE = max(inversions[end]->getSource()->getId(), inversions[end]->getTarget()->getId());
-                }
                 int cn = node2loop[bfb[0]][2], num = 0;
                 while(num < cn) {
-                    bkpPath->push_back(g->getSegmentById((num!=0 && num<=cn/2)?maxS:minS)->getPositiveVertex());
-                    bkpPath->push_back(g->getSegmentById(num<cn/2?minE:maxE)->getPositiveVertex());
+                    bkpPath->push_back(g->getSegmentById(start)->getPositiveVertex());
+                    bkpPath->push_back(g->getSegmentById(end)->getPositiveVertex());
                     
-                    bkpPath->push_back(g->getSegmentById(num<cn/2?maxE:minE)->getNegativeVertex());
-                    bkpPath->push_back(g->getSegmentById((num<cn/2||num==cn-1)?minS:maxS)->getNegativeVertex());
+                    bkpPath->push_back(g->getSegmentById(end)->getNegativeVertex());
+                    bkpPath->push_back(g->getSegmentById(start)->getNegativeVertex());
                     num++;
                 }
             }
@@ -3461,89 +3546,57 @@ void LocalGenomicMap::getBFB(vector<vector<int>> &orders, vector<vector<int>> &n
                 bkpPath->push_back(g->getSegmentById(start)->getNegativeVertex());
             }
             else {
-                int minS = start, maxS = start, minE = end, maxE = end;
-                if(inversions.find(start) != inversions.end()) {
-                    minS = min(inversions[start]->getSource()->getId(), inversions[start]->getTarget()->getId()),
-                    maxS = max(inversions[start]->getSource()->getId(), inversions[start]->getTarget()->getId());
-                }
-                if(inversions.find(end) != inversions.end()) {
-                    minE = min(inversions[end]->getSource()->getId(), inversions[end]->getTarget()->getId()),
-                    maxE = max(inversions[end]->getSource()->getId(), inversions[end]->getTarget()->getId());
-                }
+                // int minS = start, maxS = start, minE = end, maxE = end;
+                // if(inversions.find(start) != inversions.end()) {
+                //     minS = min(inversions[start]->getSource()->getId(), inversions[start]->getTarget()->getId()),
+                //     maxS = max(inversions[start]->getSource()->getId(), inversions[start]->getTarget()->getId());
+                // }
+                // if(inversions.find(end) != inversions.end()) {
+                //     minE = min(inversions[end]->getSource()->getId(), inversions[end]->getTarget()->getId()),
+                //     maxE = max(inversions[end]->getSource()->getId(), inversions[end]->getTarget()->getId());
+                // }
                 int cn = node2loop[bfb[0]][2], num = 0;
                 while(num < cn) {
-                    bkpPath->push_back(g->getSegmentById((num!=0 && num<=cn/2)?minE:maxE)->getNegativeVertex());
-                    bkpPath->push_back(g->getSegmentById(num<cn/2?maxS:minS)->getNegativeVertex());
+                    bkpPath->push_back(g->getSegmentById(end)->getNegativeVertex());
+                    bkpPath->push_back(g->getSegmentById(start)->getNegativeVertex());
                     
-                    bkpPath->push_back(g->getSegmentById(num<cn/2?minS:maxS)->getPositiveVertex());
-                    bkpPath->push_back(g->getSegmentById((num<cn/2||num==cn-1)?maxE:minE)->getPositiveVertex());
+                    bkpPath->push_back(g->getSegmentById(start)->getPositiveVertex());
+                    bkpPath->push_back(g->getSegmentById(end)->getPositiveVertex());
                     num++;
                 }
             }
         }
         // add the following entity
         int i;
-        for (i=1;i<bfb.size();i++) {
+        for (i = 1; i < bfb.size(); i++) {
             if (node2pat[bfb[i]].size()) {
                 start = node2pat[bfb[i]][0], end = node2pat[bfb[i]][1];
-                cout<<"mono-chain start: "<<start<<" end: "<<end<<endl;
+                // cout<<"mono-chain start: "<<start<<" end: "<<end<<endl;
                 if (bkpPath->back()->getId() == start && bkpPath->back()->getDir() == '-') {
-                    int minS = start, maxS = start;
-                    if(inversions.find(start) != inversions.end()) {
-                        minS = min(inversions[start]->getSource()->getId(), inversions[start]->getTarget()->getId()),
-                        maxS = max(inversions[start]->getSource()->getId(), inversions[start]->getTarget()->getId());
-                    }
-                    if(forwardDir) {
-                        bkpPath->pop_back();
-                        bkpPath->push_back(g->getSegmentById(minS)->getNegativeVertex());
-                        
-                        bkpPath->push_back(g->getSegmentById(maxS)->getPositiveVertex());
-                        bkpPath->push_back(g->getSegmentById(end)->getPositiveVertex());
-                    }
-                    else {
-                        bkpPath->pop_back();
-                        bkpPath->push_back(g->getSegmentById(maxS)->getNegativeVertex());
-                        
-                        bkpPath->push_back(g->getSegmentById(minS)->getPositiveVertex());
-                        bkpPath->push_back(g->getSegmentById(end)->getPositiveVertex());
-                    }
+                    bkpPath->push_back(g->getSegmentById(start)->getPositiveVertex());
+                    bkpPath->push_back(g->getSegmentById(end)->getPositiveVertex());
                 }
                 else if (bkpPath->back()->getId() == end && bkpPath->back()->getDir() == '+') {
-                    int minE = end, maxE = end;
-                    if(inversions.find(end) != inversions.end()) {
-                        minE = min(inversions[end]->getSource()->getId(), inversions[end]->getTarget()->getId()),
-                        maxE = max(inversions[end]->getSource()->getId(), inversions[end]->getTarget()->getId());
-                    }
-                    if(forwardDir) {
-                        bkpPath->pop_back();
-                        bkpPath->push_back(g->getSegmentById(minE)->getPositiveVertex());
-                        
-                        bkpPath->push_back(g->getSegmentById(maxE)->getNegativeVertex());
-                        bkpPath->push_back(g->getSegmentById(start)->getNegativeVertex());
-                    }
-                    else {
-                        bkpPath->pop_back();
-                        bkpPath->push_back(g->getSegmentById(maxE)->getPositiveVertex());
-
-                        bkpPath->push_back(g->getSegmentById(minE)->getNegativeVertex());
-                        bkpPath->push_back(g->getSegmentById(start)->getNegativeVertex());
-                    }
-                } 
+                    bkpPath->push_back(g->getSegmentById(end)->getNegativeVertex());
+                    bkpPath->push_back(g->getSegmentById(start)->getNegativeVertex());
+                }
                 else
                     break; 
             }
             else if (node2loop[bfb[i]].size()) {
                 start = node2loop[bfb[i]][0], end = node2loop[bfb[i]][1];
-                cout<<"loop start: "<<start<<" end: "<<end<<endl;
+                // cout<<"loop start: "<<start<<" end: "<<end<<endl;
                 Vertex *v1 = g->getSegmentById(start)->getNegativeVertex(),
                         *v2 = g->getSegmentById(end)->getPositiveVertex();
                 auto pos = find(bkpPath->rbegin(), bkpPath->rend(), v1);
-                while(pos != bkpPath->rend() && (bkpPath->rend()-pos)%2 == 1) {
+                while(pos != bkpPath->rend() && ((bkpPath->rend()-pos)%2 == 1 || 
+                    (pos-bkpPath->rbegin()>1 && (*(pos+1))->getId() < (*(pos-2))->getId()))) {
                     pos = find(pos+1, bkpPath->rend(), v1);
                 }
                 if(pos == bkpPath->rend()) {
                     pos = find(bkpPath->rbegin(), bkpPath->rend(), v2);
-                    while(pos != bkpPath->rend() && (bkpPath->rend()-pos)%2 == 1) {
+                    while(pos != bkpPath->rend() && ((bkpPath->rend()-pos)%2 == 1 || 
+                    (pos-bkpPath->rbegin()>1 && (*(pos+1))->getId() > (*(pos-2))->getId()))) {
                         pos = find(pos+1, bkpPath->rend(), v2);
                     } 
                 }
@@ -3560,36 +3613,36 @@ void LocalGenomicMap::getBFB(vector<vector<int>> &orders, vector<vector<int>> &n
                     maxE = max(inversions[end]->getSource()->getId(), inversions[end]->getTarget()->getId());
                 }
                 VertexPath *loop = new VertexPath();
-                cout<<"pos: "<<(*pos)->getInfo()<<" v1: "<<v1->getInfo()<<endl;
+                // cout<<"pos: "<<(*pos)->getInfo()<<" v1: "<<v1->getInfo()<<endl;
                 if(*pos == v1) {
                     while(num < cn) {
-                        loop->push_back(g->getSegmentById((num!=0 && num<=cn/2)?maxS:minS)->getPositiveVertex());
-                        loop->push_back(g->getSegmentById(num<=cn/2?minE:maxE)->getPositiveVertex());
+                        loop->push_back(g->getSegmentById(start)->getPositiveVertex());
+                        loop->push_back(g->getSegmentById(end)->getPositiveVertex());
                         
-                        loop->push_back(g->getSegmentById(num<=cn/2?maxE:minE)->getNegativeVertex());
-                        loop->push_back(g->getSegmentById((num<cn/2||num==cn-1)?minS:maxS)->getNegativeVertex());
+                        loop->push_back(g->getSegmentById(end)->getNegativeVertex());
+                        loop->push_back(g->getSegmentById(start)->getNegativeVertex());
                         num++;
                     }
                     auto temp =pos.base()-1;
-                    *temp = g->getSegmentById(maxS)->getNegativeVertex();
-                    if(temp+1 != bkpPath->end()) *(temp+1) = g->getSegmentById(maxS)->getPositiveVertex();
+                    *temp = g->getSegmentById(start)->getNegativeVertex();
+                    if(temp+1 != bkpPath->end()) *(temp+1) = g->getSegmentById(start)->getPositiveVertex();
                 }
                 else {
                     while(num < cn) {
-                        loop->push_back(g->getSegmentById((num!=0 && num<=cn/2)?minE:maxE)->getNegativeVertex());
-                        loop->push_back(g->getSegmentById(num<cn/2?maxS:minS)->getNegativeVertex());
+                        loop->push_back(g->getSegmentById(end)->getNegativeVertex());
+                        loop->push_back(g->getSegmentById(start)->getNegativeVertex());
                         
-                        loop->push_back(g->getSegmentById(num<cn/2?minS:maxS)->getPositiveVertex());
-                        loop->push_back(g->getSegmentById((num<cn/2||num==cn-1)?maxE:minE)->getPositiveVertex());
+                        loop->push_back(g->getSegmentById(start)->getPositiveVertex());
+                        loop->push_back(g->getSegmentById(end)->getPositiveVertex());
                         num++;
                     }
                     auto temp = pos.base()-1;
-                    *temp = g->getSegmentById(minE)->getPositiveVertex();
-                    if(temp+1 != bkpPath->end()) *(temp+1) = g->getSegmentById(minE)->getNegativeVertex();
+                    *temp = g->getSegmentById(end)->getPositiveVertex();
+                    if(temp+1 != bkpPath->end()) *(temp+1) = g->getSegmentById(end)->getNegativeVertex();
                 }
                 bkpPath->insert(pos.base(), loop->begin(), loop->end());
             }
-            this->printBFB(bkpPath);
+            // this->printBFB(bkpPath);
         }
         // cout<<"Order: ";
         // for(int j=0; j<i; j++)
@@ -3600,21 +3653,40 @@ void LocalGenomicMap::getBFB(vector<vector<int>> &orders, vector<vector<int>> &n
         // }
         // cout<<endl;
         // if(path.size()>res.size()) res = path;//find the longest result
-        this->printBFB(bkpPath);
+        imperfectFBI(bkpPath, inversions);
+        // this->printBFB(bkpPath);
         if (i == bfb.size()) {
             // cout<<"Quit: "<<i<<" "<<bfb.size()<<endl;
-            for(int j = 1; j< bkpPath->size(); j+=2) {
-                if(bkpPath->at(j-1)->getDir() == '+') {
-                    for(int k = bkpPath->at(j-1)->getId(); k <= bkpPath->at(j)->getId(); k++)
-                        path->push_back(g->getSegmentById(k)->getPositiveVertex());
-                }
-                else {
-                    for(int k = bkpPath->at(j-1)->getId(); k >= bkpPath->at(j)->getId(); k--)
-                        path->push_back(g->getSegmentById(k)->getNegativeVertex());
+            if(path->empty()) {
+                for(int j = 1; j< bkpPath->size(); j+=2) {
+                    if(bkpPath->at(j-1)->getDir() == '+') {
+                        for(int k = bkpPath->at(j-1)->getId(); k <= bkpPath->at(j)->getId(); k++)
+                            path->push_back(g->getSegmentById(k)->getPositiveVertex());
+                    }
+                    else {
+                        for(int k = bkpPath->at(j-1)->getId(); k >= bkpPath->at(j)->getId(); k--)
+                            path->push_back(g->getSegmentById(k)->getNegativeVertex());
+                    }
                 }
             }
-            this->printBFB(path);
-            break;
+            if(printAll) {
+                VertexPath *temp = new VertexPath();
+                for(int j = 1; j< bkpPath->size(); j+=2) {
+                    if(bkpPath->at(j-1)->getDir() == '+') {
+                        for(int k = bkpPath->at(j-1)->getId(); k <= bkpPath->at(j)->getId(); k++)
+                            temp->push_back(g->getSegmentById(k)->getPositiveVertex());
+                    }
+                    else {
+                        for(int k = bkpPath->at(j-1)->getId(); k >= bkpPath->at(j)->getId(); k--)
+                            temp->push_back(g->getSegmentById(k)->getNegativeVertex());
+                    }
+                }
+                this->printBFB(temp);
+            }
+            else {
+                this->printBFB(path);
+                break;
+            }
         }
         else if (n == orders.size()-1 && forwardDir != isReversed) {
             // cout<<"Reverse\n";
@@ -3685,6 +3757,7 @@ void LocalGenomicMap::indelBFB(VertexPath *path, int startSegID, int endSegID) {
         if(sourceDir == targetDir && (sourceDir=='+'&&targetID-sourceID==1 || sourceDir=='-'&&sourceID-targetID==1)) continue;// normal junction
         sv.push_back(junc);
     }
+    if(sv.empty()) return;
     // find deletion, insertion, and duplication
     while(!sv.empty()) {
         VertexPath group;
@@ -3701,37 +3774,168 @@ void LocalGenomicMap::indelBFB(VertexPath *path, int startSegID, int endSegID) {
             sv.erase(sv.begin()+i);
             i--;
         }
-        for(Vertex *v: group) cout<<v->getInfo()<<" ";
-        cout<<endl;
+        // for(Vertex *v: group) cout<<v->getInfo()<<" ";
+        // cout<<endl;
         if(group.size() == 2) {
             if(group[0]->getDir() == group[1]->getDir()) {
                 if((group[0]->getDir()=='+' && group[0]->getId() < group[1]->getId()) ||
                 (group[0]->getDir()=='-' && group[0]->getId() > group[1]->getId())) { // deletion
                     auto pos1 = find(path->begin(), path->end(), group[0]),
-                        pos2 = find(path->begin(), path->end(), group[1]);
+                        pos2 = find(pos1+1, path->end(), group[1]);
+                    if(pos1 == path->end() || pos2 == path->end()) {
+                        reverse(group.begin(), group.end());
+                        for(auto iter = group.begin(); iter != group.end(); iter++) *iter = (*iter)->getComplementVertex();
+                        pos1 = find(path->begin(), path->end(), group[0]),
+                        pos2 = find(pos1+1, path->end(), group[1]);
+                    }
+                    if(pos1 == path->end() || pos2 == path->end() || pos2-pos1 > 3) continue;
                     path->erase(pos1+1, pos2);
                 }
                 else { // duplication
                     auto pos1 = find(path->begin(), path->end(), group[0]),
-                        pos2 = find(path->begin(), path->end(), group[1]);
+                        pos2 = find(path->begin(), pos1, group[1]);
+                    if(pos1 == path->end() || pos2 == pos1) {
+                        reverse(group.begin(), group.end());
+                        for(auto iter = group.begin(); iter != group.end(); iter++) *iter = (*iter)->getComplementVertex();
+                        pos1 = find(path->begin(), path->end(), group[0]),
+                        pos2 = find(path->begin(), pos1, group[1]);
+                    }
+                    if(pos1 == path->end() || pos2 == pos1) continue;
                     path->insert(pos1+1, pos2, pos1+1);
                 }
             }
             else { // inversion
                 auto pos1 = find(path->begin(), path->end(), group[0]),
-                    pos2 = find(path->begin(), path->end(), group[1]);
+                    pos2 = find(pos1+1, path->end(), group[1]);
+                if(pos1 == path->end() || pos2 == path->end()) {
+                    reverse(group.begin(), group.end());
+                    for(auto iter = group.begin(); iter != group.end(); iter++) *iter = (*iter)->getComplementVertex();
+                    pos1 = find(path->begin(), path->end(), group[0]),
+                    pos2 = find(pos1+1, path->end(), group[1]);
+                }
+                if(pos1 == path->end() || pos2 == path->end() || pos2 - pos1 > 5) continue;
                 path->erase(pos1+1, pos2);
             }
         }
         else { // insertion
             auto pos1 = find(path->begin(), path->end(), group.front()),
-                pos2 = find(path->begin(), path->end(), group.back());
+                pos2 = find(pos1+1, path->end(), group.back());
+            if(pos1 == path->end() || pos2 == path->end()) {
+                reverse(group.begin(), group.end());
+                for(auto iter = group.begin(); iter != group.end(); iter++) *iter = (*iter)->getComplementVertex();
+                pos1 = find(path->begin(), path->end(), group.front()),
+                pos2 = find(pos1+1, path->end(), group.back());
+            }
+            if(pos1 == path->end() || pos2 == path->end()) continue;
             path->erase(pos1+1, pos2);
             path->insert(pos1+1, group.begin()+1, group.end()-1);
         }
+        // this->printBFB(path);
     }
     cout<<"BFB path with insertion, deletion, or duplication:\n";
     this->printBFB(path);
+}
+
+void LocalGenomicMap::virusBFB(VertexPath *path, unordered_map<Segment*, Segment*> &originalSegs, vector<Junction *> unusedSV) {
+    // restore path segment into original segments
+    vector<bool> isFBI{false};
+    for(auto iter = path->begin()+1; iter != path->end(); iter++) {
+        if((*(iter-1))->getDir() != (*iter)->getDir()) isFBI.push_back(true);
+        else isFBI.push_back(false);
+    }
+    // first vertex
+    Segment *seg1 = originalSegs[path->at(0)->getSegment()],
+            *seg2 = originalSegs[path->at(1)->getSegment()];
+    if(seg1->getChrId() != seg2->getChrId()) {
+        Vertex *v = seg1->getPositiveVertex();
+        bool found = false;
+        for(Edge *e: *v->getEdgesAsSource()) {
+            if(e->getTarget()->getId() == seg2->getId()) {
+                *(path->begin()) = e->getSource();
+                found = true;
+                break;
+            }
+        }
+        if(found == false) {
+            v = seg1->getNegativeVertex();
+            for(Edge *e: *v->getEdgesAsSource()) {
+                if(e->getTarget()->getId() == seg2->getId()) {
+                    *(path->begin()) = e->getSource();
+                    break;
+                }
+            }
+        }
+    }
+    else {
+        if(path->front()->getDir() == '+')
+            *(path->begin()) = originalSegs[path->front()->getSegment()]->getPositiveVertex();
+        else
+            *(path->begin()) = originalSegs[path->front()->getSegment()]->getNegativeVertex();
+    }
+    // remaining vertices
+    for(auto iter = path->begin() + 1; iter != path->end(); iter++) {
+        Segment *seg = originalSegs[(*iter)->getSegment()];
+        // cout<<seg->getId()<<" last chr id: "<<(*(iter-1))->getSegment()->getChrId()<<" current chr id: "<<seg->getChrId()<<endl;
+        if((*(iter-1))->getSegment()->getChrId() != seg->getChrId()) { // human-virus integration
+            // cout<<"Number of edges: "<<(*(iter-1))->getEdgesAsSource()->size()<<endl;
+            for(Edge *e: *(*(iter-1))->getEdgesAsSource()) {
+                if(e->getTarget()->getSegment() == seg) {
+                    *iter = e->getTarget();
+                    break;
+                }
+            }
+        }
+        else if(isFBI[iter-path->begin()]) { // FBI
+            if((*(iter-1))->getDir() == '+')
+                *iter = seg->getNegativeVertex();
+            else
+                *iter = seg->getPositiveVertex();
+        }
+        else {
+            if((*(iter-1))->getDir() == '+') 
+                *iter = seg->getPositiveVertex();
+            else
+                *iter = seg->getNegativeVertex();
+        }
+    }
+    cout<<"TRX-BFB mode: BFB path in the first stage:\n";
+    this->printBFB(path);
+
+    // deal with extra SV in the second stage
+    for(int i = 0; i < unusedSV.size(); i++) {
+        bool isEdgeA = true;
+        auto pos1 = find(path->rbegin(), path->rend(), unusedSV[i]->getEdgeA()->getSource());
+        if(pos1 == path->rend()) {
+            pos1 = find(path->rbegin(), path->rend(), unusedSV[i]->getEdgeB()->getSource());
+            isEdgeA = false;
+        }
+        if(pos1 == path->rend()) continue;
+        if(isEdgeA) {
+            auto pos2 = find(path->begin(), path->end(), unusedSV[i]->getEdgeB()->getTarget());
+            if(pos2 != path->end() && (pos2-path->begin()) < (pos1-path->rbegin())) {
+                path->erase(path->begin(), pos2);
+                path->insert(path->begin(), unusedSV[i]->getEdgeB()->getSource());
+            }
+            else {
+                path->erase(pos1.base(), path->end());
+                path->push_back(unusedSV[i]->getEdgeA()->getTarget());
+            }
+        }
+        else {
+            auto pos2 = find(path->begin(), path->end(), unusedSV[i]->getEdgeA()->getTarget());
+            if(pos2 != path->end() && (pos2-path->begin()) < (pos1-path->rbegin())) {
+                path->erase(path->begin(), pos2);
+                path->insert(path->begin(), unusedSV[i]->getEdgeA()->getSource());
+            }
+            else{
+                path->erase(pos1.base(), path->end());
+                path->push_back(unusedSV[i]->getEdgeB()->getTarget());
+            }
+        }
+        cout<<"TRX-BFB mode: BFB path in the second stage:\n";
+        this->printBFB(path);
+        break;
+    }
 }
 
 void LocalGenomicMap::readBFBProps(string &mainChr, int &insMode, vector<string> &insChr, int &conMode, vector<string> &conChr, 
@@ -3840,7 +4044,7 @@ void LocalGenomicMap::getJuncCN(unordered_map<int, Junction*> &inversions, doubl
         int sourceID = junc->getSource()->getId(), targetID = junc->getTarget()->getId();
         if(inversions.find(sourceID) == inversions.end()) 
             inversions[sourceID] = junc;
-        else if(inversions.find(targetID) == inversions.end())
+        if(inversions.find(targetID) == inversions.end())
             inversions[targetID] = junc;
     }
 }
@@ -3859,6 +4063,7 @@ void LocalGenomicMap::translocationBFB(vector<VertexPath*> paths, VertexPath *re
         if(p->at(0)->getSegment()->getChrom() == mainChr)
             res->insert(res->end(), p->begin(), p->end());
     }
+    VertexPath::iterator startPos = res->begin(); // start position for insertion
     while(!sv.empty()) {
         VertexPath group;
         for(int i = 0; i < sv.size(); i++) {
@@ -3885,34 +4090,57 @@ void LocalGenomicMap::translocationBFB(vector<VertexPath*> paths, VertexPath *re
             }
             else continue;
             sv.erase(sv.begin()+i);
-            i--;
+            i = -1;
             if(group.back()->getSegment()->getChrom() == mainChr) break;
         }
-        for(Vertex *v: group) cout<<v->getInfo()<<" ";
-        cout<<endl;
+        // for(Vertex *v: group) cout<<v->getInfo()<<" ";
+        // cout<<endl;
         if(group.size() == 2) { // concatenation
-            auto pos = find(res->rbegin(), res->rend(), group[0]);
-            if(pos == res->rend()) {
+            auto pos1 = find(res->rbegin(), res->rend(), group[0]);
+            if(pos1 == res->rend()) {
                 reverse(group.begin(), group.end());
                 for(int i = 0; i < group.size(); i++) group[i] = group[i]->getComplementVertex();
-                pos = find(res->rbegin(), res->rend(), group[0]);
+                pos1 = find(res->rbegin(), res->rend(), group[0]);
             }
-            if(pos == res->rend()) continue;
-            res->erase(pos.base(), res->end());
+            if(pos1 == res->rend()) continue;
+            res->erase(pos1.base(), res->end());
             int id = group[1]->getSegment()->getChrId();
-            res->insert(res->end(), find(paths[id]->begin(), paths[id]->end(), group[1]), paths[id]->end());
+            // this->printBFB(paths[id]);
+            auto pos2 = find(paths[id]->begin(), paths[id]->end(), group[1]);
+            if(pos2 == paths[id]->end()) {
+                reverse(paths[id]->begin(), paths[id]->end());
+                for(auto iter = paths[id]->begin(); iter != paths[id]->end(); iter++) *iter = (*iter)->getComplementVertex();
+                pos2 = find(paths[id]->begin(), paths[id]->end(), group[1]);
+            }
+            if(pos2 == paths[id]->end()) continue;
+            res->insert(res->end(), pos2, paths[id]->end());
+            startPos = res->begin();
         }
         else { // insertion
+            if(group.front()->getId() > group.back()->getId()) { // reverse the sequence
+                reverse(group.begin(), group.end());
+                for(auto iter = group.begin(); iter != group.end(); iter++) *iter = (*iter)->getComplementVertex();
+            }
             vector<VertexPath::iterator> pos;
-            auto flag = find(res->begin(), res->end(), group[0]);
+            auto flag = find(startPos, res->end(), group[0]);
             pos.push_back(flag);
             if(pos.back() != res->end()) {
                 for(int i = 1; i < group.size()-1; i+=2) {
                     int id = group[i]->getSegment()->getChrId();
                     auto pos1 = find(paths[id]->begin(), paths[id]->end(), group[i]);
+                    if(pos1 == paths[id]->end()) {
+                        reverse(paths[id]->begin(), paths[id]->end());
+                        for(auto iter = paths[id]->begin(); iter != paths[id]->end(); iter++) *iter = (*iter)->getComplementVertex();
+                        pos1 = find(paths[id]->begin(), paths[id]->end(), group[i]);
+                    }
                     if(pos1 == paths[id]->end()) break;
                     else pos.push_back(pos1);
                     auto pos2 = find(paths[id]->rbegin(), paths[id]->rend(), group[i+1]);
+                    if(pos2 == paths[id]->rend()) {
+                        reverse(paths[id]->begin(), paths[id]->end());
+                        for(auto iter = paths[id]->begin(); iter != paths[id]->end(); iter++) *iter = (*iter)->getComplementVertex();
+                        pos2 = find(paths[id]->rbegin(), paths[id]->rend(), group[i+1]);
+                    }
                     if(pos2 == paths[id]->rend()) break;
                     else pos.push_back(pos2.base()-1);
                 }
@@ -3922,27 +4150,40 @@ void LocalGenomicMap::translocationBFB(vector<VertexPath*> paths, VertexPath *re
                 reverse(group.begin(), group.end());
                 for(int i = 0; i < group.size(); i++) group[i] = group[i]->getComplementVertex();
                 pos.clear();
-                auto flag = find(res->begin(), res->end(), group[0]);
+                auto flag = find(startPos, res->end(), group[0]);
                 pos.push_back(flag);
                 if(pos.back() != res->end()) {
                     for(int i = 1; i < group.size()-1; i+=2) {
                         int id = group[i]->getSegment()->getChrId();
                         auto pos1 = find(paths[id]->begin(), paths[id]->end(), group[i]);
+                        if(pos1 == paths[id]->end()) {
+                            reverse(paths[id]->begin(), paths[id]->end());
+                            for(auto iter = paths[id]->begin(); iter != paths[id]->end(); iter++) *iter = (*iter)->getComplementVertex();
+                            pos1 = find(paths[id]->begin(), paths[id]->end(), group[i]);
+                        }
                         if(pos1 == paths[id]->end()) break;
                         else pos.push_back(pos1);
                         auto pos2 = find(paths[id]->rbegin(), paths[id]->rend(), group[i+1]);
+                        if(pos2 == paths[id]->rend()) {
+                            reverse(paths[id]->begin(), paths[id]->end());
+                            for(auto iter = paths[id]->begin(); iter != paths[id]->end(); iter++) *iter = (*iter)->getComplementVertex();
+                            pos2 = find(paths[id]->rbegin(), paths[id]->rend(), group[i+1]);
+                        }
                         if(pos2 == paths[id]->rend()) break;
                         else pos.push_back(pos2.base()-1);
                     }
                 }
                 pos.push_back(find(flag+1, res->end(), group.back()));
             }
-            if(pos.size() < group.size() || pos.back() == res->end()) break;
+            if(pos.size() < group.size() || pos.back() == res->end()) continue;
+            // for(auto p: pos) cout<<(*p)->getId()<<" ";
+            // cout<<endl;
             // insert with translocation
             VertexPath temp;
             for(int i = 1; i < pos.size()-1; i += 2) temp.insert(temp.end(), pos[i], pos[i+1]+1);
             res->erase(pos.front()+1, pos.back());
             res->insert(pos.front()+1, temp.begin(), temp.end());
+            startPos = find(res->begin(), res->end(), temp.back());
         }
     }
     this->printBFB(res);
@@ -4019,6 +4260,7 @@ void LocalGenomicMap::insertBeforeBFB(Graph*& g, vector<string>& insChr, unorder
     mSinks.push_back(mSegs.back());
     //set mJuncs
     for(Junction* junc: juncs) {
+        if(junc->getEdgeA()->getSource() == junc->getEdgeA()->getTarget()) continue;
         int startSegID = junc->getSource()->getId(), targetSegID = junc->getTarget()->getId();
         int id1 = segConversion[startSegID]-1, id2 = segConversion[targetSegID]-1;
         if(id1==-1 || id2 == -1) {
@@ -4148,7 +4390,7 @@ void LocalGenomicMap::concatBeforeBFB(Graph*& g, vector<string>& conChr, unorder
 }
 
 void LocalGenomicMap::BFB_ILP(const char *lpFn, vector<vector<int>> &patterns, vector<vector<int>> &loops, map<string, int> &variableIdx, 
-                        double** juncCN, vector<vector<int>> &components, const bool juncsInfo, const double maxError, const bool seqMode, int bias) {
+                        double** juncCN, vector<vector<int>> &components, bool juncsInfo, int bias) {
     // initialize variables for ILP
     OsiClpSolverInterface *si = new OsiClpSolverInterface();
     int startSegID = patterns.front()[0], endSegID = patterns.back()[1];
@@ -4161,7 +4403,7 @@ void LocalGenomicMap::BFB_ILP(const char *lpFn, vector<vector<int>> &patterns, v
     int numSegments = segs.size();
     int numElements = variableIdx.size(), numEpsilons = numSegments*2;
     int numVariables = numElements+numEpsilons+1, numPat = patterns.size(), numLoop = loops.size();
-    int numConstrains = (numSegments*2*3 + 3*numLoop)+(seqMode? numPat*numPat*3 : numPat*numPat);
+    int numConstrains = (numSegments*2*3 + 3*numLoop)+ numPat*numPat;
 
     double *objective = new double[numVariables];
     double *variableLowerBound = new double[numVariables];
@@ -4293,7 +4535,7 @@ void LocalGenomicMap::BFB_ILP(const char *lpFn, vector<vector<int>> &patterns, v
     //     }
     // }
 
-    //Σp(a,b)-p(c,d)>=0 and p(a,b)-Σp(c,d)>=0 where p(a,b) is a parent pattern of p(c,d)
+    //Σp(a,b)-p(c,d)>=0 and p(a,b)+Σp(c,d)<=2 where p(a,b) is a parent pattern of p(c,d)
     for (int i=0;i<numPat;i++) {
         CoinPackedVector constrain8, constrain9;
         bool flag1 = false, flag2 = false;
@@ -4332,6 +4574,7 @@ void LocalGenomicMap::BFB_ILP(const char *lpFn, vector<vector<int>> &patterns, v
     }
 
     //Σp(x1,y1)+Σl(x2,y2)-l(a,b)>=0 where l(a,b) is a child loop of p and l
+    int scale = 1;
     for (int i=0;i<numLoop;i++) {
         CoinPackedVector constrain9;
         bool flag = false;
@@ -4347,14 +4590,13 @@ void LocalGenomicMap::BFB_ILP(const char *lpFn, vector<vector<int>> &patterns, v
             }
         }
         for (int k=0;k<numLoop;k++) { // l(a,b) can be inserted into the middle of l(x2,y2)
-            if(seqMode) break;
             if ((loops[k][0] == loops[i][0]) ||
                 (loops[k][1] == loops[i][1])) {
                 int diff1 = loops[i][0]-loops[i][1], diff2 = loops[k][0]-loops[k][1];
                 if (abs(diff1)<abs(diff2)) {
                     flag = true;
                     string key = "l:"+to_string(loops[k][0])+","+to_string(loops[k][1]);
-                    constrain9.insert(variableIdx[key], 1);// scaling for copy number of small loop 
+                    constrain9.insert(variableIdx[key], scale);// scaling for copy number of small loop 
                 }
             }
         }
@@ -4367,9 +4609,10 @@ void LocalGenomicMap::BFB_ILP(const char *lpFn, vector<vector<int>> &patterns, v
             matrix->appendRow(constrain9);
         }
     }
-    //p(x1,y1)+Σl(x2,y2)<=2 where l(x2,y2) is a child loop of p(x1,y1)
-    for (int i=0;i<numPat;i++) {
-        CoinPackedVector constrain10;
+
+    // l(x,y)+Σl(a,b)<=2 where l(a,b) is a child loop of l(x,y)
+    for (int i=0;i<numLoop;i++) {
+        CoinPackedVector constrain10, constrain11;
         bool flag = false;
         for (int j=0;j<numLoop;j++) {
             if ((patterns[i][0] == loops[j][0]) ||
@@ -4379,6 +4622,50 @@ void LocalGenomicMap::BFB_ILP(const char *lpFn, vector<vector<int>> &patterns, v
                     flag = true;
                     string key = "l:"+to_string(loops[j][0])+","+to_string(loops[j][1]);
                     constrain10.insert(variableIdx[key], 1);
+                    constrain11.insert(variableIdx[key], 1);
+                }
+            }
+        }
+        if (flag) {
+            string key = "l:"+to_string(patterns[i][0])+","+to_string(patterns[i][1]);
+            constrain10.insert(variableIdx[key], 1);
+            constrainLowerBound[idx] = 0;
+            constrainUpperBound[idx] = 2+(scale-1);
+            idx++;
+            matrix->appendRow(constrain10);
+
+            key = "p:"+to_string(patterns[i][0])+","+to_string(patterns[i][1]);
+            constrain11.insert(variableIdx[key], 1);
+            constrainLowerBound[idx] = 0;
+            constrainUpperBound[idx] = 2;
+            idx++;
+            matrix->appendRow(constrain11);
+        }
+    }
+
+    //p(x1,y1)+Σl(x2,y2)+Σp(x3,y3)<=2 where l(x2,y2) is a child loop of p(x1,y1)
+    for (int i=0;i<numPat;i++) {
+        CoinPackedVector constrain10, constrain11;
+        bool flag = false;
+        for (int j=0;j<numLoop;j++) {
+            if (patterns[i][0] == loops[j][0]) {
+                int diff1 = patterns[i][0]-patterns[i][1], diff2 = loops[j][0]-loops[j][1];
+                if (abs(diff1)>abs(diff2)) {
+                    flag = true;
+                    string key = "l:"+to_string(loops[j][0])+","+to_string(loops[j][1]);
+                    constrain10.insert(variableIdx[key], 1);
+                    key = "p:"+to_string(loops[j][0])+","+to_string(loops[j][1]);
+                    constrain11.insert(variableIdx[key], 1);
+                }
+            }
+            else if (patterns[i][1] == loops[j][1]) {
+                int diff1 = patterns[i][0]-patterns[i][1], diff2 = loops[j][0]-loops[j][1];
+                if (abs(diff1)>abs(diff2)) {
+                    flag = true;
+                    string key = "p:"+to_string(loops[j][0])+","+to_string(loops[j][1]);
+                    constrain10.insert(variableIdx[key], 1);
+                    key = "l:"+to_string(loops[j][0])+","+to_string(loops[j][1]);
+                    constrain11.insert(variableIdx[key], 1);
                 }
             }
         }
@@ -4389,22 +4676,32 @@ void LocalGenomicMap::BFB_ILP(const char *lpFn, vector<vector<int>> &patterns, v
             constrainUpperBound[idx] = 2;
             idx++;
             matrix->appendRow(constrain10);
+
+            constrain11.insert(variableIdx[key], 1);
+            constrainLowerBound[idx] = 0;
+            constrainUpperBound[idx] = 2;
+            idx++;
+            matrix->appendRow(constrain11);
         }
     }
 
     //third-generation information
     if(components.size()>0&&juncsInfo) {
         CoinPackedVector constrain10;
+        set<string> loopKey;
         for(int i=0; i<components.size(); i++) {     
             int s = min(components[i].front(), components[i].back()),
                 e = max(components[i].front(), components[i].back());
             if(s==startSegID&&e==endSegID) continue; // ignore end-to-end case, e.g. 1-6
             string key = "l:"+to_string(s)+","+to_string(e);
+            if(loopKey.find(key) != loopKey.end()) continue;
+            loopKey.insert(key);
+            // cout<<key<<endl;
             constrain10.insert(variableIdx[key], 1);
             key = "p:"+to_string(s)+","+to_string(e);
             constrain10.insert(variableIdx[key], 1);            
         }
-        constrainLowerBound[idx] = 1;
+        constrainLowerBound[idx] = 0;
         constrainUpperBound[idx] = 5;
         idx++;
         matrix->appendRow(constrain10);
@@ -4460,18 +4757,19 @@ void LocalGenomicMap::BFB_ILP(const char *lpFn, vector<vector<int>> &patterns, v
 }
 
 void LocalGenomicMap::BFB_ILP_SC(const char *lpFn, vector<vector<int>> &patterns, vector<vector<int>> &loops, map<string, int> &variableIdx, 
-                        vector<Graph*> graphs, const double maxError, vector<vector<int>> &evolution) {
+                        vector<Graph*> graphs, vector<vector<int>> &evolution) {
     int numGraphs = graphs.size();
     OsiClpSolverInterface *si = new OsiClpSolverInterface();
     int startSegID = patterns.front()[0], endSegID = patterns.back()[1]; 
     
     int numSegments = endSegID-startSegID+1;
-    int numElements = variableIdx.size()*numGraphs, numEpsilons = numSegments*3*numGraphs+(numGraphs*(numGraphs-1))/2*variableIdx.size();
+    int numElements = variableIdx.size()*numGraphs, numEpsilons = numSegments*2*numGraphs+(numGraphs*(numGraphs-1))*variableIdx.size();
     int numVariables = numElements+numEpsilons, numPat = patterns.size(), numLoop = loops.size();
     int numComp = numPat+numLoop;
     int numConstrains = numSegments*2*3 + 3*numLoop + numPat;
     if (numGraphs > 1) numConstrains += (numGraphs*(numGraphs-1))*variableIdx.size()*2;
     numConstrains *= numGraphs;
+
     double *objective = new double[numVariables];
     double *variableLowerBound = new double[numVariables];
     double *variableUpperBound = new double[numVariables];
@@ -4562,7 +4860,6 @@ void LocalGenomicMap::BFB_ILP_SC(const char *lpFn, vector<vector<int>> &patterns
                     constrain6.insert(i, coef[i]);
                 }
             }
-
             constrain5.insert(numElements+idx/2, 1);//e_ii
             constrainLowerBound[idx] = juncCN[i][1];//c_ii
             constrainUpperBound[idx] = si->getInfinity();
@@ -4575,32 +4872,8 @@ void LocalGenomicMap::BFB_ILP_SC(const char *lpFn, vector<vector<int>> &patterns
             idx++;
             matrix->appendRow(constrain6);
             delete [] coef;
-        }
-
-        //inequality formula: constrains on patterns and loops    
-        //0<=p(a,b)+Σp(c,d)<=1: constrains on exclusiveness
-        // for (int i=0;i<numPat;i++) {
-        //     CoinPackedVector constrain7;
-        //     bool flag = false;
-        //     for (int j=0;j<numPat;j++) {
-        //         if ((patterns[i][0] < patterns[j][0] && patterns[i][1] < patterns[j][1]) ||
-        //             (patterns[i][0] > patterns[j][0] && patterns[i][1] > patterns[j][1])) {                
-        //             flag = true;          
-        //             string key = "p:"+to_string(patterns[j][0])+","+to_string(patterns[j][1]);
-        //             constrain7.insert(variableIdx[key], 1);                
-        //         }
-        //     }
-        //     if (flag) {
-        //         string key = "p:"+to_string(patterns[i][0])+","+to_string(patterns[i][1]);
-        //         constrain7.insert(variableIdx[key], 1);
-        //         constrainLowerBound[idx] = 0;
-        //         constrainUpperBound[idx] = 1;
-        //         idx++;
-        //         matrix->appendRow(constrain7);
-        //     }
-        // }
-
-        //Σp(c,d)-p(a,b)>=0 and p(c,d)+Σp(a,b)<=2 where p(a,b) is a sub-pattern of p(c,d)
+        }   
+        //Σp(a,b)-p(c,d)>=0 and p(a,b)+Σp(c,d)<=2 where p(a,b) is a parent pattern of p(c,d)
         for (int i=0;i<numPat;i++) {
             CoinPackedVector constrain8, constrain9;
             bool flag1 = false, flag2 = false;
@@ -4637,8 +4910,9 @@ void LocalGenomicMap::BFB_ILP_SC(const char *lpFn, vector<vector<int>> &patterns
                 matrix->appendRow(constrain9);
             }
         }
-        
-        //Σp(x1,y1)+Σl(x2,y2)-l(a,b)>=0 where l(a,b) pattern is a sub-pattern of p and l
+
+        //Σp(x1,y1)+Σl(x2,y2)-l(a,b)>=0 where l(a,b) is a child loop of p and l
+        int scale = 1;
         for (int i=0;i<numLoop;i++) {
             CoinPackedVector constrain9;
             bool flag = false;
@@ -4660,7 +4934,7 @@ void LocalGenomicMap::BFB_ILP_SC(const char *lpFn, vector<vector<int>> &patterns
                     if (abs(diff1)<abs(diff2)) {
                         flag = true;
                         string key = "l:"+to_string(loops[k][0])+","+to_string(loops[k][1]);
-                        constrain9.insert(variableIdx[key], 1);
+                        constrain9.insert(variableIdx[key], scale);// scaling for copy number of small loop 
                     }
                 }
             }
@@ -4674,9 +4948,9 @@ void LocalGenomicMap::BFB_ILP_SC(const char *lpFn, vector<vector<int>> &patterns
             }
         }
 
-        //p(x1,y1)+Σl(x2,y2)<=2 where l(x2,y2) is a child loop of p(x1,y1)
-        for (int i=0;i<numPat;i++) {
-            CoinPackedVector constrain10;
+        // l(x,y)+Σl(a,b)<=2 where l(a,b) is a child loop of l(x,y)
+        for (int i=0;i<numLoop;i++) {
+            CoinPackedVector constrain10, constrain11;
             bool flag = false;
             for (int j=0;j<numLoop;j++) {
                 if ((patterns[i][0] == loops[j][0]) ||
@@ -4686,6 +4960,50 @@ void LocalGenomicMap::BFB_ILP_SC(const char *lpFn, vector<vector<int>> &patterns
                         flag = true;
                         string key = "l:"+to_string(loops[j][0])+","+to_string(loops[j][1]);
                         constrain10.insert(variableIdx[key], 1);
+                        constrain11.insert(variableIdx[key], 1);
+                    }
+                }
+            }
+            if (flag) {
+                string key = "l:"+to_string(patterns[i][0])+","+to_string(patterns[i][1]);
+                constrain10.insert(variableIdx[key], 1);
+                constrainLowerBound[idx] = 0;
+                constrainUpperBound[idx] = 2+(scale-1);
+                idx++;
+                matrix->appendRow(constrain10);
+
+                key = "p:"+to_string(patterns[i][0])+","+to_string(patterns[i][1]);
+                constrain11.insert(variableIdx[key], 1);
+                constrainLowerBound[idx] = 0;
+                constrainUpperBound[idx] = 2;
+                idx++;
+                matrix->appendRow(constrain11);
+            }
+        }
+
+        //p(x1,y1)+Σl(x2,y2)+Σp(x3,y3)<=2 where l(x2,y2) is a child loop of p(x1,y1)
+        for (int i=0;i<numPat;i++) {
+            CoinPackedVector constrain10, constrain11;
+            bool flag = false;
+            for (int j=0;j<numLoop;j++) {
+                if (patterns[i][0] == loops[j][0]) {
+                    int diff1 = patterns[i][0]-patterns[i][1], diff2 = loops[j][0]-loops[j][1];
+                    if (abs(diff1)>abs(diff2)) {
+                        flag = true;
+                        string key = "l:"+to_string(loops[j][0])+","+to_string(loops[j][1]);
+                        constrain10.insert(variableIdx[key], 1);
+                        key = "p:"+to_string(loops[j][0])+","+to_string(loops[j][1]);
+                        constrain11.insert(variableIdx[key], 1);
+                    }
+                }
+                else if (patterns[i][1] == loops[j][1]) {
+                    int diff1 = patterns[i][0]-patterns[i][1], diff2 = loops[j][0]-loops[j][1];
+                    if (abs(diff1)>abs(diff2)) {
+                        flag = true;
+                        string key = "p:"+to_string(loops[j][0])+","+to_string(loops[j][1]);
+                        constrain10.insert(variableIdx[key], 1);
+                        key = "l:"+to_string(loops[j][0])+","+to_string(loops[j][1]);
+                        constrain11.insert(variableIdx[key], 1);
                     }
                 }
             }
@@ -4696,8 +5014,14 @@ void LocalGenomicMap::BFB_ILP_SC(const char *lpFn, vector<vector<int>> &patterns
                 constrainUpperBound[idx] = 2;
                 idx++;
                 matrix->appendRow(constrain10);
+
+                constrain11.insert(variableIdx[key], 1);
+                constrainLowerBound[idx] = 0;
+                constrainUpperBound[idx] = 2;
+                idx++;
+                matrix->appendRow(constrain11);
             }
-        }   
+        }
 
         cout<<"ILP formula done"<<endl;
 
@@ -4721,7 +5045,7 @@ void LocalGenomicMap::BFB_ILP_SC(const char *lpFn, vector<vector<int>> &patterns
         }        
     }
     //constrains on common components
-    int cnt = (numElements+numSegments*3*numGraphs)*2;//idx for remaining epsilons
+    int cnt = (numElements+numSegments*2*numGraphs)*2;//idx for remaining epsilons
     for(auto iter: variableIdx) variableIdx[iter.first] = iter.second%numComp;
     for(int i=0; i<evolution.size(); i++) {
         for(int j: evolution[i]) {
@@ -4786,18 +5110,25 @@ void LocalGenomicMap::BFB_ILP_SC(const char *lpFn, vector<vector<int>> &patterns
 }
 
 
-void LocalGenomicMap::readComponents(vector<vector<int>>& res, const char *juncsFn) {
+void LocalGenomicMap::readComponents(vector<vector<int>>& res, unordered_map<Segment*, Segment*>& originalSegs, const char *juncsFn) {
+    if(string(juncsFn)=="") return;
+    unordered_map<int, int> segConversion;
+    for(auto iter: originalSegs)
+        segConversion[iter.second->getId()] = iter.first->getId();
     ifstream inFile(juncsFn);
     string line;
     Graph* g = this->getGraph();
-    if(juncsFn=="") return;
     while (getline(inFile, line)) {
         istringstream iss(line);
         vector<int> segs;
         vector<char> sign;
         string temp;
         while(iss >> temp) {
-            segs.push_back(stoi(temp.substr(0,temp.length()-1)));
+            int seg_id = stoi(temp.substr(0,temp.length()-1));
+            if(segConversion.find(seg_id) != segConversion.end())
+                seg_id = segConversion[seg_id];
+            // cout<<seg_id<<endl;
+            segs.push_back(seg_id);
             sign.push_back(temp.back());
         }
         // process inversion, translocation, and component

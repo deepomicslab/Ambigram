@@ -193,17 +193,19 @@ public:
     void constructDAG(vector<vector<int>> &adj, vector<vector<int>> &node2pat, vector<vector<int>> &node2loop, map<string, int> &variableIdx, int *elementCN);
     void allTopologicalOrders(vector<int> &res, bool visited[], int num, int indeg[], vector<vector<int>> &adj, vector<vector<int>> &orders);
     void printBFB(VertexPath *path);
-    void getBFB(vector<vector<int>> &orders, vector<vector<int>> &node2pat, vector<vector<int>> &node2loop, VertexPath *path, unordered_map<int, Junction*> &inversions, const bool isReversed);
+    void imperfectFBI(VertexPath *bkpPath, unordered_map<int, Junction*> &inversions);
+    void getBFB(vector<vector<int>> &orders, vector<vector<int>> &node2pat, vector<vector<int>> &node2loop, VertexPath *path, unordered_map<int, Junction*> &inversions, bool isReversed, bool printAll);
     void getIndelBias(int startSegID, int endSegID);
     void indelBFB(VertexPath *path, int startSegID, int endSegID);
+    void virusBFB(VertexPath *path, unordered_map<Segment*, Segment*> &originalSegs, vector<Junction *> unusedSV);
     void readBFBProps(string &mainChr, int &insMode, vector<string> &insChr, int &conMode, vector<string> &conChr, vector<int> &startSegs, const char *lhRawFn);
     void getJuncCN(unordered_map<int, Junction*> &inversions, double** juncCN, Graph &graph, int startSegID, int endSegID);
     void translocationBFB(vector<VertexPath*> paths, VertexPath *res, string mainChr);
     void insertBeforeBFB(Graph*& g, vector<string>& insChr, unordered_map<Segment*, Segment*>& originalSegs, vector<Junction *>& unusedSV);
     void concatBeforeBFB(Graph*& g, vector<string>& conChr, unordered_map<Segment*, Segment*>& originalSegs, vector<Junction *>& unusedSV);
-    void BFB_ILP(const char *lpFn, vector<vector<int>> &patterns, vector<vector<int>> &loops, map<string, int> &variableIdx, double** juncCN, vector<vector<int>> &components, const bool juncsInfo, const double maxError, const bool seqMode, int bias);
-    void BFB_ILP_SC(const char *lpFn, vector<vector<int>> &patterns, vector<vector<int>> &loops, map<string, int> &variableIdx, vector<Graph*> graphs, const double maxError, vector<vector<int>> &evolution);
-    void readComponents(vector<vector<int>>& res, const char *juncsFn);
+    void BFB_ILP(const char *lpFn, vector<vector<int>> &patterns, vector<vector<int>> &loops, map<string, int> &variableIdx, double** juncCN, vector<vector<int>> &components, bool juncsInfo, int bias);
+    void BFB_ILP_SC(const char *lpFn, vector<vector<int>> &patterns, vector<vector<int>> &loops, map<string, int> &variableIdx, vector<Graph*> graphs, vector<vector<int>> &evolution);
+    void readComponents(vector<vector<int>>& res, unordered_map<Segment*, Segment*>& originalSegs, const char *juncsFn);
 
 };
 

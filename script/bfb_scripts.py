@@ -11,6 +11,23 @@ class MainArgParser:
         getattr(self, args.subfunc)()
 
     """ Simulate reads with different simulators and protocols """
+    def seg2bed(self):
+        parser = argparse.ArgumentParser(description='Given seg file, generate .bed file.')
+        parser.add_argument('-s', '--seg_file', dest='seg', required=True, help='Path to seg file')
+        parser.add_argument('-p', '--prefix', dest='prefix', required=False,  default = 'test', help='Prefix of output .bed file')
+        
+        args = parser.parse_args(sys.argv[2:])
+        segments = []
+        for line in open(args.seg, 'r').readlines():
+            info = line.strip('\n').split(' ')
+            chrName, bkp = info[0].split(':')
+            start, end = bkp.split('-')
+            segments.append([chrName, start, end]+info[1:])
+        with open('{}_seg.bed'.format(args.prefix), 'w') as output:
+            for segment in segments:
+                output.write('\t'.join(segment)+'\n')
+            output.close()
+
     def getFasta(self):
         parser = argparse.ArgumentParser(description='Given .bed file, generate .fa file.')
         parser.add_argument('-b', '--bed_file', dest='bed', required=True, help='Path to .bed file')

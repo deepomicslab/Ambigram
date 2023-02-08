@@ -12,6 +12,8 @@
 #include "JunctionDB.hpp"
 #include "cxxopts.hpp"
 
+#include <chrono>
+
 using namespace std;
 
 int main(int argc, char *argv[]) {
@@ -33,8 +35,7 @@ int main(int argc, char *argv[]) {
             ("juncdb", "Input .junc file with linkage information from linked/long reads", cxxopts::value<std::string>()->default_value(""))
             ("junc_info", "Whether use linked/long reads information in ILP (Default: false)", cxxopts::value<bool>()->default_value("false"))
             ("reversed", "Find BFB paths starting from the negative strand (Default: false)", cxxopts::value<bool>()->default_value("false"))
-            ("max_error", "The maximal acceptable error rate (real number)", cxxopts::value<double>()->default_value("-1"))
-            ("seq_mode", "Resolve a sequential BFB path without nested loops (Default: false)", cxxopts::value<bool>()->default_value("false"))
+            ("all", "Print all possible BFB paths (Default: false)", cxxopts::value<bool>()->default_value("false"))
             // ("edges", "Edges that indicate the evolution of single-cell data", cxxopts::value<std::string>()->default_value(""))
             ("help", "Print usage");
     auto result = options.parse(argc, argv);
@@ -46,16 +47,20 @@ int main(int argc, char *argv[]) {
     std::cout << result["op"].as<std::string>().c_str() << std::endl;
 
     if (strcmp(result["op"].as<std::string>().c_str(), "bfb") == 0) {
+        // std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
         const char *lhRawFn = result["in_lh"].as<std::string>().c_str();// path to .lh file
         const char *lpFn = result["lp_prefix"].as<std::string>().c_str();// sample name
         const char *juncsFn = result["juncdb"].as<std::string>().c_str();// extra junction information from TGS data
-        const bool juncsInfo = result["junc_info"].as<bool>();// indicate whether add extra junction iformation into ILP constrains
-        const bool isReversed = result["reversed"].as<bool>();// the reference strand: true - forward; flase - backward
-        const double maxError = result["max_error"].as<double>();// upper boundary of ILP error
-        const bool seqMode = result["seq_mode"].as<bool>();// indicate whether use sequential mode (no small loop inserted in big loop)
+        bool juncsInfo = result["junc_info"].as<bool>();// indicate whether add extra junction iformation into ILP constrains
+        bool isReversed = result["reversed"].as<bool>();// the reference strand: true - forward; flase - backward
+        bool printAll = result["all"].as<bool>();// whether print all possible BFB paths
         // string edges = result["edges"].as<std::string>();// relationship among sub-clones in single-cell data e.g. 1:2,1:3
         string edges = "";
-       
+        
+        // ofstream bfbFile;
+        // bfbFile.open("bfbPaths.txt", std::ios_base::app);
+        // bfbFile<<endl<<string(lhRawFn)<<" "<<string(juncsFn)<<endl;
+        // bfbFile.close();
         /* get multiple .lh file names for single-cell data */
         Graph *g = new Graph(lhRawFn);
         g->calculateHapDepth();
@@ -69,14 +74,13 @@ int main(int argc, char *argv[]) {
         vector<int> startSegs;// starting segments for insertions
         lgm->readBFBProps(mainChr, insMode, insChr, conMode, conChr, startSegs, lhRawFn);//read properties
         unordered_map<Segment*, Segment*> originalSegs;// mapping rearranged segments into original ones
-        // Insertion Mode 1: pre-BFB insertion
+        // TRX-BFB mode
         vector<Junction *> unusedSV;
         if(insMode == 1) {
             lgm->insertBeforeBFB(g, insChr, originalSegs, unusedSV);
             delete lgm;
             lgm = new LocalGenomicMap(g);
         }
-        // Concatenation Mode 1: pre-BFB concatenation
         else if(conMode == 1) {
             lgm->concatBeforeBFB(g, conChr, originalSegs, unusedSV);
             delete lgm;
@@ -95,12 +99,14 @@ int main(int argc, char *argv[]) {
 
         // get information of third-generation data
         vector<vector<int>> components;
-        lgm->readComponents(components, juncsFn);// third-generation data information
+        lgm->readComponents(components, originalSegs, juncsFn);// third-generation data information
 
-        vector<vector<int>> bfbPaths;
         vector<VertexPath*> paths;
         //record target CN of segments
         vector<int> targetCN(g->getSegments()->size(),0);
+
+        double ILPError = 0;
+        int numInv = 0;
         // construct bfb path on each chromosome
         for(int n = 0; n < sinks.size(); n++) {
             // enumerate all the patterns and loops
@@ -130,7 +136,7 @@ int main(int argc, char *argv[]) {
             unordered_map<int, Junction*> inversions;
             double** juncCN = new double*[endID+1];
             lgm->getJuncCN(inversions, juncCN, *g, startID, endID);
-
+            numInv += inversions.size();
             // compute bias from imperct FBI and intra-chromosomal SV
             int bias = 1;
             for(int i = startID; i <= endID; i++) {
@@ -164,7 +170,7 @@ int main(int argc, char *argv[]) {
             }
                         
             // construct ILP and generate .lp file for cbc
-            lgm->BFB_ILP(lpFn, patterns, loops, variableIdx, juncCN, validComponents, juncsInfo, maxError, seqMode, bias);
+            lgm->BFB_ILP(lpFn, patterns, loops, variableIdx, juncCN, validComponents, juncsInfo, bias);
             // reset variableIdx (for single-cell data)
             for (auto iter=variableIdx.begin();iter!=variableIdx.end();iter++) 
                 variableIdx[iter->first] = variableIdx[iter->first]%numComp;
@@ -190,6 +196,11 @@ int main(int argc, char *argv[]) {
                     infeasible = true;
                     break;
                 }
+                if(element == "value") {
+                    double temp;
+                    solFile >> temp;
+                    ILPError += temp;
+                }
                 if (element[0] == 'x') {                
                     int x = stoi(element.substr(1));
                     if (x < numComp) {// exclude epsilons
@@ -211,7 +222,7 @@ int main(int argc, char *argv[]) {
             for (auto iter=variableIdx.begin();iter!=variableIdx.end();iter++) {
                 if(elementCN[iter->second] > 0) {
                     string key = iter->first;
-                    cout<<"X"<<variableIdx[key]<<" "+key<<" CN: "<<elementCN[iter->second]<<endl;
+                    // cout<<"X"<<variableIdx[key]<<" "+key<<" CN: "<<elementCN[iter->second]<<endl;
                     int idx1 = stoi(key.substr(2, key.find(",")-2)), idx2 = stoi(key.substr(key.find(",")+1));
                     for(int i=idx1-1; i<idx2; i++) {
                         if(key[0]=='p') targetCN[i] += elementCN[iter->second];
@@ -219,7 +230,7 @@ int main(int argc, char *argv[]) {
                     }
                 }
             }
-            
+
             // construct BFB DAG and find all topological orders
             vector<vector<int>> adj, node2pat, node2loop;
             lgm->constructDAG(adj, node2pat, node2loop, variableIdx, elementCN);
@@ -241,38 +252,85 @@ int main(int argc, char *argv[]) {
             vector<int> res;
             vector<vector<int>> orders;
             lgm->allTopologicalOrders(res, visited, num, indeg, adj, orders);
-            for(vector<int> bfb: orders) {
-                for(int i: bfb) cout<<i<<" ";
-                cout<<endl;
-            }
+            // for(vector<int> bfb: orders) {
+            //     for(int i: bfb) cout<<i<<" ";
+            //     cout<<endl;
+            // }
             // get one valid bfb path
             VertexPath *path = new VertexPath();
-            lgm->getBFB(orders, node2pat, node2loop, path, inversions, isReversed);//get a valid BFB path
+            lgm->getBFB(orders, node2pat, node2loop, path, inversions, isReversed, printAll);//get a valid BFB path
             lgm->indelBFB(path, startID, endID);
-            if(insMode == 1 || conMode == 1) {
-                // restore path segment into original segments
-                for(auto iter = path->begin(); iter != path->end(); iter++) {
-                    if((*iter)->getDir() == '+') 
-                        *iter = originalSegs[(*iter)->getSegment()]->getPositiveVertex();
-                    else
-                        *iter = originalSegs[(*iter)->getSegment()]->getNegativeVertex();
-                }
-                lgm->printBFB(path);
-            }
+            if(insMode == 1 || conMode == 1) lgm->virusBFB(path, originalSegs, unusedSV);
             paths.push_back(path);
         }
         // BFB-TRX mode
         VertexPath *res = new VertexPath();
         if(insMode == 2 || conMode == 2)  lgm->translocationBFB(paths, res, mainChr);
 
+        bool isResolved = true;
+        if(ILPError < 0.1) {
+            int error = 0;
+            for(int k = 0; k < segs.size(); k++)
+                error += abs(segs[k]->getWeight()->getCopyNum()-targetCN[k]);
+            if(error > segs.size()) isResolved = false;
+        }
+        // ofstream cnFile;
+        // cnFile.open("CN.txt", std::ios_base::app);
+        // for(int k = 0; k < segs.size(); k++) {
+        //     if(targetCN[k] == 0) {
+        //         for(auto iter: *res) {
+        //             if(iter->getId() == k+1) targetCN[k] += 1;
+        //         }
+        //     }
+        //     cnFile<<string(lhRawFn)<<" "<<string(juncsFn)<<" "<<segs[k]->getId()<<" "<<segs[k]->getChrom()<<":"<<segs[k]->getStart()
+        //         <<":"<<segs[k]->getEnd()<<" "<<segs[k]->getWeight()->getCopyNum()<<" "<<targetCN[k]<<" "<<(isResolved?to_string(ILPError):"unresolvable")<<endl;
+        // }
+        // cnFile.close();
+
+        // print bed file
+        // char* lhName = (char*)lhRawFn;
+        // ofstream bedFile;
+        // bedFile.open(string(strtok_r(lhName, ".", &lhName))+"_path.bed");
+        // for(VertexPath *path: paths) {
+        //     Vertex *s = path->front();
+        //     for(int i = 1; i < path->size(); i++) {
+        //         if(path->at(i-1)->getDir() != path->at(i)->getDir()) {
+        //             if(s->getDir() == '+') {
+        //                 bedFile<<s->getSegment()->getChrom()<<"\t"<<s->getStart()<<"\t"
+        //                     <<path->at(i-1)->getEnd()<<"\t"<<s->getDir()<<"\n";
+        //             }
+        //             else {
+        //                 bedFile<<s->getSegment()->getChrom()<<"\t"<<path->at(i-1)->getEnd()<<"\t"
+        //                     <<s->getStart()<<"\t"<<s->getDir()<<"\n";
+        //             }
+        //             s = path->at(i);
+        //         }
+        //     }
+        //     if(s->getDir() == '+') {
+        //                 bedFile<<s->getSegment()->getChrom()<<"\t"<<s->getStart()<<"\t"
+        //                     <<path->back()->getEnd()<<"\t"<<s->getDir()<<"\n";
+        //             }
+        //             else {
+        //                 bedFile<<s->getSegment()->getChrom()<<"\t"<<path->back()->getEnd()<<"\t"
+        //                     <<s->getStart()<<"\t"<<s->getDir()<<"\n";
+        //             }
+        // }
+        // bedFile.close();
+        // std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
+        // ofstream timeFile;
+        // timeFile.open("time.csv", std::ios_base::app);
+        // string fileName = string(lhRawFn);
+        // timeFile << fileName.substr(0, fileName.find("."))<<","<< segs.size() << ","<< numInv<<","<<
+        //      g->getJunctions()->size()-numInv<<"," << std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count()/1000000.0 << "\n";
+
     } else if (strcmp(result["op"].as<std::string>().c_str(), "sc_bfb") == 0) {
-       const char *lhRawFn = result["in_lh"].as<std::string>().c_str();// path to .lh file
+        // std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
+        const char *lhRawFn = result["in_lh"].as<std::string>().c_str();// path to .lh file
         const char *lpFn = result["lp_prefix"].as<std::string>().c_str();// sample name
         const char *juncsFn = result["juncdb"].as<std::string>().c_str();// extra junction information from TGS data
-        const bool juncsInfo = result["junc_info"].as<bool>();// indicate whether add extra junction iformation into ILP constrains
-        const bool isReversed = result["reversed"].as<bool>();// the reference strand: true - forward; flase - backward
-        const double maxError = result["max_error"].as<double>();// upper boundary of ILP error
-        const bool seqMode = result["seq_mode"].as<bool>();// indicate whether use sequential mode (no small loop inserted in big loop)
+        bool juncsInfo = result["junc_info"].as<bool>();// indicate whether add extra junction iformation into ILP constrains
+        bool isReversed = result["reversed"].as<bool>();// the reference strand: true - forward; flase - backward
+        bool printAll = result["all"].as<bool>();// whether print all possible BFB paths
         // string edges = result["edges"].as<std::string>();// relationship among sub-clones in single-cell data e.g. 1:2,1:3
         string edges = "";
        
@@ -335,8 +393,7 @@ int main(int argc, char *argv[]) {
             }
         }
 
-        vector<vector<int>> bfbPaths;
-        vector<VertexPath*> paths;
+        vector<vector<VertexPath*>> paths(numGraphs, vector<VertexPath*>{});
         //record target CN of segments
         vector<int> targetCN(g->getSegments()->size(),0);
         // construct bfb path on each chromosome
@@ -388,15 +445,16 @@ int main(int argc, char *argv[]) {
             memset(elementCN, 0, numComp*numGraphs*sizeof(int));
 
             if (abs(inversionCNSum)<0.000001) {// no fold-back inversion
-                VertexPath *temp = new VertexPath();
-                for(int i = startID; i <= endID; i++) temp->push_back(g->getSegmentById(i)->getPositiveVertex());
-                lgm->printBFB(temp);
-                paths.push_back(temp);
+                for(int k = 0; k < numGraphs; k++) {
+                    VertexPath *temp = new VertexPath();
+                    for(int i = startID; i <= endID; i++) temp->push_back(graphs[k]->getSegmentById(i)->getPositiveVertex());
+                    paths[k].push_back(temp);
+                }
                 continue;
             }
                         
             // construct ILP and generate .lp file for cbc
-            lgm->BFB_ILP_SC(lpFn, patterns, loops, variableIdx, graphs, maxError, evolution);
+            lgm->BFB_ILP_SC(lpFn, patterns, loops, variableIdx, graphs, evolution);
             // reset variableIdx (for single-cell data)
             for (auto iter=variableIdx.begin();iter!=variableIdx.end();iter++) 
                 variableIdx[iter->first] = variableIdx[iter->first]%numComp;
@@ -432,28 +490,18 @@ int main(int argc, char *argv[]) {
                 }
             }
             if(infeasible) {
-                VertexPath *temp = new VertexPath();
-                for(int i = startID; i <= endID; i++) temp->push_back(g->getSegmentById(i)->getPositiveVertex());
-                lgm->printBFB(temp);
                 cout<<"ILP is unsolvable.\n";
-                paths.push_back(temp);
-                continue;
-            }
-            //compute target CN of segments based on loop/pattern
-            for (auto iter=variableIdx.begin();iter!=variableIdx.end();iter++) {
-                if(elementCN[iter->second] > 0) {
-                    string key = iter->first;
-                    cout<<"X"<<variableIdx[key]<<" "+key<<" CN: "<<elementCN[iter->second]<<endl;
-                    int idx1 = stoi(key.substr(2, key.find(",")-2)), idx2 = stoi(key.substr(key.find(",")+1));
-                    for(int i=idx1-1; i<idx2; i++) {
-                        if(key[0]=='p') targetCN[i] += elementCN[iter->second];
-                        else targetCN[i] += elementCN[iter->second]*2;
-                    }
+                for(int k = 0; k < numGraphs; k++) {
+                    VertexPath *temp = new VertexPath();
+                    for(int i = startID; i <= endID; i++) temp->push_back(graphs[k]->getSegmentById(i)->getPositiveVertex());
+                    paths[k].push_back(temp);
                 }
+                continue;
             }
             
             // construct BFB DAG and find all topological orders
             for (int k = 0; k < numGraphs; k++) {
+                // cout<<"Graph: "<<k+1<<endl;
                 vector<vector<int>> adj, node2pat, node2loop;
                 for (int i = 0;i < numComp/2; i++) {
                     string key = "p:"+to_string(patterns[i][0])+","+to_string(patterns[i][1]);
@@ -461,6 +509,20 @@ int main(int argc, char *argv[]) {
                     key = "l:"+to_string(patterns[i][0])+","+to_string(patterns[i][1]);
                     variableIdx[key] = i + numComp/2 + k*numComp;
                 }
+
+                //compute target CN of segments based on loop/pattern
+                for (auto iter=variableIdx.begin();iter!=variableIdx.end();iter++) {
+                    if(elementCN[iter->second] > 0) {
+                        string key = iter->first;
+                        // cout<<"X"<<variableIdx[key]<<" "+key<<" CN: "<<elementCN[iter->second]<<endl;
+                        int idx1 = stoi(key.substr(2, key.find(",")-2)), idx2 = stoi(key.substr(key.find(",")+1));
+                        for(int i=idx1-1; i<idx2; i++) {
+                            if(key[0]=='p') targetCN[i] += elementCN[iter->second];
+                            else targetCN[i] += elementCN[iter->second]*2;
+                        }
+                    }
+                }
+
                 lgms[k]->constructDAG(adj, node2pat, node2loop, variableIdx, elementCN);
                 int num = adj.size();
                 bool *visited = new bool[num];
@@ -480,16 +542,66 @@ int main(int argc, char *argv[]) {
                 vector<int> res;
                 vector<vector<int>> orders;
                 lgms[k]->allTopologicalOrders(res, visited, num, indeg, adj, orders);
-                for(vector<int> bfb: orders) {
-                    for(int i: bfb) cout<<i<<" ";
-                    cout<<endl;
-                }
+                // for(vector<int> bfb: orders) {
+                //     for(int i: bfb) cout<<i<<" ";
+                //     cout<<endl;
+                // }
                 // get one valid bfb path
+                unordered_map<int, Junction*> graph_inversions;
+                lgms[k]->getJuncCN(graph_inversions, new double*[endID+1], *graphs[k], startID, endID);
+
                 VertexPath *path = new VertexPath();
-                lgms[k]->getBFB(orders, node2pat, node2loop, path, inversions, isReversed);//get a valid BFB path
+                lgms[k]->getBFB(orders, node2pat, node2loop, path, graph_inversions, isReversed, printAll);//get a valid BFB path
                 lgms[k]->indelBFB(path, startID, endID);
-                paths.push_back(path);
+                paths[k].push_back(path);
             }
         }
+
+        // vector<char*> names;
+        // char* filenames = (char*)lhRawFn;
+        // while (lhFn = strtok_r(filenames, ",", &filenames)) {
+        //     cout<<string(lhFn)<<endl;
+        //     names.push_back(lhFn);
+        // }
+        // for(int k = 0; k < numGraphs; k++) {
+        //     ofstream bedFile;
+        //     bedFile.open(string(strtok_r(names[k], ".", &names[k]))+"_path.bed");
+        //     VertexPath *path = paths[k][0];
+        //     Vertex *s = path->front();
+        //     for(int i = 1; i < path->size(); i++) {
+        //         if(path->at(i-1)->getDir() != path->at(i)->getDir()) {
+        //             if(s->getDir() == '+') {
+        //                 bedFile<<s->getSegment()->getChrom()<<"\t"<<s->getStart()<<"\t"
+        //                     <<path->at(i-1)->getEnd()<<"\t"<<s->getDir()<<"\n";
+        //             }
+        //             else {
+        //                 bedFile<<s->getSegment()->getChrom()<<"\t"<<path->at(i-1)->getEnd()<<"\t"
+        //                     <<s->getStart()<<"\t"<<s->getDir()<<"\n";
+        //             }
+        //             s = path->at(i);
+        //         }
+        //     }
+        //     if(s->getDir() == '+') {
+        //         bedFile<<s->getSegment()->getChrom()<<"\t"<<s->getStart()<<"\t"
+        //             <<path->back()->getEnd()<<"\t"<<s->getDir()<<"\n";
+        //     }
+        //     else {
+        //         bedFile<<s->getSegment()->getChrom()<<"\t"<<path->back()->getEnd()<<"\t"
+        //             <<s->getStart()<<"\t"<<s->getDir()<<"\n";
+        //     }
+        //     bedFile.close();
+        // }
+
+        for(int k = 0; k < numGraphs; k++) {
+            VertexPath *res = new VertexPath();
+            if(insMode == 2 || conMode == 2)  lgms[k]->translocationBFB(paths[k], res, mainChr);
+        }
+
+        // std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
+        // ofstream timeFile;
+        // timeFile.open("time.csv", std::ios_base::app);
+        // string fileName = string(lhRawFn);
+        // timeFile << fileName.substr(0, fileName.find("."))<<","<< segs.size() << ","<< 0<<","<<
+        //      g->getJunctions()->size()-0<<"," << std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count()/1000000.0 << "\n";
     }
 }

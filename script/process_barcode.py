@@ -110,5 +110,5 @@ if __name__ == "__main__":
     parser.add_argument('-seg', '--seg_file', dest='segPath', required=True, help='Path to SEG file')
     parser.add_argument('-s', '--sample_name', dest='sampleName', required=False, default = 'sample', help='Sample name for output file')
     args = parser.parse_args()
-    juncDir = '{}.juncs'.format(args.sample)
-    barcode2juncs(args.bedPath, args.segPath, juncDir)
+    juncDir = '{}.juncs'.format(args.sampleName)
+    barcode2juncs(args.segPath, args.bedPath, juncDir)
