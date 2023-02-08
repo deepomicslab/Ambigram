@@ -92,20 +92,16 @@ PLOIDY 2m1
 VIRUS_START 7
 SOURCE 1
 SINK 6
-SEG H:1:chr7:55281001:55282000 15.0 1.0
-SEG H:2:chr7:55282001:55283000 75.0 5.0
-SEG H:3:chr7:55283001:55284000 120.0 8.0
-SEG H:4:chr7:55284001:55285000 120.0 8.0
-SEG H:5:chr7:55285001:55286000 90.0 6.0
-SEG H:6:chr7:55286001:55287000 60.0 4.0
-JUNC H:2:- H:2:+ 30.0 2.0 U B
-JUNC H:3:- H:3:+ 15.0 1.0 U B
-JUNC H:4:+ H:4:- 15.0 1.0 U B
-JUNC H:1:+ H:2:+ 45.0 3.0 U B
-JUNC H:2:+ H:3:+ 97.5 6.5 U B
-JUNC H:3:+ H:4:+ 120.0 8.0 U B
-JUNC H:4:+ H:5:+ 105.0 7.0 U B
-JUNC H:5:+ H:6:+ 75.0 5.0 U B
+SEG H:1:chr7:55281001:55282000 60.0 2.0
+SEG H:2:chr7:55282001:55283000 180.0 6.0
+SEG H:3:chr7:55283001:55284000 240.0 8.0
+SEG H:4:chr7:55284001:55285000 240.0 8.0
+SEG H:5:chr7:55285001:55286000 120.0 4.0
+SEG H:6:chr7:55286001:55287000 120.0 4.0
+JUNC H:2:- H:2:+ 60.0 2.0 U B
+JUNC H:3:- H:3:+ 30.0 1.0 U B
+JUNC H:4:+ H:4:- 60.0 2.0 U B
+JUNC H:6:- H:6:+ 60.0 2.0 U B
 ```
 
 The input file has three parts: header, segment, and junction. The header spans from the first line to the line starting with "VIRUS_START", which contain some default properties, e.g., "SAMPLE" refers to the sample name, and users do not need to change them.
@@ -122,19 +118,19 @@ Ambigram --op bfb --in_lh [path to your .lh file] --lp_prefix [sample name]
 ```
 The output will be shown in the console as following. It is a sequence of segments, i.e., a haplotype cased by BFB. Each number is the segment index which is followed by a sign that indicates the strand. It is noted that the vertical bar '|' represents a fold-back inversion.
 ```
-6-5-4-3-2-1-|1+2+3+4+5+6+|6-5-4-3-2-|2+3+4+|4-3-2-|2+3+4+5+6+|6-5-4-3-|3+4+5+6+
+1+2+3+4+5+6+|6-5-4-3-2-|2+3+4+|4-3-|3+4+|4-3-2-|2+3+4+5+6+|6-5-4-3-2-1-
 ```
 ### Extra options
 To decipher BFB events with translocation, we just need to add one line (shown as following) to the end of the LH file. Ambigram supports 4 complex cases involved with BFB and translocation. 
 
-1. Insertion before BFB (TRX-BFB) (e.g., segments of 101T-V1 are inserted into chr1) - [test data](https://github.com/deepomicslab/Ambigram_paper/blob/master/simulation/TRX_BFB_demo.txt)
+1. Insertion before BFB (TRX-BFB) (e.g., virus segments are inserted into chr1) - [test data](https://github.com/deepomicslab/Ambigram_paper/blob/master/simulation/test6.lh)
 
 ``` 
-PROP I1:chr1:101T-V1:chr1
+PROP I1:chr8:virus:chr8 M:chr8
 ```
-* Expected output
+* Expected output (double vertical bars "||" represent translocation)
 ```
-4:5:2:7:8:|8:7:|5:2:7:8:|8:7:2:5:4:
+1+2+3+||6+||4+|4-||6-||3-2-|2+3+||6+||4+|4-||6-||3-2-
 ```
 
 2. Insertion after BFB (BFB-TRX) (e.g., segments of chr6 and chr13 are inserted into chr2, and insertion starts at Segment 3 on chr2) - [test data](https://github.com/deepomicslab/Ambigram_paper/blob/master/simulation/test3.lh)
@@ -142,9 +138,9 @@ PROP I1:chr1:101T-V1:chr1
 ``` 
 PROP I2:chr2:chr6:chr13 M:chr2 S:3
 ```
-* Expected output (double vertical bars "||" represent translocation)
+* Expected output
 ```
-1+2+3+||5+6+7+|7-6-||8+9+||4-3-2-|2+3+4+|4-3-2-1-
+1+2+3+||5+6+7+|7-6-||8+9+||4-3-2-|2+3+4+|4-3-
 ```
 
 3. Concatenation before BFB (TRX-BFB) (e.g., segments of chr7 are linked to 260T-HBV_C3-RC by translocation) - [test data](https://github.com/deepomicslab/Ambigram_paper/blob/master/oncovirus/HBV/260T_chr1.lh)
@@ -154,11 +150,10 @@ PROP C1:chr1:260T-HBV_C3-RC
 ```
 * Expected output
 ```
-Find a BFB path with integration first
-8-5|7-8|8-7|5-8|
-8:2:3:4:5:|7:6:5:4:3:2:8:|8:2:3:4:5:6:7:|5:4:3:2:8:
-BFB path after the second integration:
-10:4:5:|7:6:5:4:3:2:8:|8:2:3:4:5:6:7:|5:4:3:2:8:
+TRX-BFB mode: BFB path in the first stage:
+8+||2+3+4+5+|7-6-5-4-3-2-||8-|8+||2+3+4+5+|7-6-5-4-3-2-|2+3+4+5+
+TRX-BFB mode: BFB path in the second stage:
+10-||4+5+|7-6-5-4-3-2-||8-|8+||2+3+4+5+|7-6-5-4-3-2-|2+3+4+5+
 ```
 
 4. Concatenation after BFB (BFB-TRX) (e.g., segments of chr2 are concatenated with segments of chr6) - [test data](https://github.com/deepomicslab/Ambigram_paper/blob/master/simulation/test4.lh)
@@ -168,9 +163,9 @@ PROP C2:chr2:chr6
 ```
 * Expected output
 ```
-1+2+3+||5+6+7+|7-6-||8+9+||4-3-2-|2+3+4+|4-3-2-1-
+1+2+3+4+|4-3-2-|2+3+||6+7+|7-6-|6+7+|7-6-5-
 ```
-Besides, we can input a JUNCS file (e.g. test.juncs) that contains extra information from long or linked reads (10x, PB, and ONT), which may help Ambigram resolve more accurate BFB paths. A JUNCS file that comprises groups of segments, which are possible fragments on BFB paths. 
+Besides, we can input a JUNCS file (e.g. test.juncs) that contains extra information from linked reads (10x), long reads (PB and ONT), and optical mapping, which may help Ambigram resolve more accurate BFB paths. A JUNCS file that comprises groups of segments, which are possible fragments on BFB paths. 
 
 * **test.juncs**
 
@@ -179,18 +174,25 @@ Besides, we can input a JUNCS file (e.g. test.juncs) that contains extra informa
 2- 2+ 3+ 4+ 5+ 6+ 6-
 6+ 6- 5- 4- 3-
 ```
-On the one hand, we can use BarcodeExtractor in SpecHap to get barcodes from 10x data and run the script (process_barcode.py) to generate the JUNCS file. To generate a JUNCS file for 10x data ([SpecHap](https://github.com/deepomicslab/SpecHap) should be installed):
+Firstly, we can use BarcodeExtractor in SpecHap to get barcodes from 10x data and run the script (process_barcode.py) to generate the JUNCS file. To generate a JUNCS file for 10x data ([SpecHap](https://github.com/deepomicslab/SpecHap) should be installed):
 
 ``` 
 BarcodeExtract [path to 10x .bam file] [output path of .bed file]
 python Ambigram/script/process_barcode.py --seg_file=[path to SEG file] --bed_file=[path to .bed file] --sample_name=[prefix of the output .juncs file]
 ```
 
-On the other hand, we can use another script (hpvpipe/main.py process_tgs) to directly get the JUNCS file from PB or ONT data. To generate a JUNCS file for PB or ONT data ([hpvpipe](https://github.com/panguangze/hpvpipe) should be installed):
+Besides, we can use another script (hpvpipe/main.py process_tgs) to directly get the JUNCS file from PB or ONT data. To generate a JUNCS file for PB or ONT data ([hpvpipe](https://github.com/panguangze/hpvpipe) should be installed):
 
 ```
 samtools bam2fq [path to PB/ONT .bam file] | seqtk seq -A > [output path of .fasta file]
 python hpvpipe/main.py process_tgs -r [path to the reference genome] -l [path to .lh file] -t [path to .fasta file] -o [output path of .juncs file]
+```
+
+Moreover, we can use SegAligner in AmpliconReconstructor to align optical map contigs and run the script (bfb_scripts.py OM2juncs) to generate the JUNCS file. To generate a JUNCS file for OM data ([SegAligner](https://github.com/jluebeck/AmpliconReconstructor#segaligner) should be installed):
+
+```
+SegAligner [reference.cmap] [BioNano_contig.cmap]
+python Ambigram/script/bfb_scripts.py OM2juncs -i [path to SA_output_score_thresholds.txt] -p [prefix of output .juncs file]
 ```
 
 With a **JUNCS** file, we can decipher BFB paths by running the following command: ([test data with JUNCS files](https://github.com/deepomicslab/Ambigram_paper/tree/master/simulation/tumor%20purity))
@@ -198,17 +200,17 @@ With a **JUNCS** file, we can decipher BFB paths by running the following comman
 ``` 
 Ambigram --op bfb --in_lh [path to your .lh file] --juncdb [path to your .juncs file] --junc_info true --lp_prefix [sample name]
 ```
-
+<!-- 
 If you have a very complicated sample, e.g. a sample with high and various copy numbers, try **Sequential Mode** that will resolve a BFB path with length-decreasing components (without nested loops):
 
 ``` 
 Ambigram --op bfb --in_lh [path to your .lh file] --juncdb [path to your .juncs file] --seq_mode true --lp_prefix [sample name]
-```
+``` -->
 
 We also provide an option to solve BFB paths for **single-cell** data, which can reconstruct BFB paths with similar components. You can input **multiple LH files** that represents different subclones with distinct SV and CNV profiles: ([test data of single-cell mode](https://github.com/deepomicslab/Ambigram_paper/tree/master/single_cell/simulation))
 
 ``` 
-Ambigram --op bfb --in_lh [paths to your .lh files (seperated by ,), e.g., test1.lh,test2.lh,test3.lh] --lp_prefix [sample name]
+Ambigram --op sc_bfb --in_lh [paths to your .lh files (seperated by ,), e.g., test1.lh,test2.lh,test3.lh] --lp_prefix [sample name]
 ```
 ## Author
 
