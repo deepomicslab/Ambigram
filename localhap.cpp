@@ -47,7 +47,7 @@ int main(int argc, char *argv[]) {
     std::cout << result["op"].as<std::string>().c_str() << std::endl;
 
     if (strcmp(result["op"].as<std::string>().c_str(), "bfb") == 0) {
-        // std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
+        std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
         const char *lhRawFn = result["in_lh"].as<std::string>().c_str();// path to .lh file
         const char *lpFn = result["lp_prefix"].as<std::string>().c_str();// sample name
         const char *juncsFn = result["juncdb"].as<std::string>().c_str();// extra junction information from TGS data
@@ -263,9 +263,57 @@ int main(int argc, char *argv[]) {
             if(insMode == 1 || conMode == 1) lgm->virusBFB(path, originalSegs, unusedSV);
             paths.push_back(path);
         }
+
+        vector<Junction *> output_juncs;
+        int pathLen = 0, cnSUM = 0, maxCN = 0;
+        for(VertexPath *p: paths) { 
+            pathLen += p->size();
+            for(int i = 0; i < p->size()-1; i++) {
+                Vertex *u = p->at(i), *v = p->at(i+1);
+                if(!(abs(u->getId()-v->getId())==1 && u->getDir()==v->getDir())) {
+                    bool hasJunc = false;
+                    for(Junction *j: output_juncs) {
+                        Edge *a = j->getEdgeA(), *b = j->getEdgeB();
+                        if((a->getSource()==u&&a->getTarget()==v) ||
+                            (b->getSource()==u&&b->getTarget()==v)) {
+                            hasJunc = true;
+                            j->getWeight()->increaseCopyNum(1);
+                        }
+                    }
+                    if(hasJunc == false) {
+                        output_juncs.push_back(new Junction(u->getSegment(), v->getSegment(), u->getDir(), v->getDir(),
+                            30, 1, 1, true, false, false));
+                    }
+                }
+            }
+        }
+        for(Segment *seg: segs) {
+            cnSUM += seg->getWeight()->getCopyNum();
+            maxCN = (maxCN>seg->getWeight()->getCopyNum())?maxCN:seg->getWeight()->getCopyNum();
+        }
         // BFB-TRX mode
         VertexPath *res = new VertexPath();
-        if(insMode == 2 || conMode == 2)  lgm->translocationBFB(paths, res, mainChr);
+        if(insMode == 2 || conMode == 2)  {
+            lgm->translocationBFB(paths, res, mainChr);
+            for(int i = 0; i < res->size()-1; i++) {
+                Vertex *u = res->at(i), *v = res->at(i+1);
+                if(!(abs(u->getId()-v->getId())==1 && u->getDir()==v->getDir())) {
+                    bool hasJunc = false;
+                    for(Junction *j: output_juncs) {
+                        Edge *a = j->getEdgeA(), *b = j->getEdgeB();
+                        if((a->getSource()==u&&a->getTarget()==v) ||
+                            (b->getSource()==u&&b->getTarget()==v)) {
+                            hasJunc = true;
+                            // j->getWeight()->increaseCopyNum(1);
+                        }
+                    }
+                    if(hasJunc == false) {
+                        output_juncs.push_back(new Junction(u->getSegment(), v->getSegment(), u->getDir(), v->getDir(),
+                            30, 1, 1, true, false, false));
+                    }
+                }
+            }
+        }
 
         bool isResolved = true;
         if(ILPError < 0.1) {
@@ -274,6 +322,21 @@ int main(int argc, char *argv[]) {
                 error += abs(segs[k]->getWeight()->getCopyNum()-targetCN[k]);
             if(error > segs.size()) isResolved = false;
         }
+
+        ofstream svFile;
+        svFile.open("simulation_sv.txt", std::ios_base::app);
+        for(Junction *j: *g->getJunctions()) {
+            Vertex *u = j->getEdgeA()->getSource(), *v = j->getEdgeA()->getTarget();
+            svFile<<string(lhRawFn)<<"\t"<<string(juncsFn)<<"\t"<<u->getSegment()->getChrom()<<"\t"<<u->getEnd()<<"\t"<<u->getDir()<<"\t"
+                <<v->getSegment()->getChrom()<<"\t"<<v->getStart()<<"\t"<<v->getDir()<<"\t"<<j->getWeight()->getCopyNum()<<"\tinput\n";
+        }
+        for(Junction *j: output_juncs) {
+            Vertex *u = j->getEdgeA()->getSource(), *v = j->getEdgeA()->getTarget();
+            svFile<<string(lhRawFn)<<"\t"<<string(juncsFn)<<"\t"<<u->getSegment()->getChrom()<<"\t"<<u->getEnd()<<"\t"<<u->getDir()<<"\t"
+                <<v->getSegment()->getChrom()<<"\t"<<v->getStart()<<"\t"<<v->getDir()<<"\t"<<j->getWeight()->getCopyNum()<<"\toutput\n";
+        }
+
+
         // ofstream cnFile;
         // cnFile.open("CN.txt", std::ios_base::app);
         // for(int k = 0; k < segs.size(); k++) {
@@ -316,15 +379,16 @@ int main(int argc, char *argv[]) {
         //             }
         // }
         // bedFile.close();
-        // std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
-        // ofstream timeFile;
-        // timeFile.open("time.csv", std::ios_base::app);
-        // string fileName = string(lhRawFn);
-        // timeFile << fileName.substr(0, fileName.find("."))<<","<< segs.size() << ","<< numInv<<","<<
-        //      g->getJunctions()->size()-numInv<<"," << std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count()/1000000.0 << "\n";
+        std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
+        ofstream timeFile;
+        timeFile.open("time.csv", std::ios_base::app);
+        string fileName = string(lhRawFn);
+        timeFile << fileName.substr(0, fileName.find("."))<<","<< segs.size() << ","<< numInv<<","<<
+             g->getJunctions()->size()-numInv<<"," << cnSUM<<","<<pathLen<< ","<<maxCN << ","
+             << std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count()/1000000.0 << "\n";
 
     } else if (strcmp(result["op"].as<std::string>().c_str(), "sc_bfb") == 0) {
-        // std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
+        std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
         const char *lhRawFn = result["in_lh"].as<std::string>().c_str();// path to .lh file
         const char *lpFn = result["lp_prefix"].as<std::string>().c_str();// sample name
         const char *juncsFn = result["juncdb"].as<std::string>().c_str();// extra junction information from TGS data
@@ -592,16 +656,25 @@ int main(int argc, char *argv[]) {
         //     bedFile.close();
         // }
 
+        int pathLen = 0, cnSUM = 0, maxCN = 0;
+        for(int k = 0; k < numGraphs; k++) {
+            for(VertexPath *p: paths[k]) pathLen += p->size();
+            for(Segment *seg: *graphs[k]->getSegments()) {
+                cnSUM += seg->getWeight()->getCopyNum();
+                maxCN = (maxCN>seg->getWeight()->getCopyNum())?maxCN:seg->getWeight()->getCopyNum();
+            }
+        }
         for(int k = 0; k < numGraphs; k++) {
             VertexPath *res = new VertexPath();
             if(insMode == 2 || conMode == 2)  lgms[k]->translocationBFB(paths[k], res, mainChr);
         }
 
-        // std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
-        // ofstream timeFile;
-        // timeFile.open("time.csv", std::ios_base::app);
-        // string fileName = string(lhRawFn);
-        // timeFile << fileName.substr(0, fileName.find("."))<<","<< segs.size() << ","<< 0<<","<<
-        //      g->getJunctions()->size()-0<<"," << std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count()/1000000.0 << "\n";
+        std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
+        ofstream timeFile;
+        timeFile.open("time.csv", std::ios_base::app);
+        string fileName = string(lhRawFn);
+        timeFile << fileName.substr(0, fileName.find("."))<<","<< segs.size() << ","<< 0<<","<<
+             g->getJunctions()->size()-0<<"," << cnSUM<<","<<pathLen<< ","<<maxCN << ","
+             << std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count()/1000000.0 << "\n";
     }
 }

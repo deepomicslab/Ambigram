@@ -4080,6 +4080,7 @@ void LocalGenomicMap::translocationBFB(vector<VertexPath*> paths, VertexPath *re
                 break;
             }
         }
+        if(group.empty()) break;
         for(int i = 0; i < sv.size(); i++) {
             Edge *edgeA = sv[i]->getEdgeA(), *edgeB = sv[i]->getEdgeB();
             if(group.back()->getSegment()->getChrId() == edgeA->getSource()->getSegment()->getChrId()) {
@@ -4539,21 +4540,25 @@ void LocalGenomicMap::BFB_ILP(const char *lpFn, vector<vector<int>> &patterns, v
     for (int i=0;i<numPat;i++) {
         CoinPackedVector constrain8, constrain9;
         bool flag1 = false, flag2 = false;
-        for (int j=0;j<numPat;j++) {
-            if ((patterns[i][0] == patterns[j][0]) ||
-                (patterns[i][1] == patterns[j][1])) {
-                int diff1 = patterns[i][0]-patterns[i][1], diff2 = patterns[j][0]-patterns[j][1];
-                if (abs(diff1)<abs(diff2)) {
-                    flag1 = true;
-                    string key = "p:"+to_string(patterns[j][0])+","+to_string(patterns[j][1]);
-                    constrain8.insert(variableIdx[key], 1);
-                }
-                else if(abs(diff1)>abs(diff2)) {
-                    flag2 = true;
-                    string key = "p:"+to_string(patterns[j][0])+","+to_string(patterns[j][1]);
-                    constrain9.insert(variableIdx[key], 1);
-                }
-            }
+        for (int j = startSegID; j < patterns[i][0]; j++) {
+            flag1 = true;
+            string key = "p:"+to_string(j)+","+to_string(patterns[i][1]);
+            constrain8.insert(variableIdx[key], 1);
+        }
+        for (int j = patterns[i][1] + 1; j <= endSegID; j++) {
+            flag1 = true;
+            string key = "p:"+to_string(patterns[i][0])+","+to_string(j);
+            constrain8.insert(variableIdx[key], 1);
+        }
+        for (int j = patterns[i][0]; j < patterns[i][1]; j++) {
+            flag2 = true;
+            string key = "p:"+to_string(patterns[i][0])+","+to_string(j);
+            constrain9.insert(variableIdx[key], 1);
+        }
+        for (int j = patterns[i][0] + 1; j <= patterns[i][1]; j++) {
+            flag2 = true;
+            string key = "p:"+to_string(j)+","+to_string(patterns[i][1]);
+            constrain9.insert(variableIdx[key], 1);
         }
         if (flag1) {
             string key = "p:"+to_string(patterns[i][0])+","+to_string(patterns[i][1]);
@@ -4578,27 +4583,19 @@ void LocalGenomicMap::BFB_ILP(const char *lpFn, vector<vector<int>> &patterns, v
     for (int i=0;i<numLoop;i++) {
         CoinPackedVector constrain9;
         bool flag = false;
-        for (int j=0;j<numPat;j++) {
-            if ((patterns[j][0] == loops[i][0])||
-                (patterns[j][1] == loops[i][1])) {
-                int diff1 = loops[i][0]-loops[i][1], diff2 = patterns[j][0]-patterns[j][1];
-                if (abs(diff1)<abs(diff2)) {
-                    flag = true;
-                    string key = "p:"+to_string(patterns[j][0])+","+to_string(patterns[j][1]);
-                    constrain9.insert(variableIdx[key], 1);
-                }
-            }
+        for (int j = startSegID; j < loops[i][0]; j++) {
+            flag = true;
+            string key = "p:"+to_string(j)+","+to_string(loops[i][1]);
+            constrain9.insert(variableIdx[key], 1);
+            key = "l:"+to_string(j)+","+to_string(loops[i][1]);
+            constrain9.insert(variableIdx[key], 1);
         }
-        for (int k=0;k<numLoop;k++) { // l(a,b) can be inserted into the middle of l(x2,y2)
-            if ((loops[k][0] == loops[i][0]) ||
-                (loops[k][1] == loops[i][1])) {
-                int diff1 = loops[i][0]-loops[i][1], diff2 = loops[k][0]-loops[k][1];
-                if (abs(diff1)<abs(diff2)) {
-                    flag = true;
-                    string key = "l:"+to_string(loops[k][0])+","+to_string(loops[k][1]);
-                    constrain9.insert(variableIdx[key], scale);// scaling for copy number of small loop 
-                }
-            }
+        for (int j = loops[i][1] + 1; j <= endSegID; j++) {
+            flag = true;
+            string key = "p:"+to_string(loops[i][0])+","+to_string(j);
+            constrain9.insert(variableIdx[key], 1);
+            key = "l:"+to_string(loops[i][0])+","+to_string(j);
+            constrain9.insert(variableIdx[key], 1);
         }
         if (flag) {
             string key = "l:"+to_string(loops[i][0])+","+to_string(loops[i][1]);
@@ -4614,18 +4611,19 @@ void LocalGenomicMap::BFB_ILP(const char *lpFn, vector<vector<int>> &patterns, v
     for (int i=0;i<numLoop;i++) {
         CoinPackedVector constrain10, constrain11;
         bool flag = false;
-        for (int j=0;j<numLoop;j++) {
-            if ((patterns[i][0] == loops[j][0]) ||
-                (patterns[i][1] == loops[j][1])) {
-                int diff1 = patterns[i][0]-patterns[i][1], diff2 = loops[j][0]-loops[j][1];
-                if (abs(diff1)>abs(diff2)) {
-                    flag = true;
-                    string key = "l:"+to_string(loops[j][0])+","+to_string(loops[j][1]);
-                    constrain10.insert(variableIdx[key], 1);
-                    constrain11.insert(variableIdx[key], 1);
-                }
-            }
+        for (int j = loops[i][0]; j < loops[i][1]; j++) {
+            flag = true;
+            string key = "l:"+to_string(loops[i][0])+","+to_string(j);
+            constrain10.insert(variableIdx[key], 1);
+            constrain11.insert(variableIdx[key], 1);
         }
+        for (int j = loops[i][0] + 1; j <= loops[i][1]; j++) {
+            flag = true;
+            string key = "l:"+to_string(j)+","+to_string(loops[i][1]);
+            constrain10.insert(variableIdx[key], 1);
+            constrain11.insert(variableIdx[key], 1);
+        }
+
         if (flag) {
             string key = "l:"+to_string(patterns[i][0])+","+to_string(patterns[i][1]);
             constrain10.insert(variableIdx[key], 1);
@@ -4647,28 +4645,21 @@ void LocalGenomicMap::BFB_ILP(const char *lpFn, vector<vector<int>> &patterns, v
     for (int i=0;i<numPat;i++) {
         CoinPackedVector constrain10, constrain11;
         bool flag = false;
-        for (int j=0;j<numLoop;j++) {
-            if (patterns[i][0] == loops[j][0]) {
-                int diff1 = patterns[i][0]-patterns[i][1], diff2 = loops[j][0]-loops[j][1];
-                if (abs(diff1)>abs(diff2)) {
-                    flag = true;
-                    string key = "l:"+to_string(loops[j][0])+","+to_string(loops[j][1]);
-                    constrain10.insert(variableIdx[key], 1);
-                    key = "p:"+to_string(loops[j][0])+","+to_string(loops[j][1]);
-                    constrain11.insert(variableIdx[key], 1);
-                }
-            }
-            else if (patterns[i][1] == loops[j][1]) {
-                int diff1 = patterns[i][0]-patterns[i][1], diff2 = loops[j][0]-loops[j][1];
-                if (abs(diff1)>abs(diff2)) {
-                    flag = true;
-                    string key = "p:"+to_string(loops[j][0])+","+to_string(loops[j][1]);
-                    constrain10.insert(variableIdx[key], 1);
-                    key = "l:"+to_string(loops[j][0])+","+to_string(loops[j][1]);
-                    constrain11.insert(variableIdx[key], 1);
-                }
-            }
+        for (int j = patterns[i][0]; j < patterns[i][1]; j++) {
+            flag = true;
+            string key = "l:"+to_string(patterns[i][0])+","+to_string(j);
+            constrain10.insert(variableIdx[key], 1);
+            key = "p:"+to_string(patterns[i][0])+","+to_string(j);
+            constrain11.insert(variableIdx[key], 1);
         }
+        for (int j = patterns[i][0] + 1; j <= patterns[i][1]; j++) {
+            flag = true;
+            string key = "p:"+to_string(j)+","+to_string(patterns[i][1]);
+            constrain10.insert(variableIdx[key], 1);
+            key = "l:"+to_string(j)+","+to_string(patterns[i][1]);
+            constrain11.insert(variableIdx[key], 1);
+        }
+
         if (flag) {
             string key = "p:"+to_string(patterns[i][0])+","+to_string(patterns[i][1]);
             constrain10.insert(variableIdx[key], 1);
@@ -4877,21 +4868,25 @@ void LocalGenomicMap::BFB_ILP_SC(const char *lpFn, vector<vector<int>> &patterns
         for (int i=0;i<numPat;i++) {
             CoinPackedVector constrain8, constrain9;
             bool flag1 = false, flag2 = false;
-            for (int j=0;j<numPat;j++) {
-                if ((patterns[i][0] == patterns[j][0]) ||
-                    (patterns[i][1] == patterns[j][1])) {
-                    int diff1 = patterns[i][0]-patterns[i][1], diff2 = patterns[j][0]-patterns[j][1];
-                    if (abs(diff1)<abs(diff2)) {
-                        flag1 = true;
-                        string key = "p:"+to_string(patterns[j][0])+","+to_string(patterns[j][1]);
-                        constrain8.insert(variableIdx[key], 1);
-                    }
-                    else if(abs(diff1)>abs(diff2)) {
-                        flag2 = true;
-                        string key = "p:"+to_string(patterns[j][0])+","+to_string(patterns[j][1]);
-                        constrain9.insert(variableIdx[key], 1);
-                    }
-                }
+            for (int j = startSegID; j < patterns[i][0]; j++) {
+                flag1 = true;
+                string key = "p:"+to_string(j)+","+to_string(patterns[i][1]);
+                constrain8.insert(variableIdx[key], 1);
+            }
+            for (int j = patterns[i][1] + 1; j <= endSegID; j++) {
+                flag1 = true;
+                string key = "p:"+to_string(patterns[i][0])+","+to_string(j);
+                constrain8.insert(variableIdx[key], 1);
+            }
+            for (int j = patterns[i][0]; j < patterns[i][1]; j++) {
+                flag2 = true;
+                string key = "p:"+to_string(patterns[i][0])+","+to_string(j);
+                constrain9.insert(variableIdx[key], 1);
+            }
+            for (int j = patterns[i][0] + 1; j <= patterns[i][1]; j++) {
+                flag2 = true;
+                string key = "p:"+to_string(j)+","+to_string(patterns[i][1]);
+                constrain9.insert(variableIdx[key], 1);
             }
             if (flag1) {
                 string key = "p:"+to_string(patterns[i][0])+","+to_string(patterns[i][1]);
@@ -4916,27 +4911,19 @@ void LocalGenomicMap::BFB_ILP_SC(const char *lpFn, vector<vector<int>> &patterns
         for (int i=0;i<numLoop;i++) {
             CoinPackedVector constrain9;
             bool flag = false;
-            for (int j=0;j<numPat;j++) {
-                if ((patterns[j][0] == loops[i][0])||
-                    (patterns[j][1] == loops[i][1])) {
-                    int diff1 = loops[i][0]-loops[i][1], diff2 = patterns[j][0]-patterns[j][1];
-                    if (abs(diff1)<abs(diff2)) {
-                        flag = true;
-                        string key = "p:"+to_string(patterns[j][0])+","+to_string(patterns[j][1]);
-                        constrain9.insert(variableIdx[key], 1);
-                    }
-                }
+            for (int j = startSegID; j < loops[i][0]; j++) {
+                flag = true;
+                string key = "p:"+to_string(j)+","+to_string(loops[i][1]);
+                constrain9.insert(variableIdx[key], 1);
+                key = "l:"+to_string(j)+","+to_string(loops[i][1]);
+                constrain9.insert(variableIdx[key], 1);
             }
-            for (int k=0;k<numLoop;k++) { // l(a,b) can be inserted into the middle of l(x2,y2)
-                if ((loops[k][0] == loops[i][0]) ||
-                    (loops[k][1] == loops[i][1])) {
-                    int diff1 = loops[i][0]-loops[i][1], diff2 = loops[k][0]-loops[k][1];
-                    if (abs(diff1)<abs(diff2)) {
-                        flag = true;
-                        string key = "l:"+to_string(loops[k][0])+","+to_string(loops[k][1]);
-                        constrain9.insert(variableIdx[key], scale);// scaling for copy number of small loop 
-                    }
-                }
+            for (int j = loops[i][1] + 1; j <= endSegID; j++) {
+                flag = true;
+                string key = "p:"+to_string(loops[i][0])+","+to_string(j);
+                constrain9.insert(variableIdx[key], 1);
+                key = "l:"+to_string(loops[i][0])+","+to_string(j);
+                constrain9.insert(variableIdx[key], 1);
             }
             if (flag) {
                 string key = "l:"+to_string(loops[i][0])+","+to_string(loops[i][1]);
@@ -4952,17 +4939,17 @@ void LocalGenomicMap::BFB_ILP_SC(const char *lpFn, vector<vector<int>> &patterns
         for (int i=0;i<numLoop;i++) {
             CoinPackedVector constrain10, constrain11;
             bool flag = false;
-            for (int j=0;j<numLoop;j++) {
-                if ((patterns[i][0] == loops[j][0]) ||
-                    (patterns[i][1] == loops[j][1])) {
-                    int diff1 = patterns[i][0]-patterns[i][1], diff2 = loops[j][0]-loops[j][1];
-                    if (abs(diff1)>abs(diff2)) {
-                        flag = true;
-                        string key = "l:"+to_string(loops[j][0])+","+to_string(loops[j][1]);
-                        constrain10.insert(variableIdx[key], 1);
-                        constrain11.insert(variableIdx[key], 1);
-                    }
-                }
+            for (int j = loops[i][0]; j < loops[i][1]; j++) {
+                flag = true;
+                string key = "l:"+to_string(loops[i][0])+","+to_string(j);
+                constrain10.insert(variableIdx[key], 1);
+                constrain11.insert(variableIdx[key], 1);
+            }
+            for (int j = loops[i][0] + 1; j <= loops[i][1]; j++) {
+                flag = true;
+                string key = "l:"+to_string(j)+","+to_string(loops[i][1]);
+                constrain10.insert(variableIdx[key], 1);
+                constrain11.insert(variableIdx[key], 1);
             }
             if (flag) {
                 string key = "l:"+to_string(patterns[i][0])+","+to_string(patterns[i][1]);
@@ -4985,27 +4972,19 @@ void LocalGenomicMap::BFB_ILP_SC(const char *lpFn, vector<vector<int>> &patterns
         for (int i=0;i<numPat;i++) {
             CoinPackedVector constrain10, constrain11;
             bool flag = false;
-            for (int j=0;j<numLoop;j++) {
-                if (patterns[i][0] == loops[j][0]) {
-                    int diff1 = patterns[i][0]-patterns[i][1], diff2 = loops[j][0]-loops[j][1];
-                    if (abs(diff1)>abs(diff2)) {
-                        flag = true;
-                        string key = "l:"+to_string(loops[j][0])+","+to_string(loops[j][1]);
-                        constrain10.insert(variableIdx[key], 1);
-                        key = "p:"+to_string(loops[j][0])+","+to_string(loops[j][1]);
-                        constrain11.insert(variableIdx[key], 1);
-                    }
-                }
-                else if (patterns[i][1] == loops[j][1]) {
-                    int diff1 = patterns[i][0]-patterns[i][1], diff2 = loops[j][0]-loops[j][1];
-                    if (abs(diff1)>abs(diff2)) {
-                        flag = true;
-                        string key = "p:"+to_string(loops[j][0])+","+to_string(loops[j][1]);
-                        constrain10.insert(variableIdx[key], 1);
-                        key = "l:"+to_string(loops[j][0])+","+to_string(loops[j][1]);
-                        constrain11.insert(variableIdx[key], 1);
-                    }
-                }
+            for (int j = patterns[i][0]; j < patterns[i][1]; j++) {
+                flag = true;
+                string key = "l:"+to_string(patterns[i][0])+","+to_string(j);
+                constrain10.insert(variableIdx[key], 1);
+                key = "p:"+to_string(patterns[i][0])+","+to_string(j);
+                constrain11.insert(variableIdx[key], 1);
+            }
+            for (int j = patterns[i][0] + 1; j <= patterns[i][1]; j++) {
+                flag = true;
+                string key = "p:"+to_string(j)+","+to_string(patterns[i][1]);
+                constrain10.insert(variableIdx[key], 1);
+                key = "l:"+to_string(j)+","+to_string(patterns[i][1]);
+                constrain11.insert(variableIdx[key], 1);
             }
             if (flag) {
                 string key = "p:"+to_string(patterns[i][0])+","+to_string(patterns[i][1]);
