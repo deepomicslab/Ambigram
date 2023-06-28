@@ -4137,12 +4137,12 @@ void LocalGenomicMap::translocationBFB(vector<VertexPath*> paths, VertexPath *re
                     if(pos1 == paths[id]->end()) break;
                     else pos.push_back(pos1);
                     auto pos2 = find(paths[id]->rbegin(), paths[id]->rend(), group[i+1]);
-                    if(pos2 == paths[id]->rend()) {
+                    if(pos2 == paths[id]->rend() || pos1 > pos2.base()) {
                         reverse(paths[id]->begin(), paths[id]->end());
                         for(auto iter = paths[id]->begin(); iter != paths[id]->end(); iter++) *iter = (*iter)->getComplementVertex();
                         pos2 = find(paths[id]->rbegin(), paths[id]->rend(), group[i+1]);
                     }
-                    if(pos2 == paths[id]->rend()) break;
+                    if(pos2 == paths[id]->rend() || pos1 > pos2.base()) break;
                     else pos.push_back(pos2.base()-1);
                 }
             }
@@ -4165,23 +4165,25 @@ void LocalGenomicMap::translocationBFB(vector<VertexPath*> paths, VertexPath *re
                         if(pos1 == paths[id]->end()) break;
                         else pos.push_back(pos1);
                         auto pos2 = find(paths[id]->rbegin(), paths[id]->rend(), group[i+1]);
-                        if(pos2 == paths[id]->rend()) {
+                        if(pos2 == paths[id]->rend() || pos1 > pos2.base()) {
                             reverse(paths[id]->begin(), paths[id]->end());
                             for(auto iter = paths[id]->begin(); iter != paths[id]->end(); iter++) *iter = (*iter)->getComplementVertex();
                             pos2 = find(paths[id]->rbegin(), paths[id]->rend(), group[i+1]);
                         }
-                        if(pos2 == paths[id]->rend()) break;
+                        if(pos2 == paths[id]->rend() || pos1 > pos2.base()) break;
                         else pos.push_back(pos2.base()-1);
                     }
                 }
                 pos.push_back(find(flag+1, res->end(), group.back()));
             }
             if(pos.size() < group.size() || pos.back() == res->end()) continue;
-            // for(auto p: pos) cout<<(*p)->getId()<<" ";
+            // this->printBFB(res);
+            // for(auto p: pos) cout<<(*p)->getInfo()<<" ";
             // cout<<endl;
             // insert with translocation
             VertexPath temp;
             for(int i = 1; i < pos.size()-1; i += 2) temp.insert(temp.end(), pos[i], pos[i+1]+1);
+            if(temp.empty()) continue;
             res->erase(pos.front()+1, pos.back());
             res->insert(pos.front()+1, temp.begin(), temp.end());
             startPos = find(res->begin(), res->end(), temp.back());
@@ -4282,7 +4284,8 @@ void LocalGenomicMap::insertBeforeBFB(Graph*& g, vector<string>& insChr, unorder
     cout<<"Seg conversion:\n";
     for(auto iter=segConversion.begin(); iter!=segConversion.end(); iter++) {
         cout<<iter->first<<"-"<<iter->second<<endl;
-        originalSegs.insert(pair<Segment*,Segment*>(mSegs[iter->second-1], segs[iter->first-1]));
+        if(iter->second > 0)
+            originalSegs.insert(pair<Segment*,Segment*>(mSegs[iter->second-1], segs[iter->first-1]));
     }
     delete g;
     g = new Graph(mSegs, mJuncs, mSources, mSinks);
@@ -4383,7 +4386,8 @@ void LocalGenomicMap::concatBeforeBFB(Graph*& g, vector<string>& conChr, unorder
     cout<<"Seg conversion:\n";
     for(auto iter=segConversion.begin(); iter!=segConversion.end(); iter++) {
         cout<<iter->first<<"-"<<iter->second<<endl;
-        originalSegs.insert(pair<Segment*,Segment*>(mSegs[iter->second-1], segs[iter->first-1]));
+        if(iter->second > 0)
+            originalSegs.insert(pair<Segment*,Segment*>(mSegs[iter->second-1], segs[iter->first-1]));
     }
     delete g;
     g = new Graph(mSegs, mJuncs, mSources, mSinks);
