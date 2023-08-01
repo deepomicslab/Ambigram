@@ -1,4 +1,5 @@
 # Ambigram
+[![DOI](https://zenodo.org/badge/442341093.svg)](https://zenodo.org/badge/latestdoi/442341093)
 
 Ambigram is a graph-based algorithm to reconstruct the BFB local haplotype during the evolution process. Ambigram currently supports general WGS sequencing (PE), 10X linked-reads (10x), PacBio SMRT (PB) and Oxford Nanopore (ONT).
 
