@@ -1,7 +1,7 @@
 # Ambigram
 [![DOI](https://zenodo.org/badge/442341093.svg)](https://zenodo.org/badge/latestdoi/442341093)
 
-Ambigram is a graph-based algorithm to reconstruct the BFB local haplotype during the evolution process. Ambigram currently supports general WGS sequencing (PE), 10X linked-reads (10x), PacBio SMRT (PB) and Oxford Nanopore (ONT).
+Ambigram is a graph-based algorithm to reconstruct the local genomic map of BFB during the evolution process. Ambigram currently supports general WGS sequencing (PE), 10X linked-reads (10x), PacBio SMRT (PB), and Oxford Nanopore (ONT). Please check our Nature Communications paper [Deciphering complex breakage-fusion-bridge genome rearrangements with Ambigram](https://doi.org/10.1038/s41467-023-41259-w) for details.
 
 ### Prerequisites
 - [Cbc](https://github.com/coin-or/Cbc) solves integer linear programming.
@@ -220,3 +220,17 @@ Should you have any queries, please feel free to contact us by <chaohuili3-c@my.
 
 ## License
 This project is licensed under the MIT License - see the [LICENSE.txt](./LICENSE.txt) file for details
+
+## Citation
+```
+@article{li2023deciphering,
+  title={Deciphering complex breakage-fusion-bridge genome rearrangements with Ambigram},
+  author={Li, Chaohui and Chen, Lingxi and Pan, Guangze and Zhang, Wenqian and Li, Shuai Cheng},
+  journal={Nature Communications},
+  volume={14},
+  number={1},
+  pages={5528},
+  year={2023},
+  publisher={Nature Publishing Group UK London}
+}
+```
