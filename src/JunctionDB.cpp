@@ -35,7 +35,7 @@ JunctionDB::JunctionDB(vector<Junction *> &junctions) {
     mRecords = new vector<Record *>();
     mRecordUUID = new vector<string>();
     for (Junction *junc: junctions) {
-        if (junc->getWeight() > 0) {
+        if (junc->getWeight()->getCopyNum() > 0) {
             string chrom5p = junc->getSource()->getChrom(),
                 chrom3p = junc->getTarget()->getChrom();
             char strand5p = junc->getSourceDir(), 
